@@ -50,7 +50,7 @@ export default function ComudeDetalleClient({ id }: { id: string }) {
   }
 
   return (
-    <div className="h-full w-full max-w-6xl mx-auto flex flex-col relative bg-white dark:bg-zinc-950 shadow-sm border border-border/40 sm:my-6 sm:rounded-2xl overflow-hidden min-h-[70vh]">
+    <div className="w-full flex-1 flex flex-col relative min-h-[calc(100vh-100px)]">
       <DetalleActividadView 
         actividad={actividad} 
         userId={user?.id} 

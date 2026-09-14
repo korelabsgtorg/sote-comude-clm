@@ -87,19 +87,12 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative flex flex-col items-center justify-center px-4 py-6 sm:p-10 lg:p-14 bg-white/80 dark:bg-black/40 backdrop-blur-2xl rounded-[2rem] sm:rounded-[2.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] text-center w-full sm:w-[90%] max-w-none mx-auto transition-all group"
+      className="relative flex flex-col items-center justify-center px-4 pt-0 pb-2 sm:px-10 lg:px-14 sm:pt-0 sm:pb-4 lg:pt-0 lg:pb-6 text-center w-full max-w-none mx-auto transition-all group"
     >
-      {/* Decorative gradient orb */}
-      <div className="absolute inset-0 overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] pointer-events-none -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-gradient-to-b from-celeste-trifinio/20 to-transparent blur-3xl" />
-      </div>
 
 
-      <h2 className="text-[22px] sm:text-3xl lg:text-5xl font-black text-azul-trifinio dark:text-white mb-4 sm:mb-6 tracking-tight">
-        ¡Bienvenido a <span className="text-transparent bg-clip-text bg-gradient-to-r from-azul-trifinio to-celeste-trifinio">SOTE-COMUDE</span>!
-      </h2>
 
-      {/* Actividades COMUDE */}
+
       <div className="w-full text-left">
         <GestorActividades userId={user?.id} effectiveRole={effectiveRole} />
       </div>
@@ -160,17 +153,17 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
           className="fixed top-0 left-0 w-full h-[65vh] flex justify-center items-center z-[5] pt-16 pb-[140px]"
           style={{ y: logoY, opacity: logoOpacity }}
         >
-          <div className="relative flex justify-center items-center w-full px-8 lg:px-12">
-            <div className="w-full sm:w-[90%] max-w-[min(100%,1600px)] mx-auto">
+          <div className="relative flex justify-center items-center w-full px-4 sm:px-8">
+            <div className="w-full sm:w-auto max-w-[800px] mx-auto">
               <LogoTrifinio />
             </div>
           </div>
         </motion.div>
 
         <div className="relative z-10 w-full mt-[65vh]">
-          <div className="relative w-full bg-muted dark:bg-muted rounded-t-[3rem] px-8 lg:px-12 pt-10 pb-20">
+          <div className="relative w-full bg-muted dark:bg-muted rounded-t-[3rem] px-8 lg:px-12 pt-4 pb-20">
             <div className={cn("absolute inset-0 rounded-t-[3rem]", DASHBOARD_DOTTED_BG_CLASS)} />
-            <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto -mt-[140px] pb-2">
+            <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto pt-0 pb-2">
               <CardsGrid />
             </div>
           </div>

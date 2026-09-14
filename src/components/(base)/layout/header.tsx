@@ -53,10 +53,11 @@ export default function Header() {
       {/* Spacer para compensar el header fijo + safe area */}
       <div
         aria-hidden
-        className={`shrink-0 pointer-events-none transition-[height] duration-200 md:h-16 ${
-          showBreadcrumb ? "h-28" : "h-14"
+        className={`shrink-0 pointer-events-none transition-[height] duration-200 ${
+          showBreadcrumb 
+            ? "h-[calc(6.5rem+env(safe-area-inset-top))] md:h-[calc(3.5rem+env(safe-area-inset-top))]" 
+            : "h-[calc(3rem+env(safe-area-inset-top))] md:h-[calc(3.5rem+env(safe-area-inset-top))]"
         }`}
-        style={{ height: `calc(${showBreadcrumb ? "7rem" : "3.5rem"} + env(safe-area-inset-top))` }}
       />
       <header 
         className="w-full fixed top-0 left-0 transition-all bg-card border-b border-border/40 z-[100] shadow-sm"
@@ -65,7 +66,7 @@ export default function Header() {
         <div style={{ height: "env(safe-area-inset-top)" }} />
         {/* Contenido del nav */}
         <div 
-          className="mx-auto flex h-14 md:h-16 items-center justify-between px-4 md:px-8 gap-4"
+          className="mx-auto flex h-12 md:h-14 items-center justify-between px-4 md:px-8 gap-4"
         >
           <div className="flex items-center h-full">
             <div className="flex items-center shrink-0">
@@ -81,7 +82,7 @@ export default function Header() {
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="text-lg md:text-4xl font-extrabold tracking-tighter leading-tight md:leading-none text-azul-trifinio dark:text-white transition-transform duration-300 group-hover:scale-105 origin-left"
+                      className="text-base md:text-2xl font-extrabold tracking-tighter leading-tight md:leading-none text-azul-trifinio dark:text-white transition-transform duration-300 group-hover:scale-105 origin-left"
                     >
                       SOTE<span className="hidden sm:inline">-</span><br className="block sm:hidden" />COMUDE
                     </motion.h1>
@@ -89,7 +90,7 @@ export default function Header() {
                       initial={{ opacity: 0, clipPath: "inset(0 100% 0 0)" }}
                       animate={{ opacity: 1, clipPath: "inset(0 0 0 0)" }}
                       transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 1, 0.5, 1] }}
-                      className="hidden md:block text-xs md:text-sm font-black uppercase tracking-widest leading-[1.15] md:leading-[1.15] text-celeste-trifinio border-l border-border/60 pl-2 md:pl-3 transition-transform duration-300 group-hover:scale-[1.02] origin-left group-hover:text-azul-trifinio dark:group-hover:text-[#FFFDD0]"
+                      className="hidden md:block text-[9px] md:text-[10px] font-black uppercase tracking-widest leading-[1.15] md:leading-[1.15] text-celeste-trifinio border-l border-border/60 pl-2 md:pl-3 transition-transform duration-300 group-hover:scale-[1.02] origin-left group-hover:text-azul-trifinio dark:group-hover:text-[#FFFDD0]"
                     >
                       SISTEMA DE ORGANIZACIÓN<br />TERRITORIAL ESTRATÉGICA
                     </motion.div>
@@ -188,7 +189,7 @@ export default function Header() {
 
       {showBreadcrumb && (
         <div 
-          style={{ top: 'calc(var(--banner-height, 0px) + 3.5rem + env(safe-area-inset-top))' }}
+          style={{ top: 'calc(var(--banner-height, 0px) + 3rem + env(safe-area-inset-top))' }}
           className="fixed left-0 md:hidden w-full pl-4 pr-3 py-1 min-h-[var(--mobile-breadcrumb-height)] flex items-center justify-between gap-3 bg-card border-b border-border/30 shadow-sm z-[105]"
         >
           <div className="shrink-0">

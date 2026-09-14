@@ -1,5 +1,7 @@
 "use client";
-
+import { domToJpeg } from 'modern-screenshot';
+import jsPDF from 'jspdf';
+import { format } from 'date-fns';
 import { useEffect, useState, useRef } from "react";
 import { compressImageFile, isAllowedImageType, generateStoragePath } from "@/components/(uploads)/imgs/constants";
 import Link from "next/link";
@@ -23,10 +25,12 @@ import {
   Upload,
   ImagePlus,
   MoreVertical,
+  Info,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActComudeConParticipantes, ActComudeRegistro } from "./lib/zod";
-import { useRegistrarAsistencia, useRegistrosAsistencia, useActualizarAgenda, useEliminarActividad, useActualizarActa, useActualizarImagenesActividad, useSignedUrl } from "./lib/hooks";
+import { useRegistrarAsistencia, useRegistrosAsistencia, useActualizarAgenda, useEliminarActividad, useActualizarActa, useActualizarImagenesActividad, useSignedUrl, useActualizarEstadoSesion } from "./lib/hooks";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import DetalleUbicacionModal from "./modals/DetalleUbicacionModal";
@@ -44,6 +48,8 @@ import {
 import dynamic from "next/dynamic";
 
 const ActaVisorModal = dynamic(() => import("./modals/ActaVisorModal"), { ssr: false });
+const ComudePdfModal = dynamic(() => import("./modals/ComudePdfModal"), { ssr: false });
+import TablaPuntosAgenda, { ContadoresEstado } from "./TablaPuntosAgenda";
 import { useConfiguracionMunicipio } from "@/components/(base)/(settings)/municipio/hooks";
 import { createClient } from "@/utils/supabase/client";
 
@@ -157,6 +163,27 @@ function formatHora(isoStr: string) {
   return `${h}:${m} ${ampm}`;
 }
 
+function formatFechaCompleta(fechaStr: string) {
+  const fecha = new Date(fechaStr);
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const diaName = dias[fecha.getDay()];
+  const d = fecha.getDate().toString().padStart(2, "0");
+  const m = (fecha.getMonth() + 1).toString().padStart(2, "0");
+  const y = fecha.getFullYear().toString().slice(-2);
+  let hours = fecha.getHours();
+  const minutes = fecha.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${diaName} ${d}/${m}/${y} a las ${hours}:${minutes} ${ampm}`;
+}
+
+function formatFechaCorto(isoStr: string) {
+  const fecha = new Date(isoStr);
+  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  return `${dias[fecha.getDay()]} ${fecha.getDate()} de ${meses[fecha.getMonth()]}, ${fecha.getFullYear()}`;
+}
+
 function calcDuracion(entrada: string, salida: string) {
   const diff = (new Date(salida).getTime() - new Date(entrada).getTime()) / 1000 / 60;
   if (diff < 0) return "--";
@@ -212,7 +239,7 @@ function ParticipanteRow({
 
   return (
     <div className={cn(
-      "flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 sm:px-4 py-3 rounded-xl bg-muted/40",
+      "flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1.5 sm:px-4 py-3 rounded-xl bg-muted/40",
       esElUsuario ? "border-2 border-azul-trifinio shadow-none" : "border border-border/40"
     )}>
       {/* Info de la persona */}
@@ -229,7 +256,7 @@ function ParticipanteRow({
       <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto mt-1 sm:mt-0 gap-2 sm:gap-6">
         <div className="flex justify-between sm:justify-center w-full sm:w-auto sm:gap-6 text-xs text-muted-foreground">
           {(!regEntrada && !regSalida) ? (
-            <span className="text-muted-foreground/70 italic sm:mr-4">Sin registros de asistencia</span>
+            <span className="text-muted-foreground dark:text-gray-400 italic sm:mr-4">Sin registros de asistencia</span>
           ) : (
             <>
               <div className="flex flex-col items-center sm:flex-row sm:gap-1.5">
@@ -250,8 +277,8 @@ function ParticipanteRow({
           )}
         </div>
 
-        {/* Enlace de ubicación al gestor */}
-        {puedeGestionar && (regEntrada || regSalida) && (
+        {/* Enlace de ubicación */}
+        {(puedeGestionar || esElUsuario) && (regEntrada || regSalida) && (
           <button
             onClick={onVerMapa}
             title="Ver ubicación"
@@ -318,11 +345,52 @@ export default function DetalleActividadView({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isActaVisorOpen, setIsActaVisorOpen] = useState(false);
   const [actaUrlToView, setActaUrlToView] = useState<string | null>(null);
+  
+  // Nuevo Punto Modal
+  const [isNuevoPuntoModalOpen, setIsNuevoPuntoModalOpen] = useState(false);
   const [isGenerandoUrl, setIsGenerandoUrl] = useState(false);
+
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [evidenciaSignedUrls, setEvidenciaSignedUrls] = useState<string[]>([]);
+  const [isCargandoPdfData, setIsCargandoPdfData] = useState(false);
+
+  const handleGeneratePdf = async () => {
+    setIsCargandoPdfData(true);
+    try {
+      const urls: string[] = [];
+      if (actividad?.img && actividad.img.length > 0) {
+        const supabase = createClient();
+        for (const path of actividad.img) {
+          if (path.startsWith("http")) {
+            urls.push(path);
+          } else {
+            const { data } = await supabase.storage.from("portada_imagenes").createSignedUrl(path, 60 * 60);
+            if (data?.signedUrl) urls.push(data.signedUrl);
+          }
+        }
+      }
+      setEvidenciaSignedUrls(urls);
+      setIsPdfModalOpen(true);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al preparar imágenes para el PDF");
+      setIsPdfModalOpen(true);
+    } finally {
+      setIsCargandoPdfData(false);
+    }
+  };
+
+  // Filtro de estado para la tabla de agenda
+  const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
+  const actaFileInputRef = useRef<HTMLInputElement>(null);
   
   const isOpen = !!actividad;
   
-  const puedeGestionarFotos = effectiveRole === "super" || effectiveRole === "admin";
+  const esFinalizada = actividad?.estado === "Finalizada";
+  // Super usuario puede gestionar siempre; Admin solo si no está finalizada.
+  const puedeGestionarAgenda = effectiveRole === "super" || (puedeGestionar && !esFinalizada);
+  
+  const puedeGestionarFotos = effectiveRole === "super" || (puedeGestionar && !esFinalizada);
   
   const isPastDate = (() => {
     if (!actividad?.fecha) return false;
@@ -333,7 +401,7 @@ export default function DetalleActividadView({
     return actDate < today;
   })();
 
-  const canManageActive = puedeGestionar && !isPastDate;
+  const canManageActive = puedeGestionarAgenda && !isPastDate;
   
   // Estado para la justificación de asistencia tardía
   const { data: municipioSettings } = useConfiguracionMunicipio(actividad?.municipio_id);
@@ -351,6 +419,78 @@ export default function DetalleActividadView({
   const { mutateAsync: actualizarAgenda, isPending: isUpdatingAgenda } = useActualizarAgenda();
   const { mutateAsync: actualizarActa, isPending: isUploadingActa } = useActualizarActa();
   const { mutateAsync: actualizarImagenes, isPending: isUploadingImg } = useActualizarImagenesActividad();
+  const { mutateAsync: actualizarEstado, isPending: isUpdatingEstado } = useActualizarEstadoSesion();
+
+  // ── Helpers para el botón de estado de sesión ──────────────────────────────
+  const getEstadoBotonLabel = () => {
+    const estado = actividad?.estado;
+    if (estado === "Programada" || !estado) return "Se apertura el COMUDE";
+    if (estado === "En progreso") return "Finalizar COMUDE";
+    if (estado === "Finalizada") {
+      if (effectiveRole === "super") return "COMUDE Finalizado";
+      return "COMUDE Finalizado"; // Show it as a status for everyone (we will handle clickability)
+    }
+    return null;
+  };
+
+  const getEstadoBotonStyle = () => {
+    const estado = actividad?.estado;
+    if (estado === "Programada" || !estado) return "bg-green-500 hover:bg-green-600 text-white cursor-pointer";
+    if (estado === "En progreso") return "bg-blue-500 hover:bg-blue-600 text-white cursor-pointer";
+    if (estado === "Finalizada") return "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-default shadow-none border border-zinc-300 dark:border-zinc-700";
+    return "";
+  };
+
+  const handleActualizarEstado = async () => {
+    if (!actividad) return;
+    const estado = actividad.estado;
+    if (estado === "Finalizada") return;
+
+    let nuevoEstado: "Programada" | "En progreso" | "Finalizada" = "Programada";
+    let mensajeHtml = "";
+
+    if (estado === "Programada" || !estado) {
+      nuevoEstado = "En progreso";
+      mensajeHtml = `¿Está seguro de aperturar el COMUDE?<br/><br/><span style="font-size:0.9em;color:#666;">Se habilitará el registro de asistencia.</span>`;
+    } else if (estado === "En progreso") {
+      nuevoEstado = "Finalizada";
+      mensajeHtml = `
+        <div style="text-align: left;">
+          <p>¿Está seguro de que deseas finalizar el COMUDE?</p>
+          <br/>
+          <p style="color: #c2410c; font-weight: bold; border: 1px solid #c2410c; padding: 10px; border-radius: 6px; font-size: 0.95em; text-align: justify;">
+            ⚠️ ADVERTENCIA: Una vez finalizado, no será posible editar ni eliminar información del COMUDE, ni registrar nuevas asistencias.
+          </p>
+        </div>
+      `;
+    } else {
+      return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+      title: "Confirmar acción",
+      html: mensajeHtml,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Continuar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (isConfirmed) {
+      try {
+        await actualizarEstado({ actComudeId: actividad.id, nuevoEstado });
+        if (nuevoEstado === "En progreso") {
+          toast.success(estado === "Finalizada" ? "COMUDE reaperturado." : "COMUDE aperturado correctamente.");
+        } else {
+          toast.success("COMUDE finalizado correctamente.");
+        }
+      } catch {
+        toast.error("Error al actualizar el estado del COMUDE.");
+      }
+    }
+  };
   
   const handleCargarActa = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -379,7 +519,8 @@ export default function DetalleActividadView({
   };
 
   const handleEliminarActa = async () => {
-    if (!actividad || !actividad.actas) return;
+    const primerActa = actividad?.acta?.[0];
+    if (!actividad || !primerActa) return;
 
     const result = await Swal.fire({
       title: '¿Eliminar Acta?',
@@ -397,7 +538,7 @@ export default function DetalleActividadView({
         const supabase = createClient();
         
         // Si no es una URL pública, extraer la ruta (como se guarda ahora)
-        let filePath = actividad.actas;
+        let filePath = primerActa;
         if (filePath.startsWith('http')) {
           const parts = filePath.split('/');
           filePath = parts[parts.length - 1]; // Extraer solo el nombre de archivo
@@ -526,6 +667,10 @@ export default function DetalleActividadView({
       toast.success(tipo === "entrada" ? "✅ Entrada registrada" : "👋 Salida registrada");
       setShowJustificationModal(false);
       setPendingTipoRegistro(null);
+      
+      if (tipo === "entrada") {
+        setActiveTab("agenda");
+      }
     } catch (err: unknown) {
       if (err instanceof GeolocationPositionError) {
         if (err.code === err.PERMISSION_DENIED) toast.error("Se necesita permiso de ubicación.");
@@ -656,8 +801,8 @@ export default function DetalleActividadView({
     if (!actividad) return;
 
     const result = await Swal.fire({
-      title: '¿Eliminar COMUDE?',
-      text: `Se eliminará permanentemente la actividad "${actividad.nombre}". Esta acción no se puede deshacer.`,
+      title: "Eliminar Actividad",
+      text: `Se eliminará permanentemente la actividad "${actividad.detalles_sesion?.titulo || "Sin título"}". Esta acción no se puede deshacer.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -677,362 +822,253 @@ export default function DetalleActividadView({
     }
   };
 
+
+
   if (!mounted || !actividad) return null;
 
   const hoy = esHoy(actividad.fecha);
   const isMuyTemprano = municipioSettings 
     ? Date.now() < new Date(actividad.fecha).getTime() - ((municipioSettings.minutos_antes_permitidos ?? 0) * 60000)
     : false;
-  const encargados = actividad.act_comude_participantes.filter((p) => p.encargado);
-  const integrantes = actividad.act_comude_participantes.filter((p) => !p.encargado);
+  const encargados = actividad.act_comude_participantes.filter((p) => p.encargado && p.usuario_id !== userId);
+  const integrantes = actividad.act_comude_participantes.filter((p) => !p.encargado && p.usuario_id !== userId);
   const participanteYo = actividad.act_comude_participantes.find((p) => p.usuario_id === userId);
+  const regEntradaYo = registros.find((r) => r.usuario_id === userId && r.tipo_registro === "entrada");
 
   const content = (
-    <div className="w-full flex flex-col h-full bg-white dark:bg-zinc-950">
-      {/* Header */}
-      <div className="px-6 py-4 sm:py-5 border-b border-border/50 shrink-0">
-        <div className="flex items-start justify-between">
-          {/* Main info container */}
-          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 w-full">
-            
-            {/* Top bar on mobile (Back + Actions) / Back button on desktop */}
-            <div className="flex items-center justify-between w-full sm:w-auto relative">
-              <div className="flex items-center shrink-0 z-10">
-                <button
-                  onClick={onClose}
-                  className="p-2 sm:mt-1 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground rounded-full transition-colors shrink-0"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-              </div>
+    <div className="w-full flex flex-col flex-1 bg-white/70 dark:bg-white/5 backdrop-blur-md">
+      {/* Top Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-6 py-3 border-b border-border/50 border-dashed bg-muted/10 gap-3 sm:gap-0">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-azul-trifinio font-medium hover:underline text-sm w-fit"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Volver
+        </button>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Botón aperturar/finalizar COMUDE */}
+          {puedeGestionarAgenda && (() => {
+            const label = getEstadoBotonLabel();
+            const style = getEstadoBotonStyle();
+            if (!label || !style) return null;
+            return (
+              <button
+                onClick={handleActualizarEstado}
+                disabled={isUpdatingEstado}
+                className={`px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-60 flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2 ${style}`}
+              >
+                {isUpdatingEstado && <Loader2 className="w-4 h-4 animate-spin" />}
+                {label}
+              </button>
+            );
+          })()}
 
-              {/* Botón de Acta (Mobile Only, Centrado Absoluto) */}
-              <div className="flex sm:hidden absolute inset-0 items-center justify-center pointer-events-none z-10">
-                <div className="pointer-events-auto">
-                  {actividad.actas ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={handleVerActa}
-                        disabled={isGenerandoUrl}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                      >
-                        {isGenerandoUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                        Ver acta
-                      </button>
-                    </div>
-                  ) : ((effectiveRole === "super" || effectiveRole === "admin") && (
-                    <label className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-sm font-bold cursor-pointer shadow-md transition-all active:scale-95">
-                      {isUploadingActa ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                      Cargar acta
-                      <input type="file" accept="application/pdf" className="hidden" onChange={handleCargarActa} disabled={isUploadingActa} />
-                    </label>
-                  ))}
-                </div>
-              </div>
+          {/* Ver Acta / Subir Acta */}
+          {actividad.acta && actividad.acta.length > 0 ? (
+            <button 
+              onClick={async () => {
+                const filePath = actividad.acta![0];
+                if (filePath.startsWith('http')) {
+                  setActaUrlToView(filePath);
+                  setIsActaVisorOpen(true);
+                  return;
+                }
+                setIsGenerandoUrl(true);
+                try {
+                  const supabase = createClient();
+                  const { data, error } = await supabase.storage.from("actas").createSignedUrl(filePath, 60 * 60);
+                  if (error) throw error;
+                  if (data?.signedUrl) {
+                    setActaUrlToView(data.signedUrl);
+                    setIsActaVisorOpen(true);
+                  }
+                } catch (e) {
+                  toast.error("No se pudo obtener el archivo");
+                } finally {
+                  setIsGenerandoUrl(false);
+                }
+              }}
+              disabled={isGenerandoUrl}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+            >
+              {isGenerandoUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Ver Acta
+            </button>
+          ) : puedeGestionarAgenda ? (
+            <button 
+              onClick={() => actaFileInputRef.current?.click()}
+              disabled={isUploadingActa}
+              className="bg-zinc-800 dark:bg-white dark:text-black hover:bg-zinc-700 hover:dark:bg-gray-200 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+            >
+              {isUploadingActa ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Subir Acta
+            </button>
+          ) : null}
 
-              {/* Acciones de gestión (Mobile Only) */}
-              <div className="flex sm:hidden items-center gap-2 shrink-0 z-10">
-                {puedeGestionar && (
-                  <>
-                    <button
-                      onClick={() => setIsEditModalOpen(true)}
-                      className="p-2 bg-muted/30 hover:bg-azul-trifinio/10 text-muted-foreground hover:text-azul-trifinio rounded-xl transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleEliminarActividad}
-                      className="p-2 bg-muted/30 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            {/* Title & Meta */}
-            <div className="w-full">
-              <h2 className="text-lg sm:text-2xl leading-tight font-bold text-azul-trifinio dark:text-white uppercase pr-2 sm:pr-0">
-                {actividad.nombre}
-              </h2>
-              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                <div className="bg-muted/80 dark:bg-muted/30 rounded-full px-2.5 py-1 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                  <CalendarDays className="w-3.5 h-3.5" />
-                  {formatFecha(actividad.fecha)}
-                </div>
-                {hoy && (
-                  <span className="text-[10px] font-bold uppercase tracking-widest bg-azul-trifinio text-white px-2 py-0.5 rounded-full">
-                    Hoy
-                  </span>
-                )}
-              </div>
-            </div>
+          <input 
+            type="file" 
+            ref={actaFileInputRef} 
+            className="hidden" 
+            accept="application/pdf" 
+            onChange={handleCargarActa} 
+          />
+
+          {actividad.estado === "Finalizada" ? (
+            <button 
+              onClick={handleGeneratePdf} 
+              disabled={isCargandoPdfData}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+            >
+              {isCargandoPdfData ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Generar PDF
+            </button>
+          ) : puedeGestionarAgenda ? (
+            <button 
+              onClick={() => setIsNuevoPuntoModalOpen(true)}
+              className="bg-purple-500 hover:bg-purple-600 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+            >
+              Nuevo Punto a tratar
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Banner Superior: Mi Asistencia o Alerta */}
+      <div className="px-3 sm:px-6 py-3">
+        {participanteYo && (regEntradaYo || actividad.estado === "En progreso" || actividad.estado === "Finalizada") ? (
+          <div>
+            <p className="text-xs font-bold text-muted-foreground dark:text-gray-300 uppercase tracking-widest mb-2">
+              Mi Asistencia
+            </p>
+            <ParticipanteRow
+              participante={participanteYo}
+              registros={registros}
+              userId={userId}
+              esActividadHoy={hoy}
+              puedeGestionar={canManageActive}
+              onRegistrar={handleRegistrar}
+              cargandoGPS={cargandoGPS}
+              isMuyTemprano={isMuyTemprano}
+              isPastDate={isPastDate}
+              onVerMapa={() => setParticipanteMapa({
+                nombre: participanteYo.profiles?.nombre || "Sin nombre",
+                entrada: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "entrada") || null,
+                salida: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "salida") || null
+              })}
+            />
           </div>
+        ) : (
+          <div className="bg-[#fff8cc] dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-sm border border-[#ffe066] dark:border-yellow-700/50 p-2.5 rounded-sm flex items-center gap-2 font-medium">
+            <Info className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+            La asistencia se podrá marcar {municipioSettings?.minutos_antes_permitidos ?? 15} mins. antes de iniciar
+          </div>
+        )}
+      </div>
 
-          {/* Acciones y Acta (Desktop Only) */}
-          <div className="hidden sm:flex flex-row items-center gap-3 shrink-0 ml-4 mt-1">
-            {/* Botón de Acta (Primero) */}
-            <div>
-              {actividad.actas ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleVerActa}
-                    disabled={isGenerandoUrl}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                  >
-                    {isGenerandoUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                    Ver acta
-                  </button>
-                </div>
-              ) : ((effectiveRole === "super" || effectiveRole === "admin") && (
-                <label className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-sm font-bold cursor-pointer shadow-md transition-all active:scale-95">
-                  {isUploadingActa ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  Cargar acta
-                  <input type="file" accept="application/pdf" className="hidden" onChange={handleCargarActa} disabled={isUploadingActa} />
-                </label>
-              ))}
-            </div>
+      {/* Header Info */}
+      <div className="px-3 sm:px-6 py-4 grid grid-cols-2 gap-4">
+        {/* Col 1 */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+              Agenda COMUDE:
+            </h2>
+            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight">
+              {actividad.detalles_sesion?.titulo || "Sin título"}
+            </p>
+          </div>
+          <div>
+            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+              Información:
+            </h2>
+            <p className="text-foreground dark:text-white font-bold text-[15px] uppercase leading-tight">
+              {actividad.detalles_sesion?.acta ? `ACTA ${actividad.detalles_sesion.acta}` : ""}
+              {actividad.detalles_sesion?.acta && actividad.detalles_sesion?.libro ? ", " : ""}
+              {actividad.detalles_sesion?.libro ? `LIBRO ${actividad.detalles_sesion.libro}` : ""}
+              {!actividad.detalles_sesion?.acta && !actividad.detalles_sesion?.libro ? "Sin lugar definido" : ""}
+            </p>
+          </div>
+        </div>
 
-            {/* Divisor vertical si hay botones de gestión */}
-            {puedeGestionar && <div className="w-px h-6 bg-border/60 mx-1"></div>}
-
-            {/* Acciones de gestión */}
-            {puedeGestionar && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="p-2 bg-muted/30 hover:bg-azul-trifinio/10 text-muted-foreground hover:text-azul-trifinio rounded-xl transition-colors"
-                  title="Editar actividad"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleEliminarActividad}
-                  className="p-2 bg-muted/30 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition-colors"
-                  title="Eliminar actividad"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+        {/* Col 2 */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+              Fecha:
+            </h2>
+            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight capitalize">
+              {formatFechaCorto(actividad.fecha)}
+            </p>
+          </div>
+          <div>
+            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+              Hora:
+            </h2>
+            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight uppercase">
+              {formatHora(actividad.fecha)}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex justify-center sm:justify-start px-4 sm:px-6 border-b border-border/50 bg-muted/10">
-        <button
-          onClick={() => setActiveTab("agenda")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
-            activeTab === "agenda" 
-              ? "border-azul-trifinio text-azul-trifinio bg-white dark:bg-black/20" 
-              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          )}
-        >
-          <ListTodo className="w-4 h-4" />
-          Agenda
-        </button>
-        <button
-          onClick={() => setActiveTab("participantes")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
-            activeTab === "participantes" 
-              ? "border-azul-trifinio text-azul-trifinio bg-white dark:bg-black/20" 
-              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          )}
-        >
-          <Users className="w-4 h-4" />
-          Participantes
-        </button>
+      <div className="flex flex-col sm:flex-row items-center justify-between px-3 sm:px-6 border-b border-border/50 bg-muted/10">
+        <div className="flex w-full sm:w-auto justify-center sm:justify-start">
+          <button
+            onClick={() => setActiveTab("agenda")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
+              activeTab === "agenda" 
+                ? "border-azul-trifinio text-azul-trifinio" 
+                : "border-transparent text-muted-foreground dark:text-gray-300 hover:text-foreground dark:hover:text-white hover:bg-muted/30"
+            )}
+          >
+            <ListTodo className="w-4 h-4" />
+            Agenda
+          </button>
+          <button
+            onClick={() => setActiveTab("participantes")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
+              activeTab === "participantes" 
+                ? "border-azul-trifinio text-azul-trifinio" 
+                : "border-transparent text-muted-foreground dark:text-gray-300 hover:text-foreground dark:hover:text-white hover:bg-muted/30"
+            )}
+          >
+            <Users className="w-4 h-4" />
+            Participantes
+          </button>
+        </div>
+        
+        {/* ContadoresEstado (solo se ven si estamos en la pestaña Agenda) */}
+        {activeTab === "agenda" && (
+          <div className="hidden sm:flex w-full sm:w-auto justify-center sm:justify-end border-t sm:border-t-0 border-border/50 sm:border-none py-2 sm:py-0">
+            <ContadoresEstado 
+              puntos={actividad.act_comude_puntos ?? []} 
+              filtroEstado={filtroEstado}
+              onFiltroChange={setFiltroEstado}
+            />
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-24 sm:pb-8">
         
         {activeTab === "agenda" && (
-          <div className="px-3 sm:px-6 py-4">
-            
-            {/* Control personal de asistencia */}
-            {participanteYo && (
-              <div className="mb-8 border-b border-border/50 pb-6">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
-                  Mi Asistencia
-                </p>
-                <ParticipanteRow
-                  participante={participanteYo}
-                  registros={registros}
-                  userId={userId}
-                  esActividadHoy={hoy}
-                  puedeGestionar={canManageActive}
-                  onRegistrar={handleRegistrar}
-                  cargandoGPS={cargandoGPS}
-                  isMuyTemprano={isMuyTemprano}
-                  isPastDate={isPastDate}
-                  onVerMapa={() => setParticipanteMapa({
-                    nombre: participanteYo.profiles?.nombre || "Sin nombre",
-                    entrada: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "entrada") || null,
-                    salida: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "salida") || null
-                  })}
+          <div className="px-1 sm:px-6 py-4">
 
-                />
-              </div>
-            )}
-
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
-              Agenda
-            </p>
-
-            {/* Tabla de agenda */}
-            <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
-              {/* Encabezado */}
-              <div className="grid grid-cols-[40px_32px_1fr_auto] items-center gap-0 bg-muted/60 border-b border-border/50 px-3 py-2">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide text-center">#</span>
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide text-center">✓</span>
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide pl-2">Punto</span>
-                {canManageActive && <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide text-center w-16">Acciones</span>}
-              </div>
-
-              {optimisticAgenda && optimisticAgenda.length > 0 ? (
-                <div className="divide-y divide-border/30">
-                  {optimisticAgenda.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "grid grid-cols-[40px_32px_1fr_auto] items-center gap-0 px-3 py-2.5 transition-colors",
-                        idx % 2 === 0 ? "bg-background/60" : "bg-muted/20"
-                      )}
-                    >
-                      {/* # */}
-                      <span className="text-xs font-semibold text-muted-foreground text-center">{idx + 1}</span>
-
-                      {/* Checkbox */}
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleToggleAgenda(item.id)}
-                          disabled={!canManageActive}
-                          className={cn(
-                            "shrink-0 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-200",
-                            item.completado
-                              ? "bg-green-500 border-green-500 text-white"
-                              : "border-muted-foreground/40 hover:border-azul-trifinio text-transparent",
-                            !isUpdatingAgenda && canManageActive && "hover:scale-110 active:scale-90"
-                          )}
-                        >
-                          <Check className={cn("w-3 h-3 transition-all duration-300", item.completado ? "scale-100 opacity-100" : "scale-50 opacity-0")} />
-                        </button>
-                      </div>
-
-                      {/* Título / Editor */}
-                      <div className="pl-2 min-w-0">
-                        {editandoPuntoId === item.id ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={textoEdicion}
-                              onChange={(e) => setTextoEdicion(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") { e.preventDefault(); handleGuardarEdicion(item.id); }
-                                if (e.key === "Escape") { setEditandoPuntoId(null); }
-                              }}
-                              className="flex-1 bg-muted/40 border border-border/50 text-sm rounded px-2 py-1 outline-none focus:ring-1 focus:ring-azul-trifinio/50 focus:border-azul-trifinio"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleGuardarEdicion(item.id)}
-                              disabled={!textoEdicion.trim() || isUpdatingAgenda}
-                              className="text-xs bg-azul-trifinio text-white px-2 rounded font-medium hover:bg-azul-trifinio/90 shrink-0"
-                            >Guardar</button>
-                            <button
-                              onClick={() => setEditandoPuntoId(null)}
-                              className="text-xs bg-muted text-muted-foreground px-2 rounded hover:bg-muted/80 shrink-0"
-                            >Cancelar</button>
-                          </div>
-                        ) : (
-                          <span
-                            onClick={() => {
-                              setExpandedItems(prev => {
-                                const next = new Set(prev);
-                                if (next.has(item.id)) {
-                                  next.delete(item.id);
-                                } else {
-                                  next.add(item.id);
-                                }
-                                return next;
-                              });
-                            }}
-                            className={cn(
-                              "text-sm block transition-colors cursor-pointer font-medium text-foreground",
-                              !expandedItems.has(item.id) && "truncate"
-                            )}
-                          >
-                            {item.titulo}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Acciones */}
-                      {canManageActive && editandoPuntoId !== item.id && (
-                        <div className="flex items-center justify-center w-16">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md transition-colors outline-none focus:ring-2 focus:ring-azul-trifinio/20">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40 bg-background border border-border shadow-md z-50">
-                              <DropdownMenuItem
-                                onClick={() => { setEditandoPuntoId(item.id); setTextoEdicion(item.titulo); }}
-                                className="gap-2 cursor-pointer focus:bg-azul-trifinio/10 focus:text-azul-trifinio"
-                              >
-                                <Pencil className="w-4 h-4" />
-                                <span>Editar punto</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleEliminarPunto(item.id)}
-                                className="gap-2 cursor-pointer focus:bg-destructive/10 focus:text-destructive text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Eliminar</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic px-4 py-4">No hay puntos de agenda.</p>
-              )}
-            </div>
-
-            {/* Agregar punto */}
-            {canManageActive && (
-              <div className="flex gap-2 mb-6">
-                <input
-                  type="text"
-                  placeholder="Añadir nuevo punto..."
-                  value={nuevoPunto}
-                  onChange={(e) => setNuevoPunto(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAgregarPunto();
-                    }
-                  }}
-                  className="flex-1 bg-muted/40 border border-border/50 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-azul-trifinio/20 focus:border-azul-trifinio"
-                />
-                <button
-                  onClick={handleAgregarPunto}
-                  disabled={!nuevoPunto.trim() || isUpdatingAgenda}
-                  className="bg-azul-trifinio text-white px-3 py-2 rounded-lg font-semibold flex items-center justify-center hover:bg-azul-trifinio/90 disabled:opacity-50 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            {/* Nueva tabla de puntos de agenda */}
+            <TablaPuntosAgenda
+              puntos={actividad.act_comude_puntos ?? []}
+              actComudeId={actividad.id}
+              canManage={puedeGestionarAgenda}
+              isAddModalOpen={isNuevoPuntoModalOpen}
+              onCloseAddModal={() => setIsNuevoPuntoModalOpen(false)}
+              sesionEstado={actividad.estado}
+              filtroEstado={filtroEstado}
+            />
 
 
             {/* Evidencia / Fotos */}
@@ -1105,9 +1141,10 @@ export default function DetalleActividadView({
 
         {activeTab === "participantes" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+
           {/* Encargados */}
           {encargados.length > 0 && (
-            <div className="px-3 sm:px-6 py-4 border-b border-border/30">
+            <div className="px-1 sm:px-6 py-4 border-b border-border/30">
               <div className="flex items-center gap-2 mb-3">
                 <Shield className="w-4 h-4 text-azul-trifinio" />
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -1140,7 +1177,7 @@ export default function DetalleActividadView({
 
           {/* Integrantes */}
           {integrantes.length > 0 && (
-            <div className="px-3 sm:px-6 py-4">
+            <div className="px-1 sm:px-6 py-4">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="w-4 h-4 text-muted-foreground" />
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -1195,14 +1232,14 @@ export default function DetalleActividadView({
         registroSalida={participanteMapa?.salida || null}
       />
 
-      {actividad.actas && actaUrlToView && (
+      {actaUrlToView && (
         <ActaVisorModal
           isOpen={isActaVisorOpen}
           onClose={() => {
             setIsActaVisorOpen(false);
             setActaUrlToView(null);
           }}
-          actividadNombre={actividad.nombre}
+          actividadNombre={actividad.detalles_sesion?.titulo || "Sin título"}
           actaUrl={actaUrlToView}
           puedeGestionar={effectiveRole === "super" || effectiveRole === "admin"}
           onEliminar={handleEliminarActa}
@@ -1237,6 +1274,14 @@ export default function DetalleActividadView({
         paths={actividad?.img || []}
         initialIndex={evidenciaSelectedIndex ?? 0}
         onClose={() => setEvidenciaSelectedIndex(null)}
+      />
+
+      <ComudePdfModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        actividad={actividad}
+        registros={registros}
+        evidenciaUrls={evidenciaSignedUrls}
       />
     </>
   );

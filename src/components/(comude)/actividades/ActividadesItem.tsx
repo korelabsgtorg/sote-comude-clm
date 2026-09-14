@@ -1,21 +1,27 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { CalendarDays, ChevronRight, Clock } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CalendarDays, ChevronRight, ChevronUp, Edit2, Trash2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ActComudeConParticipantes } from "./lib/zod";
-
+import { useEliminarActividad } from "./lib/hooks";
+import Swal from "sweetalert2";
+import CrearComude from "./modals/CrearComude";
 
 interface ActividadesItemProps {
   actividad: ActComudeConParticipantes;
   userId?: string | null;
   puedeGestionar: boolean;
+  effectiveRole: string;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 function formatFecha(fechaStr: string) {
   const fecha = new Date(fechaStr);
-  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   const diaName = dias[fecha.getDay()];
   const d = fecha.getDate().toString().padStart(2, "0");
   const m = (fecha.getMonth() + 1).toString().padStart(2, "0");
@@ -24,7 +30,7 @@ function formatFecha(fechaStr: string) {
   const minutes = fecha.getMinutes().toString().padStart(2, "0");
   const ampm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12 || 12;
-  return `${diaName} ${d}/${m}/${y} | ${hours}:${minutes} ${ampm}`;
+  return `${diaName} ${d}/${m}/${y} a las ${hours}:${minutes} ${ampm}`;
 }
 
 function esHoy(fechaStr: string) {
@@ -49,64 +55,160 @@ export default function ActividadesItem({
   actividad,
   userId,
   puedeGestionar,
+  effectiveRole,
+  isExpanded,
+  onToggle,
 }: ActividadesItemProps) {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  const { mutateAsync: eliminarActividad } = useEliminarActividad();
+
   const hoy = esHoy(actividad.fecha);
   const dias = diasRestantes(actividad.fecha);
-  const totalParticipantes = actividad.act_comude_participantes?.length ?? 0;
-  const encargados = actividad.act_comude_participantes?.filter((p) => p.encargado).length ?? 0;
+
+  const handleEliminar = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const result = await Swal.fire({
+      title: "Eliminar Actividad",
+      text: `Se eliminará permanentemente la actividad "${actividad.detalles_sesion?.titulo || "Sin título"}". Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await eliminarActividad(actividad.id);
+        Swal.fire('¡Eliminado!', 'La actividad ha sido eliminada.', 'success');
+      } catch (error) {
+        Swal.fire('Error', 'Hubo un problema al eliminar la actividad.', 'error');
+      }
+    }
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditModalOpen(true);
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "rounded-2xl border bg-white/70 dark:bg-white/5 backdrop-blur-sm shadow-sm overflow-hidden",
-        hoy
-          ? "border-azul-trifinio/40 ring-1 ring-azul-trifinio/20"
-          : "border-white/30 dark:border-white/10"
-      )}
-    >
-      <Link
-        href={`/comude/comude/${actividad.id}`}
-        className="w-full group flex items-center justify-between gap-3 p-4 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/5 transition-colors focus:outline-none text-left"
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "rounded-2xl border bg-white/70 dark:bg-white/5 backdrop-blur-sm shadow-sm overflow-hidden relative",
+          hoy
+            ? "border-azul-trifinio/40 ring-1 ring-azul-trifinio/20"
+            : "border-white/30 dark:border-white/10"
+        )}
       >
-        <div className="flex-1 min-w-0">
-          {/* Fecha como pill y badges de estado */}
-          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <div className="bg-muted/80 dark:bg-muted/30 rounded-full px-2.5 py-1 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground w-fit shadow-sm">
-              <CalendarDays className="w-3.5 h-3.5" />
-              {formatFecha(actividad.fecha)}
+        {/* Línea azul lateral */}
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1a73e8]" />
+
+        <div 
+          onClick={onToggle}
+          className="w-full group flex flex-col cursor-pointer focus:outline-none"
+        >
+          {/* Cabecera Clickable */}
+          <div className="flex items-center justify-between gap-3 p-4 pl-5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+            <div className="flex-1 min-w-0 flex flex-col gap-1">
+              {/* Fila 1: Título y Fecha */}
+              <p className="text-[15px] truncate">
+                <span className="font-bold text-foreground">
+                  {actividad.detalles_sesion?.titulo || "Sin título"}
+                </span>
+                <span className="text-muted-foreground ml-2">
+                  {formatFecha(actividad.fecha)}
+                </span>
+              </p>
+
+              {/* Fila 2: Acta y Libro */}
+              <p className="text-sm font-medium text-foreground/80 uppercase">
+                {actividad.detalles_sesion?.acta ? `ACTA ${actividad.detalles_sesion.acta}` : ""}
+                {actividad.detalles_sesion?.acta && actividad.detalles_sesion?.libro ? ", " : ""}
+                {actividad.detalles_sesion?.libro ? `LIBRO ${actividad.detalles_sesion.libro}` : ""}
+                {!actividad.detalles_sesion?.acta && !actividad.detalles_sesion?.libro ? "Sin acta/libro asignado" : ""}
+              </p>
+
+              {/* Fila 3: Estado y Días */}
+              <div className="flex items-center text-[13px]">
+                <span className="font-bold text-[#1a73e8] dark:text-blue-400">En preparación</span>
+                <span className="text-foreground font-medium">
+                  {hoy ? ", Hoy" : dias > 0 ? `, ${dias} día${dias !== 1 ? 's' : ''} restante${dias !== 1 ? 's' : ''}` : ""}
+                </span>
+              </div>
             </div>
-            {hoy && (
-              <span className="text-[10px] font-bold uppercase tracking-widest bg-azul-trifinio text-white px-2 py-0.5 rounded-full">
-                Hoy
-              </span>
-            )}
-            {!hoy && dias > 0 && (
-              <span className="text-[10px] font-semibold text-muted-foreground">
-                En {dias} día{dias !== 1 ? "s" : ""}
-              </span>
-            )}
+
+            {/* Chevron de Expansión */}
+            <div className="p-2 text-muted-foreground/50 group-hover:text-azul-trifinio transition-colors">
+              {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </div>
           </div>
 
-          {/* Nombre */}
-          <p className="font-bold text-azul-trifinio dark:text-white truncate uppercase">
-            {actividad.nombre}
-          </p>
+          {/* Action Bar Expandible */}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-border/50 bg-black/5 dark:bg-black/20 p-3 pl-5 flex items-center justify-between">
+                  {/* Izquierda: Eliminar (solo si tiene permisos) */}
+                  <div>
+                    {puedeGestionar && (
+                      <button
+                        onClick={handleEliminar}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
 
-          {/* Convocados */}
-          {totalParticipantes > 0 && (
-            <div className="mt-1 flex items-center">
-              <span className="text-[10px] font-semibold text-muted-foreground">
-                {totalParticipantes} convocado{totalParticipantes !== 1 ? "s" : ""}{encargados > 0 ? `, ${encargados} encargado${encargados !== 1 ? "s" : ""}` : ""}
-              </span>
-            </div>
-          )}
+                  {/* Derecha: Editar y Entrar */}
+                  <div className="flex items-center gap-2">
+                    {puedeGestionar && (
+                      <button
+                        onClick={handleEdit}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-[#1a73e8] dark:text-blue-400 hover:bg-[#1a73e8]/10 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Editar
+                      </button>
+                    )}
+                    <Link
+                      href={`/comude/comude/${actividad.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-md transition-colors"
+                    >
+                      Entrar
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+      </motion.div>
 
-        {/* Chevron */}
-        <ChevronRight className="w-5 h-5 text-muted-foreground/50 group-hover:text-azul-trifinio transition-colors" />
-      </Link>
-    </motion.div>
+      {/* Modal Editar */}
+      {isEditModalOpen && (
+        <CrearComude
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          actorRole={effectiveRole}
+          actividad={actividad}
+        />
+      )}
+    </>
   );
 }

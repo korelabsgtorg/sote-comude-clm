@@ -99,11 +99,11 @@ export default function LogoTrifinio({
     },
   };
 
-  const textClass = cn("text-azul-trifinio", !forceAzulColors && "dark:text-white");
-  const lineClass = cn("bg-azul-trifinio", !forceAzulColors && "dark:bg-white");
+  const textClass = cn("text-azul-trifinio");
+  const lineClass = cn("bg-azul-trifinio");
   const blurBgClass = forceAzulColors
     ? "bg-white/55 backdrop-blur-md border border-white/50"
-    : "bg-white/55 dark:bg-white/10 backdrop-blur-md border border-white/50 dark:border-white/10";
+    : "bg-white/55 backdrop-blur-md border border-white/50";
 
   return (
     <>
@@ -111,7 +111,7 @@ export default function LogoTrifinio({
         onMouseEnter={handleHover}
         onClick={handleClick}
         whileTap={{ scale: 0.96 }}
-        className="relative select-none cursor-pointer flex items-center justify-center p-2 w-full"
+        className="relative select-none cursor-pointer flex items-center justify-center p-2 sm:px-4 w-full sm:w-fit mx-auto"
         style={{ scale: scaleValue }}
         initial="hidden"
         animate="visible"
@@ -124,7 +124,7 @@ export default function LogoTrifinio({
           <div className="absolute inset-x-[-20%] inset-y-[-10%] bg-white/50 dark:bg-transparent blur-[60px] -z-10 rounded-[100px]" />
         )}
 
-        <div className="flex flex-row items-center justify-between gap-6 lg:gap-8 w-full px-4 lg:px-8">
+        <div className="flex flex-row items-center justify-center sm:justify-start gap-6 lg:gap-8 w-fit px-4 lg:px-8">
           <motion.div variants={logoVariants} className="flex-shrink-0">
             <Image
               src="/sote/logo.png"
@@ -141,25 +141,25 @@ export default function LogoTrifinio({
             variants={textContainerVariants}
             initial="hidden"
             animate="visible"
-            className="flex flex-col items-center justify-center text-center py-2 relative"
+            className="flex flex-col items-center sm:items-start justify-center text-center sm:text-left py-2 relative"
           >
             <motion.h1
               variants={titleVariants}
-              className={cn("font-black whitespace-nowrap leading-[0.95]", textClass)}
-              style={{ fontFamily: "'Arial Black', sans-serif", fontSize: "clamp(1.25rem, 2.7vw, 2.4rem)" }}
+              className={cn("font-black leading-[1.1]", textClass)}
+              style={{ fontFamily: "'Arial Black', sans-serif", fontSize: "clamp(1.2rem, 2vw, 1.8rem)" }}
             >
-              Sistema de Organización Territorial Estratégica
+              Sistema de Organización<br />Territorial Estratégica
             </motion.h1>
 
             <motion.div
               variants={lineVariants}
-              className={cn("w-[105%] h-[2px] mt-2 origin-center", lineClass)}
+              className={cn("w-full h-[2px] mt-2 origin-left", lineClass)}
             />
 
             <motion.p
               variants={sloganVariants}
               className={cn("font-bold italic mt-2 leading-tight", textClass)}
-              style={{ fontFamily: "Arial, sans-serif", fontSize: "clamp(0.9rem, 1.6vw, 1.5rem)" }}
+              style={{ fontFamily: "Arial, sans-serif", fontSize: "clamp(0.85rem, 1.2vw, 1.1rem)" }}
             >
               {dynamicTitle}
             </motion.p>

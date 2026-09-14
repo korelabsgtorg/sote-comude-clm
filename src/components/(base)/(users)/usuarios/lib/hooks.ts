@@ -37,6 +37,17 @@ export function useUsers(actorRole?: string) {
         }
       } else if (actorRole === "admin") {
         query = query.neq("rol", "super");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("municipio_id")
+            .eq("id", user.id)
+            .single();
+          if (profile?.municipio_id) {
+            query = query.eq("municipio_id", profile.municipio_id);
+          }
+        }
       } else if (actorRole === "admin-observatorio") {
         query = query.in("rol", getManageableRoles(actorRole));
       } else {

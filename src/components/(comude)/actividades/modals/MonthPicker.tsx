@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MESES = [
@@ -48,119 +47,91 @@ export default function MonthPicker({ year, month, onChange }: MonthPickerProps)
     }
   }, [year, isOpen]);
 
-  const handlePrevMonth = () => {
-    if (month === -1) {
-      onChange(year - 1, -1);
-    } else if (month === 0) {
-      onChange(year - 1, 11);
-    } else {
-      onChange(year, month - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (month === -1) {
-      onChange(year + 1, -1);
-    } else if (month === 11) {
-      onChange(year + 1, 0);
-    } else {
-      onChange(year, month + 1);
-    }
-  };
-
   const selectMonth = (m: number) => {
     onChange(viewYear, m);
     setIsOpen(false);
   };
 
-  return (
-    <div className="relative inline-block w-full sm:w-auto" ref={popoverRef}>
-      {/* Botón principal */}
-      <div className="flex items-center justify-between bg-black/5 dark:bg-black/20 rounded-xl border border-border/50 w-full">
-        <button
-          onClick={handlePrevMonth}
-          className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-l-xl transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex-1 px-4 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-        >
-          {month === -1 ? `Todo el año ${year}` : `${MESES_COMPLETOS[month]} ${year}`}
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        </button>
+  const todoElAnio = month === -1;
+  const etiqueta = todoElAnio
+    ? String(year)
+    : `${MESES_COMPLETOS[month]} ${year}`;
 
-        <button
-          onClick={handleNextMonth}
-          className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-r-xl transition-colors"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+  return (
+    <div className="flex flex-1 sm:flex-none items-center gap-2 relative" ref={popoverRef}>
+      {/* Botón Selector */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex h-10 min-w-[140px] flex-1 items-center justify-between gap-2 rounded-xl border border-border/50 bg-white px-3 dark:border-border/50 dark:bg-black/20 sm:flex-none hover:bg-muted/50 dark:hover:bg-black/40 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="shrink-0 text-azul-trifinio dark:text-blue-400" />
+          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 whitespace-nowrap">
+            {etiqueta}
+          </span>
+        </div>
+        <ChevronDown size={14} className="text-muted-foreground ml-2" />
+      </button>
+
+      {/* Botón Todo el año */}
+      <button
+        type="button"
+        onClick={() => {
+          onChange(viewYear, -1);
+          setIsOpen(false);
+        }}
+        className={cn(
+          'h-10 shrink-0 cursor-pointer rounded-xl border px-4 text-sm font-semibold whitespace-nowrap transition-colors',
+          todoElAnio
+            ? 'border-zinc-200 bg-zinc-200 text-zinc-900 dark:border-border/50 dark:bg-white/10 dark:text-white'
+            : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-border/50 dark:bg-black/20 dark:text-zinc-300 dark:hover:bg-black/40',
+        )}
+      >
+        Todo el año
+      </button>
 
       {/* Popover */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[280px] bg-white dark:bg-zinc-900 border border-border/50 dark:border-zinc-800 rounded-2xl shadow-xl z-50 p-4"
-          >
-            {/* Header del Popover (Selector de Año) */}
-            <div className="flex items-center justify-between mb-4 px-2">
-              <button
-                onClick={() => setViewYear((y) => y - 1)}
-                className="p-1 text-muted-foreground hover:text-foreground dark:text-zinc-400 dark:hover:text-white transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => selectMonth(-1)}
-                className={cn(
-                  "px-3 py-1 rounded-lg transition-colors font-bold text-base",
-                  month === -1 && viewYear === year
-                    ? "bg-blue-600/20 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-                    : "text-foreground dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                )}
-                title="Mostrar todo el año"
-              >
-                {viewYear}
-              </button>
-              <button
-                onClick={() => setViewYear((y) => y + 1)}
-                className="p-1 text-muted-foreground hover:text-foreground dark:text-zinc-400 dark:hover:text-white transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Grid de Meses */}
-            <div className="grid grid-cols-3 gap-2">
-              {MESES.map((mes, index) => {
-                const isSelected = viewYear === year && index === month;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => selectMonth(index)}
-                    className={cn(
-                      "py-2.5 text-sm font-semibold rounded-xl transition-all duration-200",
-                      isSelected
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-                    )}
-                  >
-                    {mes}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div className="absolute top-12 left-0 w-64 bg-white dark:bg-zinc-800 border border-border/50 dark:border-border/50 shadow-xl rounded-xl p-3 z-50">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <button
+              onClick={() => setViewYear(y => y - 1)}
+              className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-white/10 rounded transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="font-semibold text-sm text-azul-trifinio dark:text-blue-400">
+              {viewYear}
+            </span>
+            <button
+              onClick={() => setViewYear(y => y + 1)}
+              className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-white/10 rounded transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-1">
+            {MESES.map((mStr, idx) => {
+              const isActive = !todoElAnio && viewYear === year && month === idx;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => selectMonth(idx)}
+                  className={cn(
+                    "py-2 text-sm font-semibold rounded-lg transition-colors",
+                    isActive
+                      ? "bg-azul-trifinio text-white dark:bg-blue-500"
+                      : "text-zinc-700 dark:text-zinc-300 hover:bg-muted dark:hover:bg-white/10"
+                  )}
+                >
+                  {mStr}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

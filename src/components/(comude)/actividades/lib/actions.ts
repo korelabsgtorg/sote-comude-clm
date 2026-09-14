@@ -8,6 +8,10 @@ import {
   ActComude,
   ActComudeConParticipantes,
   ActComudeRegistro,
+  ActComudePunto,
+  ActComudeCategoria,
+  ActComudeArchivo,
+  CrearPuntoValues,
 } from "./zod";
 import { getGlobalMunicipioCookie } from "@/components/(base)/layout/actions";
 
@@ -36,6 +40,32 @@ async function attachProfilesToActividades(actividades: any[], supabase: any) {
       profiles: mapPerfiles.get(p.usuario_id) || null,
     })),
   }));
+}
+
+/** Helper para obtener el municipio_id efectivo según el rol del usuario */
+async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("municipio_id, rol")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) return null;
+
+  const isSuper = profile.rol?.toLowerCase() === "super";
+
+  if (isSuper) {
+    const globalMun = await getGlobalMunicipioCookie();
+    if (globalMun?.id) {
+      return globalMun.id;
+    }
+    return profile.municipio_id ?? null;
+  }
+
+  return profile.municipio_id ?? null;
 }
 
 /** Obtiene las actividades COMUDE de un mes específico */
@@ -67,22 +97,28 @@ export async function getActividades(year?: number, month?: number): Promise<Act
     .lte("fecha", endDate)
     .order("fecha", { ascending: true });
 
-  const globalMun = await getGlobalMunicipioCookie();
-  if (globalMun?.id) {
-    query = query.eq("municipio_id", globalMun.id);
-  } else {
-    // Si no hay cookie global, y el usuario es super, por defecto podria ver todo,
-    // pero idealmente deberíamos restringirlo a su propio municipio por defecto.
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("municipio_id, rol")
-        .eq("id", user.id)
-        .single();
-      
-      if (profile?.rol === "super" && profile.municipio_id) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("municipio_id, rol")
+      .eq("id", user.id)
+      .single();
+
+    const isSuper = profile?.rol?.toLowerCase() === "super";
+
+    if (isSuper) {
+      const globalMun = await getGlobalMunicipioCookie();
+      if (globalMun?.id) {
+        query = query.eq("municipio_id", globalMun.id);
+      } else if (profile?.municipio_id) {
         query = query.eq("municipio_id", profile.municipio_id);
+      }
+    } else {
+      if (profile?.municipio_id) {
+        query = query.eq("municipio_id", profile.municipio_id);
+      } else {
+        query = query.eq("municipio_id", -1);
       }
     }
   }
@@ -95,7 +131,7 @@ export async function getActividades(year?: number, month?: number): Promise<Act
   return actividadesConPerfiles as ActComudeConParticipantes[];
 }
 
-/** Obtiene una actividad con sus participantes y perfiles */
+/** Obtiene una actividad con sus participantes, perfiles y puntos de agenda */
 export async function getActividadById(id: string): Promise<ActComudeConParticipantes | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -106,9 +142,15 @@ export async function getActividadById(id: string): Promise<ActComudeConParticip
         act_comude_id,
         usuario_id,
         encargado
+      ),
+      act_comude_puntos (
+        *,
+        categoria:act_comude_categorias(*),
+        act_comude_archivos(*)
       )
     `)
     .eq("id", id)
+    .order("orden", { referencedTable: "act_comude_puntos", ascending: true })
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -156,20 +198,21 @@ export async function crearActividadComude(values: CrearActividadValues): Promis
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("municipio_id")
-    .eq("id", user.id)
-    .single();
+  const municipioId = await getEffectiveMunicipioId(supabase);
 
   // Insertar la actividad
   const { data: actividad, error: actError } = await supabase
     .from("act_comude")
     .insert({
-      nombre: values.nombre,
+      detalles_sesion: {
+        titulo: values.titulo,
+        acta: values.acta,
+        libro: values.libro,
+      },
       fecha: new Date(values.fecha).toISOString(),
-      agenda: values.agenda,
-      municipio_id: profile?.municipio_id ?? null,
+      descripcion: values.descripcion ?? null,
+      municipio_id: municipioId,
+      estado: "Programada",
     })
     .select("id")
     .single();
@@ -183,11 +226,13 @@ export async function crearActividadComude(values: CrearActividadValues): Promis
     encargado: p.encargado,
   }));
 
-  const { error: partError } = await supabase
-    .from("act_comude_participantes")
-    .insert(participantes);
+  if (participantes.length > 0) {
+    const { error: partError } = await supabase
+      .from("act_comude_participantes")
+      .insert(participantes);
 
-  if (partError) throw new Error(partError.message);
+    if (partError) throw new Error(partError.message);
+  }
 
   revalidatePath("/comude");
   return { id: actividad.id };
@@ -201,9 +246,13 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
   const { error: actError } = await supabase
     .from("act_comude")
     .update({
-      nombre: values.nombre,
+      detalles_sesion: {
+        titulo: values.titulo,
+        acta: values.acta,
+        libro: values.libro,
+      },
       fecha: new Date(values.fecha).toISOString(),
-      agenda: values.agenda,
+      descripcion: values.descripcion ?? null,
     })
     .eq("id", id);
 
@@ -229,18 +278,9 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
   revalidatePath("/comude");
 }
 
-/** Actualiza la agenda de una actividad COMUDE */
+/** Obsoleta: Ya no se usa la agenda de JSONB */
 export async function actualizarAgendaActividad(id: string, agenda: any[]): Promise<void> {
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("act_comude")
-    .update({ agenda })
-    .eq("id", id);
-
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/comude");
+  // Función mantenida solo para no romper imports antiguos temporalmente
 }
 
 /** Actualiza o guarda la URL del acta PDF en la base de datos */
@@ -249,7 +289,7 @@ export async function actualizarActaActividad(id: string, actaUrl: string | null
 
   const { error } = await supabase
     .from("act_comude")
-    .update({ actas: actaUrl })
+    .update({ acta: actaUrl ? [actaUrl] : null })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
@@ -325,4 +365,231 @@ export async function registrarAsistencia(values: RegistroAsistenciaValues): Pro
   });
 
   if (error) throw new Error(error.message);
+}
+
+// ============================================================
+// ----- PUNTOS DE AGENDA (act_comude_puntos) -----
+// ============================================================
+
+/** Obtiene todos los puntos de agenda de una actividad, ordenados */
+export async function getPuntosDeActividad(actComudeId: string): Promise<ActComudePunto[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("act_comude_puntos")
+    .select(`
+      *,
+      categoria:act_comude_categorias(*),
+      act_comude_archivos(*)
+    `)
+    .eq("act_comude_id", actComudeId)
+    .order("orden", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ActComudePunto[];
+}
+
+/** Crea un nuevo punto de agenda */
+export async function crearPunto(actComudeId: string, values: CrearPuntoValues): Promise<ActComudePunto> {
+  const supabase = await createClient();
+
+  // Calcular el siguiente número de orden
+  const { count } = await supabase
+    .from("act_comude_puntos")
+    .select("*", { count: "exact", head: true })
+    .eq("act_comude_id", actComudeId);
+
+  const { data, error } = await supabase
+    .from("act_comude_puntos")
+    .insert({
+      act_comude_id: actComudeId,
+      titulo: values.titulo,
+      categoria_id: values.categoria_id ?? null,
+      estado: values.estado ?? "No iniciado",
+      votacion: values.votacion ?? "No emitido",
+      notas: values.notas ?? null,
+      orden: (count ?? 0) + 1,
+    })
+    .select(`*, categoria:act_comude_categorias(*), act_comude_archivos(*)`)
+    .single();
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+  return data as ActComudePunto;
+}
+
+/** Actualiza un punto de agenda */
+export async function actualizarPunto(
+  puntoId: string,
+  values: Partial<CrearPuntoValues>
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("act_comude_puntos")
+    .update({
+      titulo: values.titulo,
+      categoria_id: values.categoria_id,
+      estado: values.estado,
+      votacion: values.votacion,
+      notas: values.notas,
+    })
+    .eq("id", puntoId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+}
+
+/** Actualiza solo el estado de un punto */
+export async function actualizarEstadoPunto(puntoId: string, estado: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("act_comude_puntos")
+    .update({ estado })
+    .eq("id", puntoId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+}
+
+/** Actualiza solo la votación de un punto */
+export async function actualizarVotacionPunto(puntoId: string, votacion: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("act_comude_puntos")
+    .update({ votacion })
+    .eq("id", puntoId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+}
+
+/** Actualiza las notas de un punto */
+export async function actualizarNotasPunto(puntoId: string, notas: string[]): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("act_comude_puntos")
+    .update({ notas })
+    .eq("id", puntoId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+}
+
+/** Elimina un punto de agenda */
+export async function eliminarPunto(puntoId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("act_comude_puntos").delete().eq("id", puntoId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
+}
+
+// ============================================================
+// ----- CATEGORÍAS (act_comude_categorias) -----
+// ============================================================
+
+/** Obtiene todas las categorías disponibles para el municipio actual */
+export async function getCategorias(): Promise<ActComudeCategoria[]> {
+  const supabase = await createClient();
+  const municipioId = await getEffectiveMunicipioId(supabase);
+
+  let query = supabase.from("act_comude_categorias").select("*");
+
+  if (municipioId) {
+    query = query.eq("municipio_id", municipioId);
+  } else {
+    query = query.is("municipio_id", null);
+  }
+
+  const { data, error } = await query.order("nombre", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ActComudeCategoria[];
+}
+
+/** Crea una nueva categoría para el municipio actual */
+export async function crearCategoria(nombre: string): Promise<ActComudeCategoria> {
+  const supabase = await createClient();
+  const municipioId = await getEffectiveMunicipioId(supabase);
+
+  const { data, error } = await supabase
+    .from("act_comude_categorias")
+    .insert({ nombre, municipio_id: municipioId })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as ActComudeCategoria;
+}
+
+// ============================================================
+// ----- ARCHIVOS POR PUNTO (act_comude_archivos) -----
+// ============================================================
+
+/** Obtiene los archivos adjuntos de un punto */
+export async function getArchivosDePunto(puntoId: string): Promise<ActComudeArchivo[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("act_comude_archivos")
+    .select("*")
+    .eq("punto_id", puntoId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ActComudeArchivo[];
+}
+
+/** Adjunta un archivo a un punto de agenda */
+export async function crearArchivoPunto(
+  puntoId: string,
+  nombre: string,
+  filePath: string
+): Promise<ActComudeArchivo> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("act_comude_archivos")
+    .insert({ punto_id: puntoId, nombre, file_path: filePath })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as ActComudeArchivo;
+}
+
+/** Elimina un archivo adjunto de un punto */
+export async function eliminarArchivoPunto(archivoId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("act_comude_archivos").delete().eq("id", archivoId);
+  if (error) throw new Error(error.message);
+}
+
+// ============================================================
+// ----- ESTADO DE LA SESIÓN (act_comude.estado) -----
+// ============================================================
+
+/** Apertura o cierra la sesión actualizando el estado e inicio/fin */
+export async function actualizarEstadoSesion(
+  actComudeId: string,
+  nuevoEstado: "Programada" | "En progreso" | "Finalizada"
+): Promise<void> {
+  const supabase = await createClient();
+
+  const updates: Record<string, string | null> = { estado: nuevoEstado };
+  const ahora = new Date().toISOString();
+
+  if (nuevoEstado === "En progreso") {
+    updates.inicio = ahora;
+    updates.fin = null;
+  } else if (nuevoEstado === "Finalizada") {
+    updates.fin = ahora;
+  } else if (nuevoEstado === "Programada") {
+    updates.inicio = null;
+    updates.fin = null;
+  }
+
+  const { error } = await supabase
+    .from("act_comude")
+    .update(updates)
+    .eq("id", actComudeId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/comude");
 }

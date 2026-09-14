@@ -21,13 +21,14 @@ export default function GestorActividades({ userId, effectiveRole }: GestorActiv
     <section className="w-full">
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-azul-trifinio shrink-0" />
-          <h3 className="font-bold text-base text-azul-trifinio dark:text-white">
-            Actividades COMUDE
-          </h3>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <CalendarDays className="w-6 h-6 sm:w-7 sm:h-7 text-azul-trifinio shrink-0" />
+          <h2 className="font-bold text-xl sm:text-2xl lg:text-3xl text-slate-800 dark:text-white tracking-tight">
+            Actividades <span className="text-azul-trifinio dark:text-celeste-trifinio">COMUDE</span>
+          </h2>
         </div>
         <div className="flex items-center self-center sm:self-auto gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+          
           {/* Botón Contactos — visible para todos los roles */}
           <button
             onClick={() => setModalContactosOpen(true)}
@@ -53,6 +54,7 @@ export default function GestorActividades({ userId, effectiveRole }: GestorActiv
       <ListActividades 
         userId={userId}
         puedeGestionar={puedeGestionar}
+        effectiveRole={effectiveRole}
         onCrearClick={() => setModalCrearOpen(true)}
       />
 

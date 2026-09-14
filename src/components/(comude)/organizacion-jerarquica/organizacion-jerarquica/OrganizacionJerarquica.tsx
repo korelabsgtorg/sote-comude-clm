@@ -232,30 +232,33 @@ export function OrganizacionJerarquica() {
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setModoSimulacion((prev) => !prev);
-                  setOrganigramaOpen(false);
-                }}
-                className={
-                  modoSimulacion
-                    ? "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-200 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-700 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600 sm:w-auto"
-                    : "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-100 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:hover:bg-violet-900 sm:w-auto"
-                }
-              >
-                {modoSimulacion ? (
-                  <>
-                    <RotateCcw className="size-4" />
-                    Ver datos reales
-                  </>
-                ) : (
-                  <>
-                    <FlaskConical className="size-4" />
-                    Simular empresa
-                  </>
-                )}
-              </button>
+              {/* Botón Simular Empresa temporalmente oculto a petición del usuario */}
+              {false && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoSimulacion((prev) => !prev);
+                    setOrganigramaOpen(false);
+                  }}
+                  className={
+                    modoSimulacion
+                      ? "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-200 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-700 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600 sm:w-auto"
+                      : "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-100 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-violet-700 transition-colors hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:hover:bg-violet-900 sm:w-auto"
+                  }
+                >
+                  {modoSimulacion ? (
+                    <>
+                      <RotateCcw className="size-4" />
+                      Ver datos reales
+                    </>
+                  ) : (
+                    <>
+                      <FlaskConical className="size-4" />
+                      Simular empresa
+                    </>
+                  )}
+                </button>
+              )}
               {!estaVacio && (
                 <button
                   type="button"

@@ -181,6 +181,7 @@ function NodoItem({
   const { isExpanded, toggle, allExpanded, setAllExpanded } = useTreeExpansion();
   const expanded = isExpanded(nodo.id);
   const hasChildren = Boolean(nodo.hijos && nodo.hijos.length > 0);
+  const isInactive = nodo.activo === false;
   const isRoot = variant === "root";
   const isDepartamento = nodo.tipo === "nivel";
   const isPuesto = nodo.tipo === "unidad";
@@ -220,10 +221,12 @@ function NodoItem({
               )
             : cn(
                 "flex bg-card",
-                isPuesto &&
+                isPuesto && !isInactive &&
                   (puestoJefatura
                     ? "relative rounded-xl border border-zinc-200/70 border-l-[3px] border-l-amber-500/80 bg-card hover:border-amber-500/35 dark:border-zinc-700/70"
                     : "relative rounded-xl border border-zinc-200/70 border-l-[3px] border-l-emerald-500/65 bg-card hover:border-emerald-500/30 dark:border-zinc-700/70"),
+                isPuesto && isInactive &&
+                  "relative rounded-xl border border-zinc-200/70 border-l-[3px] border-l-zinc-400/80 bg-zinc-50/50 dark:bg-zinc-800/40 hover:border-zinc-400/50 dark:border-zinc-700/70 grayscale-[0.5] opacity-80",
                 !isPuesto &&
                   "border-border/60 hover:border-celeste-trifinio/40 hover:bg-celeste-trifinio/5",
                 hasActionBar
@@ -294,6 +297,7 @@ function NodoItem({
                   isRoot && "text-lg font-black md:text-xl",
                   isDepartamento && "text-sm font-black md:text-base",
                   isPuesto && "text-sm font-semibold tracking-tight md:text-[0.9375rem]",
+                  isInactive && "text-muted-foreground opacity-70"
                 )}
               >
                 {nodo.nombre}
@@ -304,6 +308,11 @@ function NodoItem({
                   <CalendarDays className="size-3.5 opacity-70" />
                   {formatFechaCorto(nodo.fecha)}
                 </div>
+              )}
+              {isInactive && (
+                <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300">
+                  Inactivo
+                </span>
               )}
             </div>
             <AnimatePresence initial={false}>

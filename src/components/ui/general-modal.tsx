@@ -44,8 +44,8 @@ export function ModalShell({
           className,
         )}
       >
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/50">
-          <DialogTitle className="text-base font-black tracking-tight text-foreground">
+        <DialogHeader className="px-4 py-1.5 border-b border-border/50">
+          <DialogTitle className="text-sm font-black tracking-tight text-foreground">
             {title}
           </DialogTitle>
           {subtitle && (
@@ -54,7 +54,7 @@ export function ModalShell({
             </p>
           )}
         </DialogHeader>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-4 pt-1.5 pb-2.5">{children}</div>
       </DialogContent>
     </Dialog>
   );

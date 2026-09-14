@@ -60,41 +60,41 @@ export default function ActaVisorModal({
     <div className="fixed inset-0 z-[1050] flex flex-col bg-[#1a1a1a] sm:bg-[#111] animate-in fade-in duration-200">
       
       {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-10 pb-3 sm:py-4 bg-[#222] border-b border-neutral-800 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg shrink-0">
-            <FileText size={20} />
+      <div className="flex flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-4 bg-[#222] border-b border-neutral-800 gap-2">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="p-1.5 sm:p-2 bg-blue-500/20 text-blue-400 rounded-lg shrink-0">
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
             <h2 className="text-white font-bold text-sm sm:text-lg leading-tight truncate">
-              Acta: {actividadNombre}
+              {actividadNombre}
             </h2>
-            <p className="text-gray-400 text-xs">Visor de documento PDF</p>
+            <p className="text-gray-400 text-[10px] sm:text-xs hidden sm:block">Visor de documento PDF</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {puedeGestionar && onEliminar && (
             <button
               onClick={onEliminar}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-red-900/20 hover:bg-red-500/20 border border-red-900/50 hover:border-red-500/50 text-red-400 text-xs sm:text-sm font-medium rounded-lg transition-colors flex-1 sm:flex-none"
+              className="flex items-center justify-center p-1.5 sm:px-3 sm:py-2 bg-red-900/20 hover:bg-red-500/20 border border-red-900/50 hover:border-red-500/50 text-red-400 font-medium rounded-lg transition-colors"
               title="Eliminar acta permanentemente"
             >
-              <Trash2 size={16} />
-              <span className="hidden sm:inline">Eliminar acta</span>
+              <Trash2 className="w-4 h-4 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline sm:ml-2 text-sm">Eliminar acta</span>
             </button>
           )}
           <button 
             onClick={onClose} 
-            className="p-2 bg-neutral-800 hover:bg-red-500/20 text-gray-300 hover:text-red-400 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 bg-neutral-800 hover:bg-red-500/20 text-gray-300 hover:text-red-400 rounded-lg transition-colors"
           >
-            <X size={20} />
+            <X className="w-5 h-5 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* TOOLBAR DEL PDF */}
-      <div className="flex items-center justify-center px-4 py-2 bg-[#1a1a1a] border-b border-neutral-800 text-white shrink-0 shadow-sm z-10 overflow-x-auto">
+      <div className="flex items-center justify-center px-2 py-1.5 sm:px-4 sm:py-2 bg-[#1a1a1a] border-b border-neutral-800 text-white shrink-0 shadow-sm z-10 overflow-x-auto">
         <div className="flex items-center gap-1 sm:gap-2 bg-neutral-800 rounded-lg p-1">
            <button 
             onClick={() => setPageNumber(p => Math.max(1, p - 1))} 
@@ -102,10 +102,10 @@ export default function ActaVisorModal({
             className="p-1.5 hover:bg-neutral-700 text-gray-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Página anterior"
            >
-             <ChevronLeft size={20} />
+             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
            </button>
            
-           <span className="text-xs sm:text-sm font-mono mx-1 sm:mx-2 min-w-[60px] text-center">
+           <span className="text-xs sm:text-sm font-mono mx-1 sm:mx-2 min-w-[50px] sm:min-w-[60px] text-center">
              {pageNumber} / {numPages || '-'}
            </span>
            
@@ -115,7 +115,7 @@ export default function ActaVisorModal({
             className="p-1.5 hover:bg-neutral-700 text-gray-300 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Página siguiente"
            >
-             <ChevronRight size={20} />
+             <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
            </button>
            
            <div className="h-4 w-px bg-neutral-600 mx-1 sm:mx-2" />
@@ -125,9 +125,9 @@ export default function ActaVisorModal({
             className="p-1.5 hover:bg-neutral-700 text-gray-300 rounded transition-colors"
             title="Alejar"
            >
-             <ZoomOut size={18} />
+             <ZoomOut className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
            </button>
-           <span className="text-xs sm:text-sm font-mono min-w-[40px] text-center text-gray-400">
+           <span className="text-xs sm:text-sm font-mono min-w-[36px] sm:min-w-[40px] text-center text-gray-400">
              {Math.round(scale * 100)}%
            </span>
            <button 
@@ -135,13 +135,13 @@ export default function ActaVisorModal({
             className="p-1.5 hover:bg-neutral-700 text-gray-300 rounded transition-colors"
             title="Acercar"
            >
-             <ZoomIn size={18} />
+             <ZoomIn className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
            </button>
         </div>
       </div>
 
       {/* PDF VIEWER CONTENT */}
-      <div className="flex-1 w-full bg-[#2a2a2a] relative overflow-auto flex justify-center py-4 sm:py-8 custom-scrollbar">
+      <div className="flex-1 w-full bg-[#2a2a2a] relative overflow-auto flex justify-center py-2 sm:py-8 custom-scrollbar">
         {loadingPdf && (
            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#2a2a2a]/80 z-10">
              <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
