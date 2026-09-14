@@ -213,6 +213,7 @@ interface ParticipanteRowProps {
   cargandoGPS: boolean;
   isMuyTemprano?: boolean;
   isPastDate: boolean;
+  isFinalizada?: boolean;
 }
 
 function ParticipanteRow({
@@ -226,6 +227,7 @@ function ParticipanteRow({
   cargandoGPS,
   isMuyTemprano,
   isPastDate,
+  isFinalizada = false,
 }: ParticipanteRowProps) {
   const regEntrada = registros.find(
     (r) => r.usuario_id === participante.usuario_id && r.tipo_registro === "entrada"
@@ -295,10 +297,10 @@ function ParticipanteRow({
           {!regEntrada ? (
             <button
               onClick={() => onRegistrar("entrada")}
-              disabled={cargandoGPS || isMuyTemprano}
+              disabled={cargandoGPS || isMuyTemprano || isFinalizada}
               className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold text-white px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
-                isMuyTemprano
-                  ? "bg-gray-400 dark:bg-neutral-600 cursor-not-allowed"
+                isFinalizada || isMuyTemprano
+                  ? "bg-gray-400 dark:bg-neutral-700 dark:text-gray-400 cursor-not-allowed shadow-none"
                   : "bg-green-600 hover:bg-green-700 disabled:opacity-60"
               }`}
             >
@@ -308,8 +310,12 @@ function ParticipanteRow({
           ) : (
             <button
               onClick={() => onRegistrar("salida")}
-              disabled={cargandoGPS}
-              className="flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold bg-orange-600 text-white px-4 py-4 sm:py-2 rounded-lg hover:bg-orange-700 disabled:opacity-60 transition-colors w-full sm:w-auto"
+              disabled={cargandoGPS || isFinalizada}
+              className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
+                isFinalizada
+                  ? "bg-gray-400 dark:bg-neutral-700 text-white dark:text-gray-400 cursor-not-allowed shadow-none"
+                  : "bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
+              }`}
             >
               {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
               {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Salida"}
@@ -387,10 +393,12 @@ export default function DetalleActividadView({
   const isOpen = !!actividad;
   
   const esFinalizada = actividad?.estado === "Finalizada";
-  // Super usuario puede gestionar siempre; Admin solo si no está finalizada.
-  const puedeGestionarAgenda = effectiveRole === "super" || (puedeGestionar && !esFinalizada);
+  const esEncargado = !!(userId && actividad?.act_comude_participantes?.some((p) => p.usuario_id === userId && p.encargado));
+
+  // Super usuario puede gestionar siempre; Admin o Encargado del COMUDE solo si no está finalizada.
+  const puedeGestionarAgenda = effectiveRole === "super" || ((puedeGestionar || esEncargado) && !esFinalizada);
   
-  const puedeGestionarFotos = effectiveRole === "super" || (puedeGestionar && !esFinalizada);
+  const puedeGestionarFotos = effectiveRole === "super" || ((puedeGestionar || esEncargado) && !esFinalizada);
   
   const isPastDate = (() => {
     if (!actividad?.fecha) return false;
@@ -951,6 +959,7 @@ export default function DetalleActividadView({
               cargandoGPS={cargandoGPS}
               isMuyTemprano={isMuyTemprano}
               isPastDate={isPastDate}
+              isFinalizada={esFinalizada}
               onVerMapa={() => setParticipanteMapa({
                 nombre: participanteYo.profiles?.nombre || "Sin nombre",
                 entrada: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "entrada") || null,
@@ -1169,6 +1178,7 @@ export default function DetalleActividadView({
                     })}
                     isMuyTemprano={isMuyTemprano}
                     isPastDate={isPastDate}
+                    isFinalizada={esFinalizada}
                   />
                 ))}
               </div>
@@ -1202,6 +1212,7 @@ export default function DetalleActividadView({
                     })}
                     isMuyTemprano={isMuyTemprano}
                     isPastDate={isPastDate}
+                    isFinalizada={esFinalizada}
                   />
                 ))}
               </div>
