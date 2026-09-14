@@ -856,7 +856,7 @@ export default function DetalleActividadView({
               <button
                 onClick={handleActualizarEstado}
                 disabled={isUpdatingEstado}
-                className={`px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-60 flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2 ${style}`}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2 ${style}`}
               >
                 {isUpdatingEstado && <Loader2 className="w-4 h-4 animate-spin" />}
                 {label}
@@ -890,7 +890,7 @@ export default function DetalleActividadView({
                 }
               }}
               disabled={isGenerandoUrl}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+              className="border border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-500 bg-transparent hover:bg-blue-600/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
               {isGenerandoUrl ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               Ver Acta
@@ -899,7 +899,7 @@ export default function DetalleActividadView({
             <button 
               onClick={() => actaFileInputRef.current?.click()}
               disabled={isUploadingActa}
-              className="bg-zinc-800 dark:bg-white dark:text-black hover:bg-zinc-700 hover:dark:bg-gray-200 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+              className="border border-zinc-700 text-zinc-700 dark:border-zinc-300 dark:text-zinc-200 bg-transparent hover:bg-zinc-500/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
               {isUploadingActa ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               Subir Acta
@@ -918,7 +918,7 @@ export default function DetalleActividadView({
             <button 
               onClick={handleGeneratePdf} 
               disabled={isCargandoPdfData}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+              className="border border-red-600 text-red-600 dark:text-red-400 dark:border-red-500 bg-transparent hover:bg-red-600/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
               {isCargandoPdfData ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               Generar PDF
@@ -926,7 +926,7 @@ export default function DetalleActividadView({
           ) : puedeGestionarAgenda ? (
             <button 
               onClick={() => setIsNuevoPuntoModalOpen(true)}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-3 sm:px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
+              className="border border-purple-500 text-purple-600 dark:text-purple-400 dark:border-purple-400 bg-transparent hover:bg-purple-500/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
               Nuevo Punto a tratar
             </button>
