@@ -34,7 +34,7 @@ const OPCIONES: {
   },
   {
     id: "territorial",
-    label: "Territorial",
+    label: "Cocodes y Territorio",
     desc: "Mapa geográfico · Microrregiones, Aldeas y Caseríos",
     icon: Map,
     color:

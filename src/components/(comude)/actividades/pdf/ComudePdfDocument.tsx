@@ -123,10 +123,11 @@ const styles = StyleSheet.create({
   colVoto: { width: "14%", textAlign: "center" },
   colNotas: { width: "24%" },
 
-  colPartNum: { width: "6%", textAlign: "center" },
-  colPartNom: { width: "64%" },
+  colPartNum: { width: "5%", textAlign: "center" },
+  colPartNom: { width: "50%" },
   colPartEntrada: { width: "15%", textAlign: "center" },
   colPartSalida: { width: "15%", textAlign: "center" },
+  colPartDuracion: { width: "15%", textAlign: "center" },
 
   badge: {
     fontSize: 7,
@@ -362,6 +363,7 @@ export default function ComudePdfDocument({
             <Text style={styles.colPartNom}>Nombre del Integrante</Text>
             <Text style={styles.colPartEntrada}>Hora Entrada</Text>
             <Text style={styles.colPartSalida}>Hora Salida</Text>
+            <Text style={styles.colPartDuracion}>Duración</Text>
           </View>
 
           {participantes.length === 0 ? (
@@ -374,6 +376,7 @@ export default function ComudePdfDocument({
             participantes.map((part, idx) => {
               const regE = registros.find((r) => r.usuario_id === part.usuario_id && r.tipo_registro === "entrada");
               const regS = registros.find((r) => r.usuario_id === part.usuario_id && r.tipo_registro === "salida");
+              const duracionTexto = regE?.created_at ? calcDuracion(regE.created_at, regS?.created_at ?? null) : "--";
 
               return (
                 <View
@@ -387,6 +390,7 @@ export default function ComudePdfDocument({
                   </Text>
                   <Text style={styles.colPartEntrada}>{formatHora(regE?.created_at ?? null)}</Text>
                   <Text style={styles.colPartSalida}>{formatHora(regS?.created_at ?? null)}</Text>
+                  <Text style={styles.colPartDuracion}>{duracionTexto}</Text>
                 </View>
               );
             })

@@ -40,6 +40,7 @@ import VerPerfil from "@/components/(base)/(users)/profile/VerPerfil";
 import PassKeysModal from "@/components/(base)/layout/modals/PassKeysModal";
 import ManualUsuarioModal from "@/components/(base)/layout/modals/ManualUsuarioModal";
 import { GlobalMunicipioSelector } from "./GlobalMunicipioSelector";
+import { ROLE_LABELS } from "@/components/(base)/(users)/usuarios/lib/permissions";
 
 const MENU_OPTION_ICONS: Record<string, LucideIcon> = {
   "movilidad-humana": Globe,
@@ -463,9 +464,9 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   }, []);
 
   const menuTop =
-    "top-[calc(var(--banner-height,0px)+var(--mobile-header-height)+var(--mobile-breadcrumb-height))] md:top-[calc(var(--banner-height,0px)+4rem)]";
+    "top-[calc(var(--banner-height,0px)+var(--mobile-header-height)+var(--mobile-breadcrumb-height)+env(safe-area-inset-top))] md:top-[calc(var(--banner-height,0px)+3.5rem+env(safe-area-inset-top))]";
   const menuHeight =
-    "h-[calc(100dvh-var(--banner-height,0px)-var(--mobile-header-height)-var(--mobile-breadcrumb-height))] md:h-[calc(100dvh-var(--banner-height,0px)-4rem)]";
+    "h-[calc(100dvh-var(--banner-height,0px)-var(--mobile-header-height)-var(--mobile-breadcrumb-height)-env(safe-area-inset-top))] md:h-[calc(100dvh-var(--banner-height,0px)-3.5rem-env(safe-area-inset-top))]";
 
   const metadata = user?.user_metadata || {};
   const usuario = metadata.username || user?.email?.split("@")[0] || "—";
@@ -584,7 +585,7 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                       Rol
                     </p>
                     <p className="font-bold leading-tight text-celeste-trifinio uppercase truncate">
-                      {effectiveRole}
+                      {ROLE_LABELS[effectiveRole]?.toUpperCase() || effectiveRole.toUpperCase()}
                     </p>
                   </div>
                   <div className="col-span-2 min-w-0 border-t border-border/40 pt-3">
@@ -605,7 +606,7 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                 <span className="text-xs font-bold text-celeste-trifinio">Manual de Usuario</span>
               </button>
 
-              {(pathname === "/" || pathname === "/comude") && (
+              {effectiveRole === "super" && (pathname === "/" || pathname === "/comude") && (
                 <div className="mt-3 p-3 bg-white/90 dark:bg-zinc-900/90 rounded-2xl ring-1 ring-white/60 dark:ring-zinc-700/60 flex justify-center">
                   <GlobalMunicipioSelector />
                 </div>
@@ -722,11 +723,9 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                 className="bg-transparent text-xs font-bold text-yellow-700 outline-none cursor-pointer w-full"
               >
                 <option value="">Rol Real: {realRole.toUpperCase()}</option>
-                <option value="admin">Simular: ADMIN</option>
-                <option value="admin-observatorio">Simular: ADMIN-OBSERVATORIO</option>
-                <option value="observatorio">Simular: OBSERVATORIO</option>
-                <option value="comunicacion">Simular: COMUNICACIÓN</option>
-                <option value="user">Simular: USER</option>
+                <option value="admin">Simular: ADMINISTRADOR</option>
+                <option value="cocode">Simular: COMUDE</option>
+                <option value="institucion">Simular: INSTITUCIÓN</option>
               </select>
             </div>
           </div>

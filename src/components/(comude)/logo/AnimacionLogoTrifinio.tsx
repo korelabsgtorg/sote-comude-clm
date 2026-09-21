@@ -36,14 +36,14 @@ export default function AnimacionLogoTrifinio({ isOpen, onClose }: AnimacionLogo
                 initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
                 animate={{ opacity: 1, scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 50, damping: 16, duration: 2.4 }}
-                className="flex-shrink-0"
+                className="flex-shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm"
               >
                 <Image
                   src="/sote/logo.png"
                   alt="SOTE"
                   width={250}
                   height={250}
-                  className="w-[120px] lg:w-[250px] h-auto object-contain"
+                  className="w-[120px] lg:w-[250px] h-auto object-contain rounded-2xl sm:rounded-3xl"
                   priority
                 />
               </motion.div>

@@ -15,6 +15,7 @@ import {
   type ProfileOpcion,
   type PuestoFormValues,
   type PuestoRecord,
+  type AcreditacionFile,
   buscarNodoPorId,
   reubicarPuestoSchema,
   type ReubicarPuestoValues,
@@ -88,6 +89,7 @@ function normalizarDepartamento(
     orden: typeof row.orden === "number" ? row.orden : 0,
     activo: row.activo !== false,
     comunidad_id: (row.comunidad_id as string | null) ?? null,
+    jalar_jefes_territoriales: Boolean(row.jalar_jefes_territoriales),
   };
 }
 
@@ -101,6 +103,17 @@ function normalizarPuesto(
     fecha = fecha.split("T")[0].split(" ")[0];
   }
 
+  let acreditaciones: AcreditacionFile[] = [];
+  if (Array.isArray(row.acreditaciones)) {
+    acreditaciones = row.acreditaciones as AcreditacionFile[];
+  } else if (typeof row.acreditaciones === "string") {
+    try {
+      acreditaciones = JSON.parse(row.acreditaciones);
+    } catch {
+      acreditaciones = [];
+    }
+  }
+
   return {
     id: String(row.id),
     nombre: String(row.nombre ?? ""),
@@ -110,26 +123,40 @@ function normalizarPuesto(
     orden: typeof row.orden === "number" ? row.orden : 0,
     activo: row.activo !== false,
     fecha,
+    acreditaciones,
   };
 }
 
 const DEPARTAMENTOS_SELECT =
-  "id, nombre, parent_id, descripcion, comunidad_id";
-const DEPARTAMENTOS_SELECT_BASE = "id, nombre, parent_id, comunidad_id";
-const PUESTOS_SELECT_FULL = "id, nombre, departamento_id, orden, activo, fecha";
-const PUESTOS_SELECT_BASE = "id, nombre, departamento_id, activo, fecha";
+  "id, nombre, parent_id, descripcion, comunidad_id, orden, jalar_jefes_territoriales";
+const DEPARTAMENTOS_SELECT_LEGACY =
+  "id, nombre, parent_id, descripcion, comunidad_id, orden";
+const DEPARTAMENTOS_SELECT_BASE = "id, nombre, parent_id, comunidad_id, orden";
+const PUESTOS_SELECT_FULL = "id, nombre, departamento_id, orden, activo, fecha, acreditaciones";
+const PUESTOS_SELECT_BASE = "id, nombre, departamento_id, activo, fecha, acreditaciones";
 
 async function listarDepartamentos(supabase: SupabaseServerClient, municipioId: number) {
-  const withDesc = await supabase
+  const withJefes = await supabase
     .from("departamentos")
     .select(DEPARTAMENTOS_SELECT)
     .eq("municipio_id", municipioId)
+    .order("orden", { ascending: true })
+    .order("nombre");
+  if (!withJefes.error) return withJefes;
+
+  const withDesc = await supabase
+    .from("departamentos")
+    .select(DEPARTAMENTOS_SELECT_LEGACY)
+    .eq("municipio_id", municipioId)
+    .order("orden", { ascending: true })
     .order("nombre");
   if (!withDesc.error) return withDesc;
+
   return supabase
     .from("departamentos")
     .select(DEPARTAMENTOS_SELECT_BASE)
     .eq("municipio_id", municipioId)
+    .order("orden", { ascending: true })
     .order("nombre");
 }
 
@@ -187,6 +214,7 @@ function departamentoPayload(values: DepartamentoFormValues, municipioId: number
     parent_id: values.parent_id,
     descripcion: values.descripcion?.trim() || null,
     comunidad_id: values.comunidad_id || null,
+    jalar_jefes_territoriales: Boolean(values.jalar_jefes_territoriales),
     municipio_id: municipioId,
   };
 }
@@ -196,9 +224,37 @@ async function insertarDepartamento(
   values: DepartamentoFormValues,
   municipioId: number,
 ) {
-  return supabase
+  let query = supabase
     .from("departamentos")
-    .insert(departamentoPayload(values, municipioId));
+    .select("orden")
+    .eq("municipio_id", municipioId);
+
+  if (values.parent_id === null) {
+    query = query.is("parent_id", null);
+  } else {
+    query = query.eq("parent_id", values.parent_id);
+  }
+
+  const { data: ultimos } = await query
+    .order("orden", { ascending: false })
+    .limit(1);
+
+  const maxOrden = ultimos && ultimos.length > 0 ? (ultimos[0].orden ?? 0) + 1 : 0;
+
+  const payload = departamentoPayload(values, municipioId);
+  const insertRes = await supabase.from("departamentos").insert({
+    ...payload,
+    orden: maxOrden,
+  });
+
+  if (!insertRes.error) return insertRes;
+
+  // Fallback en caso de que la columna jalar_jefes_territoriales aún no exista en Supabase
+  const { jalar_jefes_territoriales, ...legacyPayload } = payload;
+  return supabase.from("departamentos").insert({
+    ...legacyPayload,
+    orden: maxOrden,
+  });
 }
 
 async function actualizarDepartamento(
@@ -207,9 +263,20 @@ async function actualizarDepartamento(
   values: DepartamentoFormValues,
   municipioId: number,
 ) {
+  const payload = departamentoPayload(values, municipioId);
+  const updateRes = await supabase
+    .from("departamentos")
+    .update(payload)
+    .eq("id", id)
+    .eq("municipio_id", municipioId);
+
+  if (!updateRes.error) return updateRes;
+
+  // Fallback en caso de que la columna jalar_jefes_territoriales aún no exista en Supabase
+  const { jalar_jefes_territoriales, ...legacyPayload } = payload;
   return supabase
     .from("departamentos")
-    .update(departamentoPayload(values, municipioId))
+    .update(legacyPayload)
     .eq("id", id)
     .eq("municipio_id", municipioId);
 }
@@ -241,6 +308,7 @@ async function insertarPuesto(
     municipio_id: municipioId,
     fecha: values.fecha ? new Date(values.fecha).toISOString() : null,
     activo: values.activo,
+    acreditaciones: values.acreditaciones ?? [],
   };
 
   const withSelect = await supabase
@@ -401,6 +469,7 @@ function construirArbol(
       titular_id: titular?.id,
       fecha: puesto.fecha,
       activo: puesto.activo,
+      acreditaciones: puesto.acreditaciones,
     };
   };
 
@@ -505,6 +574,7 @@ async function cargarPuestosConJefaturas(
         orden: puesto.orden,
         activo: puesto.activo,
         fecha: puesto.fecha,
+        acreditaciones: puesto.acreditaciones,
       },
       idsPorPuesto.get(puesto.id) ?? [],
       nombresPorPuesto.get(puesto.id) ?? [],
@@ -671,7 +741,100 @@ export async function getEstructuraOrganizacional(): Promise<{
       normalizarDepartamento(row as Record<string, unknown>),
     );
 
-    const data = construirArbol(departamentos, puestos, titularesPorPuesto);
+    // Separar los departamentos normales de los creados automáticamente por comunidades territoriales
+    const deptosAdministrativos = departamentos.filter((d) => !d.comunidad_id);
+
+    const data = construirArbol(deptosAdministrativos, puestos, titularesPorPuesto);
+
+    // Si algún departamento tiene jalar_jefes_territoriales activado, inyectar dinámicamente puestos líderes territoriales
+    const depsConsolidadores = departamentos.filter((d) => d.jalar_jefes_territoriales);
+    if (depsConsolidadores.length > 0 && data) {
+      try {
+        const [comunidadesRes, puestosTerritorialesRes] = await Promise.all([
+          supabase
+            .from("lug_comunidades")
+            .select("id, nombre, tipo")
+            .eq("municipio_id", municipioId),
+          supabase
+            .from("puestos")
+            .select("id, nombre, departamento_id, activo, fecha, acreditaciones")
+            .eq("municipio_id", municipioId)
+            .not("departamento_id", "is", null),
+        ]);
+
+        if (!comunidadesRes.error && comunidadesRes.data && !puestosTerritorialesRes.error && puestosTerritorialesRes.data) {
+          const comunidadesMap = new Map(comunidadesRes.data.map((c) => [c.id, c]));
+          const deptosTerritorialesRes = await supabase
+            .from("departamentos")
+            .select("id, comunidad_id")
+            .eq("municipio_id", municipioId)
+            .not("comunidad_id", "is", null);
+
+          if (!deptosTerritorialesRes.error && deptosTerritorialesRes.data) {
+            const deptoToComunidadMap = new Map(
+              deptosTerritorialesRes.data.map((d) => [d.id, d.comunidad_id])
+            );
+
+            // Obtener jefaturas de puestos territoriales
+            const puestoIdsTerritoriales = puestosTerritorialesRes.data.map((p) => p.id);
+            if (puestoIdsTerritoriales.length > 0) {
+              const { data: jefaturasTerr } = await supabase
+                .from("puesto_jefaturas")
+                .select("puesto_id, departamento_id")
+                .in("puesto_id", puestoIdsTerritoriales);
+
+              const jefesPuestoIds = new Set((jefaturasTerr ?? []).map((j) => j.puesto_id));
+              const puestosLideres = puestosTerritorialesRes.data.filter((p) =>
+                p.departamento_id && deptoToComunidadMap.has(p.departamento_id) && jefesPuestoIds.has(p.id)
+              );
+
+              if (puestosLideres.length > 0) {
+                const nodosLideres: NodoOrganizacion[] = puestosLideres.map((p) => {
+                  const comId = deptoToComunidadMap.get(p.departamento_id!);
+                  const comunidad = comId ? comunidadesMap.get(comId) : null;
+                  const titular = titularesPorPuesto.get(p.id);
+                  let acreditaciones: AcreditacionFile[] = [];
+                  if (Array.isArray(p.acreditaciones)) {
+                    acreditaciones = p.acreditaciones as AcreditacionFile[];
+                  } else if (typeof p.acreditaciones === "string") {
+                    try { acreditaciones = JSON.parse(p.acreditaciones); } catch {}
+                  }
+
+                  return {
+                    id: p.id,
+                    nombre: comunidad ? `${p.nombre} - ${comunidad.nombre}` : p.nombre,
+                    tipo: "unidad",
+                    tiene_jefaturas: true,
+                    titular: titular?.nombre,
+                    titular_id: titular?.id,
+                    fecha: p.fecha ? String(p.fecha).split("T")[0] : null,
+                    activo: p.activo !== false,
+                    acreditaciones,
+                  };
+                });
+
+                // Inyectar en los nodos correspondientes
+                for (const depConsolidador of depsConsolidadores) {
+                  const buscarYInyectar = (nodo: NodoOrganizacion): boolean => {
+                    if (nodo.id === depConsolidador.id) {
+                      nodo.hijos = [...(nodo.hijos ?? []), ...nodosLideres];
+                      return true;
+                    }
+                    for (const hijo of nodo.hijos ?? []) {
+                      if (buscarYInyectar(hijo)) return true;
+                    }
+                    return false;
+                  };
+                  buscarYInyectar(data);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error al inyectar líderes territoriales:", err);
+      }
+    }
 
     return { data, error: null };
   } catch {
@@ -1088,16 +1251,32 @@ export async function deletePuesto(id: string): Promise<ActionResult> {
       listarTitularesPorPuesto(supabase, municipioId),
     ]);
 
+    const puestoTarget = puestos.find((p) => p.id === id);
+    if (!puestoTarget) return { success: false, error: "PUESTO_NOT_FOUND" };
+
     if (!departamentosRes.error) {
       const departamentos = (departamentosRes.data ?? []).map((row) =>
         normalizarDepartamento(row as Record<string, unknown>),
       );
       const arbol = construirArbol(departamentos, puestos, titularesPorPuesto);
       const nodo = buscarNodoPorId(arbol, id);
-      if (nodo && (nodo.hijos?.length ?? 0) > 0) {
-        return { success: false, error: "PUESTO_HAS_CHILDREN" };
+      if (nodo) {
+        const tieneSubdeps = (nodo.hijos ?? []).some((h) => h.tipo === "nivel");
+        if (tieneSubdeps) {
+          return { success: false, error: "PUESTO_HAS_CHILDREN" };
+        }
       }
     }
+
+    const salidaError = validarSalidaPuesto(puestos, puestoTarget);
+    if (salidaError) return { success: false, error: salidaError };
+
+    // Limpiar asociaciones FK
+    await supabase.from("puesto_jefaturas").delete().eq("puesto_id", id);
+    await supabase
+      .from("profiles")
+      .update({ puesto_id: null })
+      .eq("puesto_id", id);
 
     const { error: deleteError } = await supabase
       .from("puestos")
@@ -1105,6 +1284,194 @@ export async function deletePuesto(id: string): Promise<ActionResult> {
       .eq("id", id);
 
     if (deleteError) return { success: false, error: "DELETE_FAILED" };
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "DELETE_FAILED" };
+  }
+}
+
+export async function moverDepartamento(
+  id: string,
+  direccion: "arriba" | "abajo" | "inicio" | "fin",
+): Promise<ActionResult> {
+  try {
+    const { supabase, municipioId, error } = await requireAdminConMunicipio();
+    if (error || !supabase) return { success: false, error };
+
+    const { data: targetDep, error: targetErr } = await supabase
+      .from("departamentos")
+      .select("id, parent_id, orden")
+      .eq("id", id)
+      .eq("municipio_id", municipioId)
+      .maybeSingle();
+
+    if (targetErr || !targetDep) {
+      return { success: false, error: "DEPARTMENT_NOT_FOUND" };
+    }
+
+    const parentId = targetDep.parent_id;
+
+    let query = supabase
+      .from("departamentos")
+      .select("id, orden, nombre")
+      .eq("municipio_id", municipioId);
+
+    if (parentId === null) {
+      query = query.is("parent_id", null);
+    } else {
+      query = query.eq("parent_id", parentId);
+    }
+
+    const { data: hermanos, error: hermanosErr } = await query
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true });
+
+    if (hermanosErr || !hermanos || hermanos.length <= 1) {
+      return { success: true, error: null };
+    }
+
+    const idx = hermanos.findIndex((h) => h.id === id);
+    if (idx === -1) {
+      return { success: false, error: "DEPARTMENT_NOT_FOUND" };
+    }
+
+    const list = [...hermanos];
+
+    if (direccion === "arriba") {
+      if (idx === 0) return { success: true, error: null };
+      const temp = list[idx];
+      list[idx] = list[idx - 1];
+      list[idx - 1] = temp;
+    } else if (direccion === "abajo") {
+      if (idx === list.length - 1) return { success: true, error: null };
+      const temp = list[idx];
+      list[idx] = list[idx + 1];
+      list[idx + 1] = temp;
+    } else if (direccion === "inicio") {
+      if (idx === 0) return { success: true, error: null };
+      const item = list.splice(idx, 1)[0];
+      list.unshift(item);
+    } else if (direccion === "fin") {
+      if (idx === list.length - 1) return { success: true, error: null };
+      const item = list.splice(idx, 1)[0];
+      list.push(item);
+    }
+
+    const updates = list.map((item, index) =>
+      supabase
+        .from("departamentos")
+        .update({ orden: index })
+        .eq("id", item.id)
+        .eq("municipio_id", municipioId),
+    );
+
+    await Promise.all(updates);
+
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "SAVE_FAILED" };
+  }
+}
+
+export async function agregarAcreditacionPuesto({
+  puestoId,
+  nombre,
+  filePath,
+}: {
+  puestoId: string;
+  nombre: string;
+  filePath: string;
+}): Promise<ActionResult> {
+  try {
+    const { supabase, municipioId, error } = await requireAdminConMunicipio();
+    if (error || !supabase) return { success: false, error };
+
+    const { data: puesto, error: fetchErr } = await supabase
+      .from("puestos")
+      .select("acreditaciones")
+      .eq("id", puestoId)
+      .eq("municipio_id", municipioId)
+      .maybeSingle();
+
+    if (fetchErr || !puesto) {
+      return { success: false, error: "PUESTO_NOT_FOUND" };
+    }
+
+    let lista: AcreditacionFile[] = [];
+    if (Array.isArray(puesto.acreditaciones)) {
+      lista = puesto.acreditaciones as AcreditacionFile[];
+    } else if (typeof puesto.acreditaciones === "string") {
+      try {
+        lista = JSON.parse(puesto.acreditaciones);
+      } catch {
+        lista = [];
+      }
+    }
+
+    const nuevoArchivo: AcreditacionFile = {
+      id: String(Date.now()),
+      nombre,
+      file_path: filePath,
+      created_at: new Date().toISOString(),
+    };
+
+    lista = [nuevoArchivo, ...lista];
+
+    const { error: updateErr } = await supabase
+      .from("puestos")
+      .update({ acreditaciones: lista })
+      .eq("id", puestoId)
+      .eq("municipio_id", municipioId);
+
+    if (updateErr) return { success: false, error: "SAVE_FAILED" };
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: "SAVE_FAILED" };
+  }
+}
+
+export async function eliminarAcreditacionPuesto({
+  puestoId,
+  archivoId,
+}: {
+  puestoId: string;
+  archivoId: string;
+}): Promise<ActionResult> {
+  try {
+    const { supabase, municipioId, error } = await requireAdminConMunicipio();
+    if (error || !supabase) return { success: false, error };
+
+    const { data: puesto, error: fetchErr } = await supabase
+      .from("puestos")
+      .select("acreditaciones")
+      .eq("id", puestoId)
+      .eq("municipio_id", municipioId)
+      .maybeSingle();
+
+    if (fetchErr || !puesto) {
+      return { success: false, error: "PUESTO_NOT_FOUND" };
+    }
+
+    let lista: AcreditacionFile[] = [];
+    if (Array.isArray(puesto.acreditaciones)) {
+      lista = puesto.acreditaciones as AcreditacionFile[];
+    } else if (typeof puesto.acreditaciones === "string") {
+      try {
+        lista = JSON.parse(puesto.acreditaciones);
+      } catch {
+        lista = [];
+      }
+    }
+
+    const filtrado = lista.filter((a) => a.id !== archivoId);
+
+    const { error: updateErr } = await supabase
+      .from("puestos")
+      .update({ acreditaciones: filtrado })
+      .eq("id", puestoId)
+      .eq("municipio_id", municipioId);
+
+    if (updateErr) return { success: false, error: "DELETE_FAILED" };
     return { success: true, error: null };
   } catch {
     return { success: false, error: "DELETE_FAILED" };

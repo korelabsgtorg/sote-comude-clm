@@ -76,11 +76,16 @@ export function BreadcrumbNav() {
   }
 
   const rawSegments = pathname.split("/").filter((item) => item !== "");
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const segments = rawSegments.filter(seg => !isUUID.test(seg));
+  const uuidRegex = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+  
+  const segments = rawSegments.filter(seg => {
+    const withoutUuid = seg.replace(uuidRegex, "").replace(/^-/, "");
+    // Si era un UUID puro sin título detrás, se filtra
+    return !uuidRegex.test(seg) || withoutUuid.length > 0;
+  });
 
   const parentPath =
-    segments.length > 1 ? `/${segments.slice(0, -1).join("/")}` : "/comude";
+    rawSegments.length > 1 ? `/${rawSegments.slice(0, -1).join("/")}` : "/comude";
 
   return (
     <LayoutGroup id="breadcrumb">
@@ -113,8 +118,9 @@ export function BreadcrumbNav() {
             {segments.map((segment, index) => {
               if (segment === "comude") return null;
 
-              const href = `/${segments.slice(0, index + 1).join("/")}`;
+              const href = `/${rawSegments.slice(0, index + 1).join("/")}`;
               const isLast = index === segments.length - 1;
+              const displayLabel = segment.replace(uuidRegex, "").replace(/^-/, "").replace(/-/g, " ");
 
               return (
                 <motion.div
@@ -144,7 +150,7 @@ export function BreadcrumbNav() {
                         : crumbTextLink,
                     )}
                   >
-                    {segment.replace(/-/g, " ")}
+                    {displayLabel}
                   </Link>
                 </motion.div>
               );

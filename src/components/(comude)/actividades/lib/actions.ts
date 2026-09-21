@@ -14,6 +14,7 @@ import {
   CrearPuntoValues,
 } from "./zod";
 import { getGlobalMunicipioCookie } from "@/components/(base)/layout/actions";
+import { extractUuid } from "./slug";
 
 // ----- LECTURA -----
 
@@ -85,14 +86,7 @@ export async function getActividades(year?: number, month?: number): Promise<Act
 
   let query = supabase
     .from("act_comude")
-    .select(`
-      *,
-      act_comude_participantes (
-        act_comude_id,
-        usuario_id,
-        encargado
-      )
-    `)
+    .select("*")
     .gte("fecha", startDate)
     .lte("fecha", endDate)
     .order("fecha", { ascending: true });
@@ -127,14 +121,19 @@ export async function getActividades(year?: number, month?: number): Promise<Act
 
   if (error) throw new Error(error.message);
   
-  const actividadesConPerfiles = await attachProfilesToActividades(data || [], supabase);
-  return actividadesConPerfiles as ActComudeConParticipantes[];
+  return (data || []).map((act) => ({
+    ...act,
+    act_comude_participantes: act.act_comude_participantes || [],
+  })) as ActComudeConParticipantes[];
 }
 
-/** Obtiene una actividad con sus participantes, perfiles y puntos de agenda */
-export async function getActividadById(id: string): Promise<ActComudeConParticipantes | null> {
+/** Obtiene una actividad con sus participantes, perfiles y puntos de agenda (admite UUID o slug de título) */
+export async function getActividadById(idOrSlug: string): Promise<ActComudeConParticipantes | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const uuidMatch = idOrSlug.match(/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
+  const realId = uuidMatch ? uuidMatch[1] : null;
+
+  let query = supabase
     .from("act_comude")
     .select(`
       *,
@@ -149,9 +148,16 @@ export async function getActividadById(id: string): Promise<ActComudeConParticip
         act_comude_archivos(*)
       )
     `)
-    .eq("id", id)
-    .order("orden", { referencedTable: "act_comude_puntos", ascending: true })
-    .maybeSingle();
+    .order("orden", { referencedTable: "act_comude_puntos", ascending: true });
+
+  if (realId) {
+    query = query.eq("id", realId);
+  } else {
+    const rawSearch = idOrSlug.replace(/-/g, " ");
+    query = query.filter("detalles_sesion->>titulo", "ilike", `%${rawSearch}%`);
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
@@ -163,10 +169,11 @@ export async function getActividadById(id: string): Promise<ActComudeConParticip
 /** Obtiene los registros de asistencia de una actividad */
 export async function getRegistrosAsistencia(actComude_id: string): Promise<ActComudeRegistro[]> {
   const supabase = await createClient();
+  const realId = extractUuid(actComude_id);
   const { data, error } = await supabase
     .from("act_comude_registros")
     .select("*")
-    .eq("act_comude_id", actComude_id)
+    .eq("act_comude_id", realId)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);

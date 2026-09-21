@@ -113,108 +113,111 @@ export default function GestorArchivosPuntoModal({
         onClose={onClose}
         title="Documentos adjuntos"
         subtitle={punto.titulo}
+        className="max-w-md w-full"
       >
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground">
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
             Documentos adjuntos ({archivos.length})
           </span>
         </div>
         
-        <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 mb-6">
-          {archivos.length === 0 ? (
-            <li className="p-6 text-center text-sm text-muted-foreground">
-              No hay documentos adjuntos.
-            </li>
-          ) : (
-            archivos.map((archivo) => {
-              const isPdf = archivo.nombre.toLowerCase().endsWith('.pdf');
-              return (
-                <li
-                  key={archivo.id}
-                  className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                        isPdf
-                          ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
-                          : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                      }`}
-                    >
-                      {isPdf ? <FileText size={18} /> : <LinkIcon size={18} />}
+        <div className="max-h-[50vh] overflow-y-auto custom-scrollbar pr-1 mb-4">
+          <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/60">
+            {archivos.length === 0 ? (
+              <li className="p-5 text-center text-xs text-muted-foreground italic">
+                No hay documentos adjuntos.
+              </li>
+            ) : (
+              archivos.map((archivo) => {
+                const isPdf = archivo.nombre.toLowerCase().endsWith('.pdf');
+                return (
+                  <li
+                    key={archivo.id}
+                    className="flex items-center justify-between gap-2 p-2.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          isPdf
+                            ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+                            : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                        }`}
+                      >
+                        {isPdf ? <FileText size={16} /> : <LinkIcon size={16} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                          {archivo.nombre}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {new Date(archivo.created_at || Date.now()).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                        {archivo.nombre}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(archivo.created_at || Date.now()).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isPdf ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setIsGenerandoUrl(archivo.id);
-                          try {
-                            const supabase = createClient();
-                            const { data, error } = await supabase.storage.from("actas").createSignedUrl(archivo.file_path, 3600);
-                            if (error || !data) throw error;
-                            setPdfViendoNombre(archivo.nombre);
-                            setActaUrlToView(data.signedUrl);
-                          } catch (e) {
-                            toast.error("Error al cargar el PDF");
-                          } finally {
-                            setIsGenerandoUrl(null);
-                          }
-                        }}
-                        disabled={isGenerandoUrl === archivo.id}
-                        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-[#0066cc] dark:hover:bg-zinc-800 dark:hover:text-blue-400 disabled:opacity-50"
-                        title="Ver documento"
-                      >
-                        {isGenerandoUrl === archivo.id ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const supabase = createClient();
-                            const { data, error } = await supabase.storage.from("actas").createSignedUrl(archivo.file_path, 3600);
-                            if (error || !data) throw error;
-                            window.open(data.signedUrl, '_blank');
-                          } catch (e) {
-                            toast.error("Error al descargar el archivo");
-                          }
-                        }}
-                        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-[#0066cc] dark:hover:bg-zinc-800 dark:hover:text-blue-400"
-                        title="Abrir archivo"
-                      >
-                        <ExternalLink size={16} />
-                      </button>
-                    )}
-                    {canManage && (
-                      <button
-                        onClick={() => handleEliminar(archivo.id, archivo.file_path)}
-                        disabled={eliminando}
-                        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                        title="Eliminar archivo"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })
-          )}
-        </ul>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isPdf ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setIsGenerandoUrl(archivo.id);
+                            try {
+                              const supabase = createClient();
+                              const { data, error } = await supabase.storage.from("actas").createSignedUrl(archivo.file_path, 3600);
+                              if (error || !data) throw error;
+                              setPdfViendoNombre(archivo.nombre);
+                              setActaUrlToView(data.signedUrl);
+                            } catch (e) {
+                              toast.error("Error al cargar el PDF");
+                            } finally {
+                              setIsGenerandoUrl(null);
+                            }
+                          }}
+                          disabled={isGenerandoUrl === archivo.id}
+                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-blue-600 dark:hover:bg-zinc-800 dark:hover:text-blue-400 disabled:opacity-50"
+                          title="Ver documento"
+                        >
+                          {isGenerandoUrl === archivo.id ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const supabase = createClient();
+                              const { data, error } = await supabase.storage.from("actas").createSignedUrl(archivo.file_path, 3600);
+                              if (error || !data) throw error;
+                              window.open(data.signedUrl, '_blank');
+                            } catch (e) {
+                              toast.error("Error al descargar el archivo");
+                            }
+                          }}
+                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-blue-600 dark:hover:bg-zinc-800 dark:hover:text-blue-400"
+                          title="Abrir archivo"
+                        >
+                          <ExternalLink size={15} />
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          onClick={() => handleEliminar(archivo.id, archivo.file_path)}
+                          disabled={eliminando}
+                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          title="Eliminar archivo"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
 
         {canManage && (
-          <div className="mb-4">
+          <div className="mb-2">
             <input 
               type="file" 
               ref={fileInputRef}
@@ -224,19 +227,19 @@ export default function GestorArchivosPuntoModal({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-70"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition-colors disabled:opacity-70"
             >
-              {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
               {isUploading ? "Subiendo archivo..." : "Subir nuevo archivo"}
             </button>
           </div>
         )}
 
-        <ModalFooter>
-          <Button variant="outline" className="w-full rounded-xl font-bold" onClick={onClose}>
+        <div className="mt-3">
+          <Button variant="outline" size="sm" className="w-full rounded-xl text-xs font-semibold h-8" onClick={onClose}>
             Cerrar
           </Button>
-        </ModalFooter>
+        </div>
       </ModalShell>
 
       <ActaVisorModal

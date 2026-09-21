@@ -480,29 +480,7 @@ export default function SignUp({
                       )}
                     </div>
 
-                    {showOrganizacion && (
-                      <div className="grid gap-2">
-                        <Label htmlFor="organizacion_id">
-                          Organización{" "}
-                          <span className="font-normal text-muted-foreground">
-                            (opcional)
-                          </span>
-                        </Label>
-                        <Select
-                          id="organizacion_id"
-                          name="organizacion_id"
-                          value={logic.organizacionId}
-                          onChange={(e) => logic.setOrganizacionId(e.target.value)}
-                        >
-                          <option value="">Sin organización</option>
-                          {organizaciones.map((org) => (
-                            <option key={org.id} value={org.id}>
-                              {org.nombre}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    )}
+
 
                     <div className="grid gap-2">
                       <div className="flex items-center justify-between">

@@ -256,7 +256,7 @@ export default function NotasModal({
                   </div>
 
                   {canManage && (
-                    <div className="flex justify-end gap-1 w-full border-t border-border/50 pt-2 pb-2">
+                    <div className="flex items-center justify-between w-full border-t border-border/50 pt-2 pb-2">
                       {editingIndex === index ? (
                         <>
                           <Button

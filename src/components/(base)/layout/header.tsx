@@ -96,25 +96,24 @@ export default function Header() {
                     </motion.div>
                   </>
                 ) : (
-                  <>
-                    <motion.div
+                  <div className="flex items-center gap-2 min-w-0">
+                    <motion.h1
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="flex flex-col gap-0 leading-none text-sm md:text-lg lg:text-xl font-extrabold tracking-tight"
+                      className="text-base sm:text-lg md:text-2xl font-extrabold tracking-tighter leading-none text-azul-trifinio dark:text-white shrink-0"
                     >
-                      <span className="text-azul-trifinio dark:text-white">SOTE</span>
-                      <span className="inline-flex items-baseline gap-1">
-                        <span className="font-light text-border/80">|</span>
-                        <span
-                          className="text-xs md:text-base lg:text-lg font-semibold text-celeste-trifinio tracking-normal"
-                          style={{ fontFamily: "Arial, sans-serif" }}
-                        >
-                          {dynamicTitle}
-                        </span>
-                      </span>
+                      SOTE
+                    </motion.h1>
+                    <motion.div
+                      initial={{ opacity: 0, clipPath: "inset(0 100% 0 0)" }}
+                      animate={{ opacity: 1, clipPath: "inset(0 0 0 0)" }}
+                      transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 1, 0.5, 1] }}
+                      className="text-[9px] sm:text-[10px] md:text-[11px] font-black uppercase tracking-wider sm:tracking-widest leading-[1.1] text-celeste-trifinio border-l border-border/60 pl-2 min-w-0"
+                    >
+                      SISTEMA DE ORGANIZACIÓN<br />TERRITORIAL ESTRATÉGICA
                     </motion.div>
-                  </>
+                  </div>
                 )}
               </Link>
             </div>

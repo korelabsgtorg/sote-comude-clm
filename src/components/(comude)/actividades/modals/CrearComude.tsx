@@ -71,7 +71,7 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
       setLibro(actividad.detalles_sesion?.libro || "");
       setFecha(parseInitialDate(actividad.fecha));
       setParticipantes(
-        actividad.act_comude_participantes.map(p => ({
+        (actividad.act_comude_participantes || []).map(p => ({
           usuario_id: p.usuario_id,
           nombre: p.profiles?.nombre || "Sin nombre",
           encargado: p.encargado

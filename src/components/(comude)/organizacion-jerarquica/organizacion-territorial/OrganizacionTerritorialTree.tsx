@@ -18,11 +18,23 @@ import {
   Layers,
   TreePine,
   Home,
-  Users,
   Plus,
   Pencil,
-  Trash2,
   MapPin,
+  Briefcase,
+  Crown,
+  UserPlus,
+  UserMinus,
+  UserRound,
+  ArrowRightLeft,
+  FileText,
+  CalendarDays,
+  FileCheck,
+  Scroll,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NodoTerritorial, TipoLugar } from "./lib/zod";
@@ -33,16 +45,20 @@ import {
   ORG_ACTIONS_HOVER,
   type TerritorialAdminHandlers,
 } from "./lib/org-actions";
-import { VerMiembrosModal } from "./modals/VerMiembrosModal";
 
-export type { TerritorialAdminHandlers };
+function formatFechaCorto(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso + (iso.includes("T") ? "" : "T12:00:00"));
+  if (isNaN(d.getTime())) return "";
+  const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const dayName = days[d.getDay()];
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dayName} ${dd}/${mm}/${yy}`;
+}
 
 const ACCORDION_EASE = [0.33, 1, 0.68, 1] as const;
-
-function contarMiembrosTotal(nodo: NodoTerritorial): number {
-  const directos = nodo.residentes?.length ?? 0;
-  return directos + nodo.hijos.reduce((acc, h) => acc + contarMiembrosTotal(h), 0);
-}
 
 const TIPO_STYLES: Record<
   TipoLugar,
@@ -87,6 +103,9 @@ function collectExpandableIds(nodos: NodoTerritorial[]): string[] {
       ids.push(n.id);
       ids.push(...collectExpandableIds(n.hijos));
     }
+    if (n.puestos && n.puestos.length > 0) {
+      ids.push(`puestos-${n.id}`);
+    }
   }
   return ids;
 }
@@ -101,11 +120,13 @@ function ExpansionProvider({
   const expandableIds = useMemo(() => collectExpandableIds(nodos), [nodos]);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set(expandableIds),
+    () => new Set(expandableIds.filter((id) => !id.startsWith("puestos-"))),
   );
 
   useEffect(() => {
-    setExpandedIds(new Set(expandableIds));
+    setExpandedIds(
+      new Set(expandableIds.filter((id) => !id.startsWith("puestos-"))),
+    );
   }, [expandableIds]);
 
   const isExpanded = useCallback((id: string) => expandedIds.has(id), [expandedIds]);
@@ -169,6 +190,8 @@ export function ToolbarExpansionTerritorial() {
   );
 }
 
+export type { TerritorialAdminHandlers };
+
 function RowAccionesNode({
   nodo,
   adminHandlers,
@@ -193,12 +216,23 @@ function RowAccionesNode({
         </OrgActionButton>
       )}
 
-      <OrgActionButton
-        label="Gestionar Residentes"
-        onClick={() => adminHandlers.onAsignarResidentes(nodo.id)}
-      >
-        <Users className="size-4" strokeWidth={2.25} />
-      </OrgActionButton>
+      {(nodo.tipo === "aldea" || nodo.tipo === "caserio") && adminHandlers.onGestionarResolucion && (
+        <OrgActionButton
+          label="Resolución COCODE"
+          onClick={() => adminHandlers.onGestionarResolucion!(nodo.id, nodo.nombre)}
+        >
+          <Scroll className="size-4" strokeWidth={2.25} />
+        </OrgActionButton>
+      )}
+
+      {(nodo.tipo === "aldea" || nodo.tipo === "caserio") && adminHandlers.onAddPuesto && (
+        <OrgActionButton
+          label="Agregar Puesto"
+          onClick={() => adminHandlers.onAddPuesto(nodo.id, nodo.nombre)}
+        >
+          <Briefcase className="size-4" strokeWidth={2.25} />
+        </OrgActionButton>
+      )}
 
       <OrgActionButton
         label="Editar"
@@ -223,18 +257,23 @@ function NodoItem({
 }) {
   const { isExpanded, toggle } = useExpansion();
   const tieneHijos = nodo.hijos.length > 0;
+  const tienePuestos = Boolean(nodo.puestos && nodo.puestos.length > 0);
   const expanded = isExpanded(nodo.id);
+  const puestosExpanded = isExpanded(`puestos-${nodo.id}`);
   const styles = TIPO_STYLES[nodo.tipo];
   const Icon = styles.icon;
-  const tieneResidentes = nodo.residentes && nodo.residentes.length > 0;
-  const [modalOpen, setModalOpen] = useState(false);
-  const miembrosDirectos = nodo.residentes?.length ?? 0;
-  const totalMiembros = contarMiembrosTotal(nodo);
-  const tieneHijosConMiembros = tieneHijos && totalMiembros > miembrosDirectos;
+
+  const canToggleHijos = tieneHijos && nodo.tipo === "microrregion";
+  const canTogglePuestos = tienePuestos;
+  const canToggle = canToggleHijos || canTogglePuestos;
 
   const onChevronClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggle(nodo.id);
+    if (canTogglePuestos) {
+      toggle(`puestos-${nodo.id}`);
+    } else if (canToggleHijos) {
+      toggle(nodo.id);
+    }
   };
 
   return (
@@ -249,22 +288,38 @@ function NodoItem({
         <div
           className={cn(
             "flex min-w-0 flex-1 items-stretch transition-colors",
-            tieneHijos && "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+            canToggle && "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
           )}
-          onClick={tieneHijos ? onChevronClick : undefined}
-          role={tieneHijos ? "button" : undefined}
+          onClick={canToggle ? onChevronClick : undefined}
+          role={canToggle ? "button" : undefined}
         >
-          {/* Icono Expandir */}
-          {tieneHijos ? (
+          {/* Icono Expandir (Microrregiones o Puestos) */}
+          {canToggle ? (
             <div
               className={cn(
                 "flex min-h-12 w-11 shrink-0 items-center justify-center",
                 styles.text,
               )}
-              title={expanded ? "Colapsar" : "Expandir"}
+              title={
+                canTogglePuestos
+                  ? puestosExpanded
+                    ? "Ocultar puestos"
+                    : "Mostrar puestos"
+                  : expanded
+                  ? "Colapsar"
+                  : "Expandir"
+              }
             >
               <motion.div
-                animate={{ rotate: expanded ? 90 : 0 }}
+                animate={{
+                  rotate: canTogglePuestos
+                    ? puestosExpanded
+                      ? 90
+                      : 0
+                    : expanded
+                    ? 90
+                    : 0,
+                }}
                 transition={{ duration: 0.25, ease: ACCORDION_EASE }}
               >
                 <ChevronRight className="size-4" strokeWidth={2.5} />
@@ -285,66 +340,200 @@ function NodoItem({
                 )}
               >
                 <Icon className="size-4" strokeWidth={2.25} />
-            </span>
+              </span>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-bold text-foreground">
-                  {nodo.nombre}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-bold text-foreground">
+                    {nodo.nombre}
+                  </p>
+                  {(nodo.tipo === "aldea" || nodo.tipo === "caserio") && (
+                    nodo.resolucion_vigente ? (
+                      nodo.resolucion_vigente.estado_vigencia === "vencido" ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:text-red-300">
+                          <XCircle className="size-3" /> Vencido
+                        </span>
+                      ) : nodo.resolucion_vigente.estado_vigencia === "por_vencer" ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                          <AlertTriangle className="size-3" /> Por Vencer ({nodo.resolucion_vigente.dias_restantes}d)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                          <CheckCircle2 className="size-3" /> Vigente
+                        </span>
+                      )
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-zinc-500/10 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">
+                        <Clock className="size-3" /> Sin Resolución
+                      </span>
+                    )
+                  )}
+                </div>
+                <p className={cn("text-[10px] font-bold uppercase tracking-wider", styles.text)}>
+                  {TIPO_LABELS[nodo.tipo]}
                 </p>
-                {totalMiembros > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                    <Users className="size-2.5" />
-                    {miembrosDirectos > 0 && tieneHijosConMiembros
-                      ? `${miembrosDirectos} ${miembrosDirectos === 1 ? 'miembro' : 'miembros'} · ${totalMiembros} total`
-                      : miembrosDirectos > 0
-                        ? `${miembrosDirectos} ${miembrosDirectos === 1 ? 'miembro' : 'miembros'}`
-                        : `${totalMiembros} ${totalMiembros === 1 ? 'miembro' : 'miembros'} en total`}
-                  </span>
-                )}
               </div>
-              <p className={cn("text-[10px] font-bold uppercase tracking-wider", styles.text)}>
-                {TIPO_LABELS[nodo.tipo]}
-                {tieneHijos && (
-                  <span className="ml-1.5 font-normal text-muted-foreground">
-                    · {nodo.hijos.length}{" "}
-                    {nodo.hijos.length === 1
-                      ? TIPO_LABELS[TIPOS_HIJOS[nodo.tipo] ?? nodo.tipo]
-                      : TIPO_LABELS[TIPOS_HIJOS[nodo.tipo] ?? nodo.tipo] + "s"}
-                  </span>
-                )}
-              </p>
             </div>
           </div>
-
-          {/* Botón Ver Miembros */}
-          {tieneResidentes && (
-            <div className="ml-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setModalOpen(true); }}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[9px] font-semibold tracking-wide transition-colors",
-                  styles.border,
-                  styles.text,
-                  "hover:opacity-80",
-                )}
-              >
-                <Users className="size-3" />
-                <span>Ver <span className="hidden sm:inline">miembros</span></span>
-              </button>
-            </div>
-          )}
-        </div>
         </div>
 
         {/* Acciones del Nodo */}
         <RowAccionesNode nodo={nodo} adminHandlers={adminHandlers} parentId={parentId} />
       </div>
 
-      {/* Nodos Hijos Anidados */}
+      {/* Renderizado de Puestos de la Comunidad (ocultos como acordeón) */}
       <AnimatePresence initial={false}>
-        {tieneHijos && expanded && (
+        {nodo.puestos && nodo.puestos.length > 0 && puestosExpanded && (
+          <motion.div
+            key={`puestos-${nodo.id}`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: ACCORDION_EASE }}
+            className="overflow-hidden mt-2 space-y-2.5"
+          >
+            {nodo.puestos.map((puesto) => {
+              const esJefe = puesto.jefatura_ids.length > 0;
+              const tieneTitular = Boolean(puesto.titular);
+              return (
+                <div
+                  key={puesto.id}
+                  className={cn(
+                    "group/puesto relative flex min-w-0 items-stretch overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:shadow-md",
+                    !esJefe && "ml-4 md:ml-6",
+                    esJefe
+                      ? "border-purple-500/50 bg-card"
+                      : "border-border/60 bg-card"
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 items-center justify-between px-4 py-3 md:px-5 md:py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p
+                          className={cn(
+                            "leading-tight text-foreground text-sm font-semibold tracking-tight md:text-[0.9375rem]",
+                            !puesto.activo && "text-muted-foreground opacity-70"
+                          )}
+                        >
+                          {puesto.nombre}
+                        </p>
+
+                        {puesto.fecha && (
+                          <div className="flex items-center gap-1.5 shrink-0 text-xs font-medium text-muted-foreground/70">
+                            <span className="opacity-50">·</span>
+                            <CalendarDays className="size-3.5 opacity-70" />
+                            {formatFechaCorto(puesto.fecha)}
+                          </div>
+                        )}
+
+                        {Boolean(puesto.acreditaciones?.length) && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                            <FileCheck className="size-3" />
+                            Acreditado
+                          </span>
+                        )}
+
+                        {!puesto.activo && (
+                          <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300">
+                            Inactivo
+                          </span>
+                        )}
+                      </div>
+
+                      <AnimatePresence initial={false}>
+                        {puesto.titular ? (
+                          <motion.div
+                            key="titular"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: ACCORDION_EASE }}
+                            className="mt-1.5 flex items-center gap-2 overflow-hidden"
+                          >
+                            <span
+                              className={cn(
+                                "flex size-5 shrink-0 items-center justify-center rounded-full ring-1",
+                                esJefe
+                                  ? "bg-purple-500/20 text-purple-600 ring-purple-500/30 dark:text-purple-300"
+                                  : "bg-zinc-500/12 text-muted-foreground ring-zinc-500/20"
+                              )}
+                            >
+                              <UserRound className="size-3" />
+                            </span>
+                            <span className="truncate text-xs font-medium text-muted-foreground">
+                              {puesto.titular}
+                            </span>
+                          </motion.div>
+                        ) : (
+                          <motion.p
+                            key="sin-persona"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="mt-1 text-[11px] text-muted-foreground/60 italic"
+                          >
+                            Sin persona asignada
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Acciones del Puesto */}
+                  {adminHandlers && (
+                    <div
+                      className={cn(
+                        "flex shrink-0 self-stretch items-stretch divide-x overflow-visible border-l",
+                        esJefe
+                          ? "divide-purple-500/35 border-purple-500/25 [&_button]:bg-purple-500/5 [&_button]:text-purple-700 [&_button]:hover:bg-purple-500/12 dark:[&_button]:text-purple-300"
+                          : "divide-emerald-500/35 border-emerald-500/25 [&_button]:bg-emerald-500/5 [&_button]:text-emerald-700 [&_button]:hover:bg-emerald-500/12 dark:[&_button]:text-emerald-300"
+                      )}
+                    >
+                      {tieneTitular && adminHandlers.onDesasignarPersona ? (
+                        <OrgActionButton
+                          label="Desasignar persona"
+                          onClick={() => adminHandlers.onDesasignarPersona!(puesto.id, puesto.nombre, puesto.titular!)}
+                        >
+                          <UserMinus className="size-4" />
+                        </OrgActionButton>
+                      ) : adminHandlers.onAsignarPersona ? (
+                        <OrgActionButton
+                          label="Asignar persona"
+                          onClick={() => adminHandlers.onAsignarPersona!(puesto.id, puesto.nombre)}
+                        >
+                          <UserPlus className="size-4" />
+                        </OrgActionButton>
+                      ) : null}
+
+                      {adminHandlers.onReubicarPuesto && (
+                        <OrgActionButton
+                          label="Reubicar puesto"
+                          onClick={() => adminHandlers.onReubicarPuesto!(puesto.id, puesto.nombre)}
+                        >
+                          <ArrowRightLeft className="size-4" />
+                        </OrgActionButton>
+                      )}
+
+                      {adminHandlers.onEditPuesto && (
+                        <OrgActionButton
+                          label="Editar puesto"
+                          onClick={() => adminHandlers.onEditPuesto!(puesto.id)}
+                        >
+                          <Pencil className="size-4" />
+                        </OrgActionButton>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Nodos Hijos Anidados (Siempre expandidos si es Aldea o si su nodo está en expanded) */}
+      <AnimatePresence initial={false}>
+        {tieneHijos && (nodo.tipo === "aldea" || expanded) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -352,7 +541,14 @@ function NodoItem({
             transition={{ duration: 0.3, ease: ACCORDION_EASE }}
             className="overflow-hidden"
           >
-            <div className="mt-2 space-y-2 border-l-2 border-emerald-500/20 pl-3 md:pl-5">
+            <div
+              className={cn(
+                "mt-2 space-y-2",
+                nodo.tipo === "microrregion"
+                  ? "border-l-2 border-emerald-500/20 pl-3 md:pl-5"
+                  : "pl-0"
+              )}
+            >
               {nodo.hijos.map((hijo) => (
                 <NodoItem
                   key={hijo.id}
@@ -366,15 +562,6 @@ function NodoItem({
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Modal Ver Miembros */}
-      <VerMiembrosModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        nombre={nodo.nombre}
-        tipo={nodo.tipo}
-        residentes={nodo.residentes}
-      />
     </div>
   );
 }
@@ -405,7 +592,7 @@ export function OrganizacionTerritorialTree({
                     Municipio
                   </p>
                   <h3 className="text-sm font-black text-foreground md:text-base leading-tight">
-                    {municipioNombre ?? "Estructura Territorial del Municipio"}
+                    {municipioNombre ?? "Estructura de Cocodes y Territorio del Municipio"}
                   </h3>
                 </div>
               </div>

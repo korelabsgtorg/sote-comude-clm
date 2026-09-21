@@ -1,5 +1,5 @@
 export const ROLE_LABELS: Record<string, string> = {
-  cocode: "Cocode",
+  cocode: "Comude",
   institucion: "Institución",
   admin: "Administrador",
   super: "Super Admin",

@@ -40,6 +40,8 @@ export interface PersonaTerritorioOption {
   comunidad_nombre?: string | null;
 }
 
+import type { PuestoRecord } from "../../organizacion-jerarquica/lib/zod";
+
 export interface NodoTerritorial {
   id: string;
   nombre: string;
@@ -47,6 +49,8 @@ export interface NodoTerritorial {
   personas_count: number;
   residentes: PersonaResidente[];
   hijos: NodoTerritorial[];
+  puestos?: PuestoRecord[];
+  resolucion_vigente?: CocodePeriodo | null;
 }
 
 // ─── Zod ─────────────────────────────────────────────────────────────────────
@@ -65,3 +69,48 @@ export const asignarPersonaComunidadSchema = z.object({
 });
 
 export type AsignarPersonaComunidadValues = z.infer<typeof asignarPersonaComunidadSchema>;
+
+// ─── Resoluciones y COCODE Periodos ──────────────────────────────────────────
+
+export type EstadoVigencia = "vigente" | "por_vencer" | "vencido" | "sin_resolucion";
+
+export interface CocodeResolucionFileItem {
+  id: string;
+  nombre: string;
+  file_path: string;
+  created_at: string;
+}
+
+export interface CocodeResolucionData {
+  titulo: string;
+  archivos: CocodeResolucionFileItem[];
+}
+
+export interface CocodePeriodo {
+  id: string;
+  comunidad_id: string;
+  municipio_id: number;
+  resolucion: CocodeResolucionData;
+  fecha_emision: string | null;
+  fecha_vencimiento: string;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  estado_vigencia?: EstadoVigencia;
+  dias_restantes?: number;
+}
+
+export interface CocodeHistoricoPuesto {
+  id: string;
+  periodo_id: string;
+  nombre_puesto: string;
+  es_presidente: boolean;
+  titular_nombre: string | null;
+  fecha_asignacion: string | null;
+  created_at: string;
+}
+
+export interface PeriodoConHistorico extends CocodePeriodo {
+  historico_puestos?: CocodeHistoricoPuesto[];
+}
+

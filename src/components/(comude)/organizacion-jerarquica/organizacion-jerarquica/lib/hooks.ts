@@ -14,6 +14,9 @@ import {
   updateDepartamento,
   updatePuesto,
   reubicarPuesto,
+  moverDepartamento,
+  agregarAcreditacionPuesto,
+  eliminarAcreditacionPuesto,
 } from "./actions";
 import {
   ESTRUCTURA_VACIA,
@@ -91,34 +94,50 @@ export function useEliminarDepartamento() {
 
 export function useCrearPuesto() {
   const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: PuestoFormValues) => createPuesto(values),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
+    },
   });
 }
 
 export function useEditarPuesto() {
   const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, values }: { id: string; values: PuestoFormValues }) =>
       updatePuesto(id, values),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
+    },
   });
 }
 
 export function useEliminarPuesto() {
   const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deletePuesto(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
+    },
   });
 }
 
 export function useReubicarPuesto() {
   const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: ReubicarPuestoValues) => reubicarPuesto(values),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
+    },
   });
 }
 
@@ -139,7 +158,48 @@ export function useAsignarPersonaAPuesto() {
       if (result.success) {
         invalidate();
         queryClient.invalidateQueries({ queryKey: [PERSONAS_ASIGNAR_KEY] });
+        queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
       }
+    },
+  });
+}
+
+export function useMoverDepartamento() {
+  const invalidate = useInvalidateEstructura();
+  return useMutation({
+    mutationFn: ({
+      id,
+      direccion,
+    }: {
+      id: string;
+      direccion: "arriba" | "abajo" | "inicio" | "fin";
+    }) => moverDepartamento(id, direccion),
+    onSuccess: invalidate,
+  });
+}
+
+export function useAgregarAcreditacionPuesto() {
+  const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: { puestoId: string; nombre: string; filePath: string }) =>
+      agregarAcreditacionPuesto(values),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
+    },
+  });
+}
+
+export function useEliminarAcreditacionPuesto() {
+  const invalidate = useInvalidateEstructura();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: { puestoId: string; archivoId: string }) =>
+      eliminarAcreditacionPuesto(values),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["estructura-territorial"] });
     },
   });
 }

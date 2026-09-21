@@ -15,9 +15,10 @@ export function RoleSimulator() {
           onChange={(e) => setSimulatedRole(e.target.value || null)}
         >
           <option value="">{realRole}</option>
-          <option value="super">SUPER</option>
-          <option value="admin">ADMIN</option>
-          <option value="user">USER</option>
+          <option value="super">SUPER ADMIN</option>
+          <option value="admin">ADMINISTRADOR</option>
+          <option value="cocode">COMUDE</option>
+          <option value="institucion">INSTITUCCIÓN</option>
         </select>
       </div>
       <div className="bg-white/80 dark:bg-black/80 backdrop-blur-md px-1 py-1.5 rounded-l-lg border border-r-0 border-white/20 cursor-pointer transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none">

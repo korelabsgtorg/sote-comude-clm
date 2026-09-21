@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { Paperclip, Trash2, Pencil, Plus, Loader2, ChevronDown, FileText, X, MoreVertical } from "lucide-react";
@@ -201,12 +202,15 @@ function FilaPunto({
   if (isMobile) {
     return (
       <>
-      <div className="bg-card shadow-sm border border-zinc-300 dark:border-zinc-700 rounded-lg py-3 px-1.5 flex flex-col gap-2">
-        <div className="flex justify-between items-start cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="flex flex-col gap-2 flex-1 pr-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground">#{orden}</span>
-              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border border-current/10", colorEstado(punto.estado))}>
+      <div className="bg-card shadow-xs border border-border/60 rounded-xl p-4 flex flex-col gap-3 transition-all">
+        {/* Cabecera de la tarjeta */}
+        <div className="flex items-start justify-between gap-3 cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-black text-muted-foreground/80 bg-muted/60 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                #{orden}
+              </span>
+              <span className={cn("text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-current/15", colorEstado(punto.estado))}>
                 {punto.estado ?? "No iniciado"}
               </span>
             </div>
@@ -220,123 +224,153 @@ function FilaPunto({
                     if (e.key === "Enter") handleGuardarTitulo();
                     if (e.key === "Escape") { setEditando(false); setTituloEdit(punto.titulo); }
                   }}
-                  className="flex-1 text-sm border border-border/60 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-azul-trifinio/50 bg-background"
+                  className="flex-1 text-sm border border-border/60 rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-azul-trifinio/50 bg-background"
                 />
-                <button onClick={handleGuardarTitulo} disabled={actualizando} className="text-xs bg-azul-trifinio text-white px-2 py-1 rounded font-medium">
-                  {actualizando ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+                <button onClick={handleGuardarTitulo} disabled={actualizando} className="text-xs bg-azul-trifinio text-white px-3 py-1.5 rounded-lg font-bold">
+                  {actualizando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "OK"}
                 </button>
               </div>
             ) : (
-              <h4 className="text-sm font-semibold text-foreground/90 leading-tight">{punto.titulo}</h4>
+              <h4 className="text-sm font-bold text-foreground leading-snug tracking-tight">{punto.titulo}</h4>
             )}
           </div>
-          <button className="p-1 mt-1 text-muted-foreground hover:bg-muted rounded-md transition-colors">
-            <ChevronDown className={cn("w-4 h-4 transition-transform", isExpanded && "rotate-180")} />
+          <button 
+            type="button"
+            className="p-1.5 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg transition-colors mt-0.5"
+          >
+            <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", isExpanded && "rotate-180")} />
           </button>
         </div>
 
-        {isExpanded && (
-          <div className="mt-2 pt-3 border-t border-border/30 flex flex-col gap-4">
-            
-            {/* Categoría y Votación */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Categoría</span>
-                {canManage ? (
-                  <button
-                    onClick={() => onOpenCategoriasModal(punto.id)}
-                    className="flex justify-between items-center text-xs text-foreground bg-transparent border border-border/50 rounded px-1.5 py-1 w-full hover:bg-muted/50 transition-colors"
-                  >
-                    <span>{punto.categoria?.nombre ?? "Sin categoría"}</span>
-                    <ChevronDown className="w-3 h-3 opacity-60" />
-                  </button>
-                ) : (
-                  <span className="text-xs">{punto.categoria?.nombre ?? "—"}</span>
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Votación</span>
-                <InlineSelect
-                  value={punto.votacion}
-                  options={VOTACIONES}
-                  onChange={(v) => cambiarVotacion({ puntoId: punto.id, votacion: v, actComudeId })}
-                  colorFn={colorVotacion}
-                  disabled={!canManage}
-                />
-              </div>
-            </div>
-
-            {/* Notas */}
-            {(sesionEstado !== "Programada" && sesionEstado != null) && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Notas</span>
-                {punto.notas && punto.notas.length > 0 ? (
-                  <div className="flex flex-col gap-1 w-full" onClick={() => canManage && onOpenNotasModal(punto)}>
-                    {punto.notas.map((nota, index) => (
-                      <div key={index} className={cn("w-full rounded p-2 bg-muted/10 border border-transparent", canManage && "cursor-pointer hover:border-border/50 transition-colors")}>
-                        <p className="text-xs text-foreground">
-                          {punto.notas!.length > 1 && <span className="font-semibold opacity-70 mr-1">{index + 1}.</span>}
-                          {nota}
-                        </p>
-                      </div>
-                    ))}
+        {/* Contenido Expandible Animado */}
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              key="mobile-expanded-content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pt-3 border-t border-border/40 flex flex-col gap-3.5">
+                
+                {/* Contenedor Categoría y Votación */}
+                <div className="grid grid-cols-2 gap-2.5 bg-muted/30 dark:bg-zinc-900/40 p-2.5 rounded-xl border border-border/40">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Categoría</span>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCategoriasModal(punto.id)}
+                        className="flex justify-between items-center text-xs font-medium text-foreground bg-background dark:bg-zinc-900 border border-border/60 rounded-lg px-2.5 py-1.5 w-full hover:bg-muted/50 transition-colors"
+                      >
+                        <span className="truncate">{punto.categoria?.nombre ?? "Sin categoría"}</span>
+                        <ChevronDown className="w-3 h-3 opacity-60 ml-1 shrink-0" />
+                      </button>
+                    ) : (
+                      <span className="text-xs font-medium text-foreground/90 truncate">{punto.categoria?.nombre ?? "—"}</span>
+                    )}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => canManage && onOpenNotasModal(punto)}
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Votación</span>
+                    <InlineSelect
+                      value={punto.votacion}
+                      options={VOTACIONES}
+                      onChange={(v) => cambiarVotacion({ puntoId: punto.id, votacion: v, actComudeId })}
+                      colorFn={colorVotacion}
+                      disabled={!canManage}
+                    />
+                  </div>
+                </div>
+
+                {/* Sección de Notas */}
+                {(sesionEstado !== "Programada" && sesionEstado != null) && (
+                  <div className="flex flex-col gap-1.5 bg-muted/30 dark:bg-zinc-900/40 p-2.5 rounded-xl border border-border/40">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Notas y Acuerdos</span>
+                    {punto.notas && punto.notas.length > 0 ? (
+                      <div className="flex flex-col gap-1.5 w-full" onClick={() => canManage && onOpenNotasModal(punto)}>
+                        {punto.notas.map((nota, index) => (
+                          <div key={index} className={cn("w-full rounded-lg p-2 bg-background dark:bg-zinc-900 border border-border/50 shadow-2xs", canManage && "cursor-pointer hover:border-azul-trifinio/40 transition-colors")}>
+                            <p className="text-xs text-foreground/90 leading-relaxed">
+                              {punto.notas!.length > 1 && <span className="font-bold text-celeste-trifinio mr-1.5">{index + 1}.</span>}
+                              {nota}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => canManage && onOpenNotasModal(punto)}
+                        className={cn(
+                          "text-xs text-left w-full block bg-background dark:bg-zinc-900 rounded-lg p-2.5 border border-border/50",
+                          canManage ? "cursor-pointer hover:border-azul-trifinio/40 transition-colors text-muted-foreground italic" : "cursor-default text-muted-foreground italic"
+                        )}
+                      >
+                        {canManage ? "+ Añadir notas o acuerdos..." : "Sin notas registradas"}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Barra Inferior: Archivos Adjuntos y Acciones */}
+                <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                  <button 
+                    type="button"
+                    onClick={() => setIsArchivosModalOpen(true)}
                     className={cn(
-                      "text-xs text-left w-full block bg-muted/10 rounded p-2 border border-transparent",
-                      canManage ? "cursor-pointer hover:border-border/50 transition-colors text-muted-foreground italic" : "cursor-default text-muted-foreground italic"
+                      "flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all border shadow-2xs",
+                      totalArchivos > 0
+                        ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20"
+                        : "bg-muted/40 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground"
                     )}
                   >
-                    {canManage ? "Añadir notas..." : "—"}
+                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {totalArchivos > 0
+                        ? `${totalArchivos} adjunto${totalArchivos !== 1 ? "s" : ""}`
+                        : canManage
+                        ? "+ Adjuntar"
+                        : "Sin adjuntos"}
+                    </span>
                   </button>
-                )}
+                  
+                  {canManage && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg transition-colors flex items-center justify-center border border-border/40"
+                          title="Acciones"
+                        >
+                          {eliminando ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-36 z-[1100] bg-white dark:bg-zinc-950 shadow-xl border border-border">
+                        <DropdownMenuItem 
+                          onClick={() => { setEditando(true); setTituloEdit(punto.titulo); }}
+                          className="cursor-pointer"
+                        >
+                          <Pencil className="mr-2 w-4 h-4" />
+                          <span>Editar</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={handleEliminar}
+                          disabled={eliminando}
+                          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950"
+                        >
+                          <Trash2 className="mr-2 w-4 h-4" />
+                          <span>Eliminar</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
-            )}
-
-            {/* Acciones y Docs */}
-            <div className="flex items-center justify-between mt-1">
-              <button 
-                onClick={() => setIsArchivosModalOpen(true)}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-azul-trifinio transition-colors px-2 py-1 -ml-2 rounded-md hover:bg-muted/50"
-              >
-                <Paperclip className="w-3.5 h-3.5" />
-                <span>{totalArchivos} adjunto{totalArchivos !== 1 && "s"}</span>
-              </button>
-              
-              {canManage && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors flex items-center justify-center"
-                      title="Acciones"
-                    >
-                      {eliminando ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-36 z-[1100] bg-white dark:bg-zinc-950 shadow-lg border-border">
-                    <DropdownMenuItem 
-                      onClick={() => { setEditando(true); setTituloEdit(punto.titulo); }}
-                      className="cursor-pointer"
-                    >
-                      <Pencil className="mr-2" />
-                      <span>Editar</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={handleEliminar}
-                      disabled={eliminando}
-                      className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950"
-                    >
-                      <Trash2 className="mr-2" />
-                      <span>Eliminar</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <GestorArchivosPuntoModal
         isOpen={isArchivosModalOpen}
@@ -359,20 +393,18 @@ function FilaPunto({
 
       {/* DOCS */}
       <td className="px-2 py-2.5 text-center w-12 border-r border-zinc-200 dark:border-zinc-800/80">
-        <div className="relative inline-flex">
-          <button
-            onClick={() => setIsArchivosModalOpen(true)}
-            title="Documentos adjuntos"
-            className="text-muted-foreground hover:text-azul-trifinio transition-colors"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
+        <button
+          onClick={() => setIsArchivosModalOpen(true)}
+          title="Documentos adjuntos"
+          className="relative inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-azul-trifinio transition-colors cursor-pointer select-none group"
+        >
+          <Paperclip className="w-4 h-4 transition-transform group-hover:scale-110" />
           {totalArchivos > 0 && (
-            <span className="absolute -top-1.5 -right-2 bg-blue-500 text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center pointer-events-none select-none shadow-2xs">
               {totalArchivos}
             </span>
           )}
-        </div>
+        </button>
       </td>
 
       {/* PUNTO A TRATAR */}

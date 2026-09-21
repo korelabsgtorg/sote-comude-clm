@@ -10,11 +10,13 @@ export function JefaturasField({
   selectedIds,
   onChange,
   required = false,
+  esComunidad = false,
 }: {
   departamentoId?: string;
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   required?: boolean;
+  esComunidad?: boolean;
 }) {
   const { data: departamentos = [], isLoading } = useDepartamentos();
 
@@ -51,7 +53,7 @@ export function JefaturasField({
   return (
     <div className="space-y-3">
       <FormLabel>
-        Jefatura de departamentos
+        {esComunidad ? "Asignar como Presidente / Líder" : "Jefatura de departamentos"}
         {required ? (
           <span className="ml-1 font-normal text-amber-600 dark:text-amber-400">
             (obligatorio)
@@ -60,9 +62,9 @@ export function JefaturasField({
       </FormLabel>
 
       <p className="text-xs text-muted-foreground">
-        Marca su propia dependencia para quedar como jefatura de ella, o una del
-        nivel inmediatamente inferior. Al seleccionar una, quedan a cargo también
-        sus subdependencias.
+        {esComunidad
+          ? "Marca esta opción si este puesto también tendrá rol de Presidente / Líder en esta comunidad o en sus aldeas/caseríos dependientes."
+          : "Marca su propia dependencia para quedar como jefatura de ella, o una del nivel inmediatamente inferior. Al seleccionar una, quedan a cargo también sus subdependencias."}
       </p>
 
       {isLoading ? (

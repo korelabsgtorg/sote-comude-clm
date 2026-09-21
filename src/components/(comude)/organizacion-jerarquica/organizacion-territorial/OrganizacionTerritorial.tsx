@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Layers,
@@ -16,6 +16,8 @@ import {
   useEstructuraTerritorial,
   useEliminarComunidad,
 } from "./lib/hooks";
+import { useAsignarPersonaAPuesto } from "../organizacion-jerarquica/lib/hooks";
+import { confirmarDesasignarPersona } from "../organizacion-jerarquica/lib/swal";
 import {
   OrganizacionTerritorialTree,
   type TerritorialAdminHandlers,
@@ -24,12 +26,17 @@ import { OrganizacionTerritorialSkeleton } from "./OrganizacionTerritorialSkelet
 import { OrganigramaTerritorialVertical } from "./OrganigramaTerritorialVertical";
 import { CrearTerritorio } from "./forms/CrearTerritorio";
 import { VerEditarTerritorio } from "./forms/VerEditarTerritorio";
-import { AsignarResidentes } from "./forms/AsignarResidentes";
+import { AsignarPersonaPuesto } from "../organizacion-jerarquica/forms/AsignarPersona";
+import { ReubicarPuestoModal } from "../organizacion-jerarquica/forms/ReubicarPuesto";
+import { VerEditarEstructura } from "../organizacion-jerarquica/forms/VerEditar";
+import { GestorAcreditacionesModal } from "../organizacion-jerarquica/forms/GestorAcreditacionesModal";
+import { GestionarResolucionModal } from "./forms/GestionarResolucionModal";
 import {
   TIPO_LABELS,
   type NodoTerritorial,
   type TipoLugar,
 } from "./lib/zod";
+import { CrearEstructura } from "../organizacion-jerarquica/forms/Crear";
 import {
   ModalConfirmDelete,
   modalActionMessage,
@@ -75,12 +82,6 @@ export function OrganizacionTerritorial() {
     parentId: string | null;
   } | null>(null);
 
-  const [modalResidentes, setModalResidentes] = useState<{
-    id: string;
-    nombre: string;
-    tipo: TipoLugar;
-  } | null>(null);
-
   const [modalEliminar, setModalEliminar] = useState<{
     id: string;
     nombre: string;
@@ -92,31 +93,96 @@ export function OrganizacionTerritorial() {
   const estaVacio = nodos.length === 0;
   const counts = useMemo(() => contarTiposTerritorio(nodos), [nodos]);
 
+  const desasignarPersonaMutation = useAsignarPersonaAPuesto();
+
+  const [modalPuesto, setModalPuesto] = useState<{
+    comunidadId: string;
+    comunidadNombre: string;
+  } | null>(null);
+
+  const [asignar, setAsignar] = useState<{
+    open: boolean;
+    puestoId: string | null;
+    puestoNombre: string;
+  }>({ open: false, puestoId: null, puestoNombre: "" });
+
+  const [reubicar, setReubicar] = useState<{
+    open: boolean;
+    puestoId: string | null;
+    puestoNombre: string;
+    departamentoActualId: string | null;
+  }>({ open: false, puestoId: null, puestoNombre: "", departamentoActualId: null });
+
+  const [editarPuestoId, setEditarPuestoId] = useState<string | null>(null);
+
+  const [acreditacionesModal, setAcreditacionesModal] = useState<{
+    open: boolean;
+    puestoId: string | null;
+    puestoNombre: string;
+  }>({ open: false, puestoId: null, puestoNombre: "" });
+
+  const [resolucionModal, setResolucionModal] = useState<{
+    open: boolean;
+    comunidadId: string | null;
+    comunidadNombre: string;
+  }>({ open: false, comunidadId: null, comunidadNombre: "" });
+
+  const desasignarPersona = useCallback(
+    async (puestoId: string, _puestoNombre: string, titularNombre: string) => {
+      const result = await confirmarDesasignarPersona({
+        title: "¿Desasignar persona?",
+        text: `Se quitará a ${titularNombre} de este puesto.`,
+      });
+      if (!result.isConfirmed) return;
+
+      const res = await desasignarPersonaMutation.mutateAsync({
+        puesto_id: puestoId,
+        profile_id: null,
+      });
+
+      if (res.success) {
+        toast.success("Persona desasignada del puesto.");
+        return;
+      }
+
+      toast.error(
+        modalActionMessage(
+          res.error ?? undefined,
+          "No se pudo desasignar la persona.",
+        ),
+      );
+    },
+    [desasignarPersonaMutation],
+  );
+
   const adminHandlers: TerritorialAdminHandlers = useMemo(
     () => ({
       onAddComunidad: (parentId, tipo) => setModalCrear({ parentId, tipo }),
-      onAsignarResidentes: (comunidadId) => {
-        function buscar(lista: NodoTerritorial[]): NodoTerritorial | null {
-          for (const n of lista) {
-            if (n.id === comunidadId) return n;
-            const r = buscar(n.hijos);
-            if (r) return r;
+      onAddPuesto: async (comunidadId, comunidadNombre) => {
+        try {
+          const { obtenerOManutenerDepartamentoComunidad } = await import("./lib/actions");
+          const { departamentoId, error } = await obtenerOManutenerDepartamentoComunidad(comunidadId, comunidadNombre);
+          if (error || !departamentoId) {
+            toast.error("No se pudo obtener o crear el departamento de la comunidad.");
+            return;
           }
-          return null;
+          setModalPuesto({ comunidadId: departamentoId, comunidadNombre });
+        } catch {
+          toast.error("Error al preparar el puesto.");
         }
-        const encontrado = buscar(nodos);
-        setModalResidentes({
-          id: comunidadId,
-          nombre: encontrado?.nombre ?? "Territorio",
-          tipo: encontrado?.tipo ?? "caserio",
-        });
       },
       onEditComunidad: (id, nombre, tipo, tieneHijos, parentId) => 
         setModalEditar({ id, nombre, tipo, tieneHijos, parentId }),
       onDeleteComunidad: (id, nombre, tipo, tieneHijos) =>
         setModalEliminar({ id, nombre, tipo, tieneHijos }),
+      onAsignarPersona: (puestoId, puestoNombre) => setAsignar({ open: true, puestoId, puestoNombre }),
+      onDesasignarPersona: desasignarPersona,
+      onReubicarPuesto: (puestoId, puestoNombre) => setReubicar({ open: true, puestoId, puestoNombre, departamentoActualId: null }),
+      onEditPuesto: (puestoId) => setEditarPuestoId(puestoId),
+      onGestionarAcreditaciones: (puestoId, puestoNombre) => setAcreditacionesModal({ open: true, puestoId, puestoNombre }),
+      onGestionarResolucion: (comunidadId, comunidadNombre) => setResolucionModal({ open: true, comunidadId, comunidadNombre }),
     }),
-    [nodos],
+    [desasignarPersona],
   );
 
   const handleEliminar = async () => {
@@ -155,7 +221,7 @@ export function OrganizacionTerritorial() {
                 COMUDE
               </p>
               <h1 className="text-2xl font-black tracking-tight text-foreground md:text-4xl">
-                Estructura Territorial
+                Cocodes y Territorio
               </h1>
               <p className="text-sm md:text-base text-muted-foreground max-w-3xl">
                 Mapa geográfico del municipio · Gestión de Microrregiones, Aldeas y Caseríos.
@@ -312,17 +378,6 @@ export function OrganizacionTerritorial() {
         />
       )}
 
-      {/* Form Residentes */}
-      {modalResidentes && (
-        <AsignarResidentes
-          open={true}
-          onClose={() => setModalResidentes(null)}
-          comunidadId={modalResidentes.id}
-          comunidadNombre={modalResidentes.nombre}
-          tipo={modalResidentes.tipo}
-        />
-      )}
-
       {/* Modal Eliminar */}
       {modalEliminar && (
         <ModalConfirmDelete
@@ -339,6 +394,60 @@ export function OrganizacionTerritorial() {
           hideConfirm={modalEliminar.tieneHijos}
         />
       )}
+
+      {/* Modal Crear Puesto Territorio */}
+      {modalPuesto && (
+        <CrearEstructura
+          open={true}
+          onOpenChange={(op) => !op && setModalPuesto(null)}
+          tipo="puesto"
+          presetDepartamentoId={modalPuesto.comunidadId}
+        />
+      )}
+
+      {/* Modal Asignar Persona a Puesto */}
+      <AsignarPersonaPuesto
+        open={asignar.open}
+        onOpenChange={(op) => !op && setAsignar({ open: false, puestoId: null, puestoNombre: "" })}
+        puestoId={asignar.puestoId}
+        puestoNombre={asignar.puestoNombre}
+      />
+
+      {/* Modal Reubicar Puesto */}
+      <ReubicarPuestoModal
+        open={reubicar.open}
+        onOpenChange={(op) => !op && setReubicar({ open: false, puestoId: null, puestoNombre: "", departamentoActualId: null })}
+        puestoId={reubicar.puestoId}
+        puestoNombre={reubicar.puestoNombre}
+        departamentoActualId={reubicar.departamentoActualId}
+      />
+
+      {/* Modal Editar Puesto */}
+      {editarPuestoId && (
+        <VerEditarEstructura
+          open={true}
+          onOpenChange={(op) => !op && setEditarPuestoId(null)}
+          tipo="puesto"
+          id={editarPuestoId}
+          puedeEliminar={true}
+        />
+      )}
+
+      {/* Modal Acreditaciones */}
+      <GestorAcreditacionesModal
+        open={acreditacionesModal.open}
+        onOpenChange={(op) => !op && setAcreditacionesModal({ open: false, puestoId: null, puestoNombre: "" })}
+        puestoId={acreditacionesModal.puestoId}
+        puestoNombre={acreditacionesModal.puestoNombre}
+      />
+
+      {/* Modal Resolución COCODE */}
+      <GestionarResolucionModal
+        open={resolucionModal.open}
+        onOpenChange={(op) => !op && setResolucionModal({ open: false, comunidadId: null, comunidadNombre: "" })}
+        comunidadId={resolucionModal.comunidadId}
+        comunidadNombre={resolucionModal.comunidadNombre}
+      />
     </div>
   );
 }

@@ -846,7 +846,7 @@ export default function DetalleActividadView({
   const content = (
     <div className="w-full flex flex-col flex-1 bg-white/70 dark:bg-white/5 backdrop-blur-md">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-6 py-3 border-b border-border/50 border-dashed bg-muted/10 gap-3 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1.5 sm:px-6 py-3 border-b border-border/50 border-dashed bg-muted/10 gap-3 sm:gap-0">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 text-azul-trifinio font-medium hover:underline text-sm w-fit"
@@ -943,7 +943,7 @@ export default function DetalleActividadView({
       </div>
 
       {/* Banner Superior: Mi Asistencia o Alerta */}
-      <div className="px-3 sm:px-6 py-3">
+      <div className="px-1.5 sm:px-6 py-3">
         {participanteYo && (regEntradaYo || actividad.estado === "En progreso" || actividad.estado === "Finalizada") ? (
           <div>
             <p className="text-xs font-bold text-muted-foreground dark:text-gray-300 uppercase tracking-widest mb-2">
@@ -976,7 +976,7 @@ export default function DetalleActividadView({
       </div>
 
       {/* Header Info */}
-      <div className="px-3 sm:px-6 py-4 grid grid-cols-2 gap-4">
+      <div className="px-1.5 sm:px-6 py-4 grid grid-cols-2 gap-4">
         {/* Col 1 */}
         <div className="flex flex-col gap-4">
           <div>

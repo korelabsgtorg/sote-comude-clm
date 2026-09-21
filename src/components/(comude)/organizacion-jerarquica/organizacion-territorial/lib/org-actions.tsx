@@ -6,9 +6,15 @@ import type { TipoLugar } from "./zod";
 
 export type TerritorialAdminHandlers = {
   onAddComunidad: (parentId: string | null, tipo: TipoLugar) => void;
-  onAsignarResidentes: (comunidadId: string) => void;
+  onAddPuesto: (comunidadId: string, comunidadNombre: string) => void;
   onEditComunidad: (id: string, nombre: string, tipo: TipoLugar, tieneHijos: boolean, parentId: string | null) => void;
   onDeleteComunidad: (id: string, nombre: string, tipo: TipoLugar, tieneHijos: boolean) => void;
+  onAsignarPersona?: (puestoId: string, puestoNombre: string) => void;
+  onDesasignarPersona?: (puestoId: string, puestoNombre: string, titularNombre: string) => void;
+  onReubicarPuesto?: (puestoId: string, puestoNombre: string) => void;
+  onEditPuesto?: (puestoId: string) => void;
+  onGestionarAcreditaciones?: (puestoId: string, puestoNombre: string) => void;
+  onGestionarResolucion?: (comunidadId: string, comunidadNombre: string) => void;
 };
 
 export const ORG_ACTION_BTN =

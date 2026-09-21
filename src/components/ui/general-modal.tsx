@@ -26,6 +26,8 @@ interface ModalShellProps {
   subtitle?: string;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
+  headerExtra?: React.ReactNode;
 }
 
 export function ModalShell({
@@ -35,6 +37,8 @@ export function ModalShell({
   subtitle,
   children,
   className,
+  contentClassName,
+  headerExtra,
 }: ModalShellProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -44,17 +48,20 @@ export function ModalShell({
           className,
         )}
       >
-        <DialogHeader className="px-4 py-1.5 border-b border-border/50">
-          <DialogTitle className="text-sm font-black tracking-tight text-foreground">
-            {title}
-          </DialogTitle>
-          {subtitle && (
-            <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
-              {subtitle}
-            </p>
-          )}
+        <DialogHeader className="px-4 py-3 border-b border-border/50 flex flex-row items-center justify-between pr-12">
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-xs sm:text-sm font-bold tracking-tight text-foreground leading-tight line-clamp-2">
+              {title}
+            </DialogTitle>
+            {subtitle && (
+              <p className="text-[11px] font-medium text-muted-foreground mt-0.5 line-clamp-2 leading-tight">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {headerExtra && <div className="shrink-0 ml-2">{headerExtra}</div>}
         </DialogHeader>
-        <div className="px-4 pt-1.5 pb-2.5">{children}</div>
+        <div className={cn("px-4 pt-1.5 pb-2.5", contentClassName)}>{children}</div>
       </DialogContent>
     </Dialog>
   );
@@ -209,6 +216,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   JEFE_REQUIRED_LEAVE: "No se puede eliminar: quedaría un equipo sin jefe.",
   DROP_ES_JEFATURA: "No se puede quitar la jefatura si el puesto es de tipo jefe.",
   JEFATURAS_SYNC_FAILED: "No se pudieron sincronizar las jefaturas.",
+  PUESTO_HAS_CHILDREN: "No se puede eliminar este puesto porque tiene dependencias bajo su cargo.",
+  PUESTO_NOT_FOUND: "El puesto no fue encontrado.",
 };
 
 /**

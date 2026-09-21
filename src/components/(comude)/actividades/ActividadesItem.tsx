@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ActComudeConParticipantes } from "./lib/zod";
 import { useEliminarActividad } from "./lib/hooks";
+import { getComudeUrl } from "./lib/slug";
 import Swal from "sweetalert2";
 import CrearComude from "./modals/CrearComude";
 
@@ -116,29 +117,37 @@ export default function ActividadesItem({
           {/* Cabecera Clickable */}
           <div className="flex items-center justify-between gap-3 p-4 pl-5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
             <div className="flex-1 min-w-0 flex flex-col gap-1">
-              {/* Fila 1: Título y Fecha */}
-              <p className="text-[15px] truncate">
-                <span className="font-bold text-foreground">
-                  {actividad.detalles_sesion?.titulo || "Sin título"}
-                </span>
-                <span className="text-muted-foreground ml-2">
-                  {formatFecha(actividad.fecha)}
-                </span>
+              {/* Fila 1: Título */}
+              <p className="text-[15px] font-bold text-foreground truncate">
+                {actividad.detalles_sesion?.titulo || "Sin título"}
               </p>
 
               {/* Fila 2: Acta y Libro */}
-              <p className="text-sm font-medium text-foreground/80 uppercase">
+              <p className="text-xs font-semibold text-foreground/80 uppercase">
                 {actividad.detalles_sesion?.acta ? `ACTA ${actividad.detalles_sesion.acta}` : ""}
                 {actividad.detalles_sesion?.acta && actividad.detalles_sesion?.libro ? ", " : ""}
                 {actividad.detalles_sesion?.libro ? `LIBRO ${actividad.detalles_sesion.libro}` : ""}
                 {!actividad.detalles_sesion?.acta && !actividad.detalles_sesion?.libro ? "Sin acta/libro asignado" : ""}
               </p>
 
-              {/* Fila 3: Estado y Días */}
-              <div className="flex items-center text-[13px]">
-                <span className="font-bold text-[#1a73e8] dark:text-blue-400">En preparación</span>
-                <span className="text-foreground font-medium">
-                  {hoy ? ", Hoy" : dias > 0 ? `, ${dias} día${dias !== 1 ? 's' : ''} restante${dias !== 1 ? 's' : ''}` : ""}
+              {/* Fila 3: Estado y Fecha */}
+              <div className="flex flex-wrap items-center gap-x-1 text-xs sm:text-[13px]">
+                <span className={cn(
+                  "font-bold",
+                  actividad.estado === "Finalizada"
+                    ? "text-gray-500 dark:text-gray-400"
+                    : actividad.estado === "En progreso"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-[#1a73e8] dark:text-blue-400"
+                )}>
+                  {actividad.estado === "Finalizada"
+                    ? "Finalizado,"
+                    : actividad.estado === "En progreso"
+                    ? "En progreso,"
+                    : "En preparación,"}
+                </span>
+                <span className="text-muted-foreground font-medium capitalize">
+                  {formatFecha(actividad.fecha)}
                 </span>
               </div>
             </div>
@@ -185,7 +194,7 @@ export default function ActividadesItem({
                       </button>
                     )}
                     <Link
-                      href={`/comude/comude/${actividad.id}`}
+                      href={getComudeUrl(actividad.id, actividad.detalles_sesion?.titulo)}
                       onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-md transition-colors"
                     >

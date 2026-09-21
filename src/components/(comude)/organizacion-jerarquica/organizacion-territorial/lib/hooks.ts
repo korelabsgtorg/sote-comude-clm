@@ -8,6 +8,10 @@ import {
   deleteComunidad,
   getPersonasParaAsignarTerritorio,
   asignarPersonaATerritorio,
+  getResolucionVigenteComunidad,
+  getHistorialResolucionesComunidad,
+  renovarResolucionCOCODE,
+  editarResolucionCOCODE,
 } from "./actions";
 import type { ComunidadFormValues, AsignarPersonaComunidadValues } from "./zod";
 
@@ -69,3 +73,49 @@ export function useAsignarPersonaATerritorio() {
     onSuccess: invalidate,
   });
 }
+
+// ─── Resoluciones COCODE Hooks ──────────────────────────────────────────────
+
+const RESOLUCION_KEY = ["resolucion-cocode"];
+
+export function useResolucionVigente(comunidadId: string | null) {
+  return useQuery({
+    queryKey: [...RESOLUCION_KEY, "vigente", comunidadId],
+    queryFn: () => getResolucionVigenteComunidad(comunidadId!),
+    enabled: Boolean(comunidadId),
+  });
+}
+
+export function useHistorialResoluciones(comunidadId: string | null) {
+  return useQuery({
+    queryKey: [...RESOLUCION_KEY, "historial", comunidadId],
+    queryFn: () => getHistorialResolucionesComunidad(comunidadId!),
+    enabled: Boolean(comunidadId),
+  });
+}
+
+export function useRenovarResolucion() {
+  const queryClient = useQueryClient();
+  const invalidateTerritorial = useInvalidateTerritorial();
+  return useMutation({
+    mutationFn: renovarResolucionCOCODE,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: RESOLUCION_KEY });
+      invalidateTerritorial();
+    },
+  });
+}
+
+export function useEditarResolucion() {
+  const queryClient = useQueryClient();
+  const invalidateTerritorial = useInvalidateTerritorial();
+  return useMutation({
+    mutationFn: editarResolucionCOCODE,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: RESOLUCION_KEY });
+      invalidateTerritorial();
+    },
+  });
+}
+
+

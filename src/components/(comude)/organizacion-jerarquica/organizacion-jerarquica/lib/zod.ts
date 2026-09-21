@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export type AcreditacionFile = {
+  id: string;
+  nombre: string;
+  file_path: string;
+  created_at: string;
+};
+
 export const nodoOrganizacionSchema: z.ZodType<{
   id: string;
   nombre: string;
@@ -10,6 +17,7 @@ export const nodoOrganizacionSchema: z.ZodType<{
   titular_id?: string;
   fecha?: string | null;
   activo?: boolean;
+  acreditaciones?: AcreditacionFile[];
   hijos?: NodoOrganizacion[];
 }> = z.lazy(() =>
   z.object({
@@ -22,6 +30,14 @@ export const nodoOrganizacionSchema: z.ZodType<{
     titular_id: z.string().uuid().optional(),
     fecha: z.string().nullable().optional(),
     activo: z.boolean().optional(),
+    acreditaciones: z.array(
+      z.object({
+        id: z.string(),
+        nombre: z.string(),
+        file_path: z.string(),
+        created_at: z.string(),
+      }),
+    ).optional(),
     hijos: z.array(nodoOrganizacionSchema).optional(),
   }),
 );
@@ -43,6 +59,7 @@ export const departamentoFormSchema = z.object({
   descripcion: z.string().trim().max(500).optional().default(""),
   orden: z.coerce.number().int().min(0).default(0),
   comunidad_id: z.string().nullable().optional().default(null),
+  jalar_jefes_territoriales: z.boolean().optional().default(false),
 });
 
 export type DepartamentoFormValues = z.infer<typeof departamentoFormSchema>;
@@ -54,6 +71,17 @@ export const puestoFormSchema = z.object({
   orden: z.coerce.number().int().min(0).default(0),
   fecha: z.string().nullable().optional().default(null),
   activo: z.boolean().default(true),
+  acreditaciones: z
+    .array(
+      z.object({
+        id: z.string(),
+        nombre: z.string(),
+        file_path: z.string(),
+        created_at: z.string(),
+      }),
+    )
+    .optional()
+    .default([]),
 });
 
 export type PuestoFormValues = z.infer<typeof puestoFormSchema>;
@@ -66,6 +94,7 @@ export type DepartamentoRecord = {
   orden: number;
   activo: boolean;
   comunidad_id: string | null;
+  jalar_jefes_territoriales?: boolean;
 };
 
 export type PuestoRecord = {
@@ -77,6 +106,8 @@ export type PuestoRecord = {
   orden: number;
   activo: boolean;
   fecha: string | null;
+  acreditaciones?: AcreditacionFile[];
+  titular?: string | null;
 };
 
 export function departamentoTieneJefe(

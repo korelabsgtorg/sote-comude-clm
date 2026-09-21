@@ -125,13 +125,13 @@ export default function LogoTrifinio({
         )}
 
         <div className="flex flex-row items-center justify-center sm:justify-start gap-6 lg:gap-8 w-fit px-4 lg:px-8">
-          <motion.div variants={logoVariants} className="flex-shrink-0">
+          <motion.div variants={logoVariants} className="flex-shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm">
             <Image
               src="/sote/logo.png"
               alt="COMUDE Concepción Las Minas"
               width={150}
               height={150}
-              className="w-[120px] lg:w-[150px] h-auto object-contain"
+              className="w-[120px] lg:w-[150px] h-auto object-contain rounded-2xl sm:rounded-3xl"
               priority
             />
           </motion.div>

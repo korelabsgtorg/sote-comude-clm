@@ -15,6 +15,8 @@ import {
   ChevronRight,
   ChevronsDown,
   ChevronsUp,
+  ArrowUp,
+  ArrowDown,
   UserPlus,
   UserMinus,
   UserRound,
@@ -24,6 +26,8 @@ import {
   Building2,
   ArrowRightLeft,
   CalendarDays,
+  FileText,
+  FileCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NodoOrganizacion } from "./lib/zod";
@@ -50,6 +54,7 @@ function TreeActionButton(props: {
   label: string;
   onClick: () => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   return <OrgActionButton {...props} />;
 }
@@ -170,6 +175,8 @@ function NodoItem({
   admin,
   espaciadoVertical = false,
   mostrarInactivos = false,
+  esPrimero = false,
+  esUltimo = false,
 }: {
   nodo: NodoOrganizacion;
   depth?: number;
@@ -177,6 +184,8 @@ function NodoItem({
   admin?: AdminHandlers;
   espaciadoVertical?: boolean;
   mostrarInactivos?: boolean;
+  esPrimero?: boolean;
+  esUltimo?: boolean;
 }) {
   const { isExpanded, toggle, allExpanded, setAllExpanded } = useTreeExpansion();
   const expanded = isExpanded(nodo.id);
@@ -309,6 +318,12 @@ function NodoItem({
                   {formatFechaCorto(nodo.fecha)}
                 </div>
               )}
+              {isPuesto && Boolean(nodo.acreditaciones?.length) && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                  <FileCheck className="size-3" />
+                  Acreditado
+                </span>
+              )}
               {isInactive && (
                 <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300">
                   Inactivo
@@ -400,6 +415,38 @@ function NodoItem({
               className={TREE_ACTIONS_BAR}
               onClick={stop}
             >
+              {admin.onMoverDepartamento && (
+                <>
+                  <TreeActionButton
+                    label="Mover al inicio"
+                    disabled={esPrimero}
+                    onClick={() => admin.onMoverDepartamento!(nodo.id, "inicio")}
+                  >
+                    <ChevronsUp className="size-4" />
+                  </TreeActionButton>
+                  <TreeActionButton
+                    label="Subir una posición"
+                    disabled={esPrimero}
+                    onClick={() => admin.onMoverDepartamento!(nodo.id, "arriba")}
+                  >
+                    <ArrowUp className="size-4" />
+                  </TreeActionButton>
+                  <TreeActionButton
+                    label="Bajar una posición"
+                    disabled={esUltimo}
+                    onClick={() => admin.onMoverDepartamento!(nodo.id, "abajo")}
+                  >
+                    <ArrowDown className="size-4" />
+                  </TreeActionButton>
+                  <TreeActionButton
+                    label="Mover al final"
+                    disabled={esUltimo}
+                    onClick={() => admin.onMoverDepartamento!(nodo.id, "fin")}
+                  >
+                    <ChevronsDown className="size-4" />
+                  </TreeActionButton>
+                </>
+              )}
               <TreeActionButton
                 label="Añadir Dependencia/Unidad"
                 onClick={() => admin.onAddDepartamento(nodo.id)}
@@ -426,7 +473,6 @@ function NodoItem({
           <div
             className={cn(
               TREE_ACTIONS_BAR,
-              "opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-within:opacity-100",
               puestoJefatura
                 ? "divide-amber-500/35 border-amber-500/25 [&_button]:bg-amber-500/5 [&_button]:text-amber-700 [&_button]:hover:bg-amber-500/12 dark:[&_button]:text-amber-300"
                 : "divide-emerald-500/35 border-emerald-500/25 [&_button]:bg-emerald-500/5 [&_button]:text-emerald-700 [&_button]:hover:bg-emerald-500/12 dark:[&_button]:text-emerald-300",
@@ -460,6 +506,14 @@ function NodoItem({
             >
               <ArrowRightLeft className="size-4" />
             </TreeActionButton>
+            {admin.onGestionarAcreditaciones && (
+              <TreeActionButton
+                label="Acreditación"
+                onClick={() => admin.onGestionarAcreditaciones!(nodo.id, nodo.nombre)}
+              >
+                <FileText className="size-4" />
+              </TreeActionButton>
+            )}
             <TreeActionButton
               label="Editar"
               onClick={() => admin.onEdit("puesto", nodo.id)}
@@ -491,29 +545,45 @@ function NodoItem({
                   : "mt-1 space-y-1 md:mt-3 md:space-y-3",
               )}
             >
-              {(nodo.hijos || [])
-                .filter((h) => mostrarInactivos || h.activo !== false)
-                .map((hijo, index) => (
-                <motion.div
-                  key={hijo.id}
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{
-                    duration: 0.35,
-                    delay: index * 0.04,
-                    ease: ACCORDION_EASE,
-                  }}
-                >
-                  <NodoItem
-                    nodo={hijo}
-                    depth={depth + 1}
-                    admin={admin}
-                    espaciadoVertical={espaciadoVertical}
-                    mostrarInactivos={mostrarInactivos}
-                  />
-                </motion.div>
-              ))}
+              {(() => {
+                const hijosVisibles = (nodo.hijos || []).filter(
+                  (h) => mostrarInactivos || h.activo !== false,
+                );
+                const departamentosHijos = hijosVisibles.filter(
+                  (h) => h.tipo === "nivel",
+                );
+                return hijosVisibles.map((hijo, index) => {
+                  const idxDep = departamentosHijos.findIndex(
+                    (d) => d.id === hijo.id,
+                  );
+                  const esPrimero = idxDep === 0;
+                  const esUltimo =
+                    idxDep !== -1 && idxDep === departamentosHijos.length - 1;
+                  return (
+                    <motion.div
+                      key={hijo.id}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{
+                        duration: 0.35,
+                        delay: index * 0.04,
+                        ease: ACCORDION_EASE,
+                      }}
+                    >
+                      <NodoItem
+                        nodo={hijo}
+                        depth={depth + 1}
+                        admin={admin}
+                        espaciadoVertical={espaciadoVertical}
+                        mostrarInactivos={mostrarInactivos}
+                        esPrimero={esPrimero}
+                        esUltimo={esUltimo}
+                      />
+                    </motion.div>
+                  );
+                });
+              })()}
             </div>
           </motion.div>
         )}
@@ -554,14 +624,16 @@ export function OrganizacionTree({
 }) {
   return (
     <TreeExpansionProvider estructura={estructura}>
-      <div className="w-full">
-        <NodoItem
-          nodo={estructura}
-          variant="root"
-          admin={admin}
-          espaciadoVertical={espaciadoVertical}
-          mostrarInactivos={mostrarInactivos}
-        />
+      <div className="w-full max-md:overflow-x-auto max-md:pb-3">
+        <div className="w-full max-md:min-w-[520px]">
+          <NodoItem
+            nodo={estructura}
+            variant="root"
+            admin={admin}
+            espaciadoVertical={espaciadoVertical}
+            mostrarInactivos={mostrarInactivos}
+          />
+        </div>
       </div>
     </TreeExpansionProvider>
   );

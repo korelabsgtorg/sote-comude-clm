@@ -87,7 +87,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative flex flex-col items-center justify-center px-4 pt-0 pb-2 sm:px-10 lg:px-14 sm:pt-0 sm:pb-4 lg:pt-0 lg:pb-6 text-center w-full max-w-none mx-auto transition-all group"
+      className="relative flex flex-col items-center justify-center px-[1%] pt-0 pb-2 sm:px-10 lg:px-14 sm:pt-0 sm:pb-4 lg:pt-0 lg:pb-6 text-center w-full max-w-none mx-auto transition-all group"
     >
 
 
@@ -130,7 +130,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
           />
         </div>
 
-        <div className="relative w-full px-2 pt-8 pb-20">
+        <div className="relative w-full px-[1%] pt-8 pb-20">
           <div className={cn("absolute inset-0", DASHBOARD_DOTTED_BG_CLASS)} />
           <div className="relative z-10">
             <CardsGrid />

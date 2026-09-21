@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Loader2, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -63,8 +63,15 @@ function EditarDepartamentoBody({
 
   const [nombre, setNombre] = useState(departamento.nombre);
   const [descripcion, setDescripcion] = useState(departamento.descripcion ?? "");
+  const [jalarJefes, setJalarJefes] = useState(Boolean(departamento.jalar_jefes_territoriales));
   const [eliminando, setEliminando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+
+  useEffect(() => {
+    setNombre(departamento.nombre);
+    setDescripcion(departamento.descripcion ?? "");
+    setJalarJefes(Boolean(departamento.jalar_jefes_territoriales));
+  }, [departamento]);
 
   const tieneHijos = useMemo(() => {
     if (modoDemo && estructuraDemo) {
@@ -95,6 +102,7 @@ function EditarDepartamentoBody({
       parent_id: departamento.parent_id,
       descripcion,
       orden: departamento.orden,
+      jalar_jefes_territoriales: jalarJefes,
     });
     if (!values.success) {
       toast.warn("Escribe un nombre válido.");
@@ -198,6 +206,34 @@ function EditarDepartamentoBody({
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
         />
+      </div>
+
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={jalarJefes}
+          onClick={() => setJalarJefes(!jalarJefes)}
+          className={cn(
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            jalarJefes ? "bg-emerald-600" : "bg-zinc-200 dark:bg-zinc-700"
+          )}
+        >
+          <span
+            className={cn(
+              "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
+              jalarJefes ? "translate-x-5" : "translate-x-0"
+            )}
+          />
+        </button>
+        <div>
+          <FormLabel htmlFor="jalarJefes-edit" className="mb-0 cursor-pointer font-bold" onClick={() => setJalarJefes(!jalarJefes)}>
+            Consolidar Líderes Territoriales (COCODES)
+          </FormLabel>
+          <p className="text-[11px] text-muted-foreground">
+            Jala automáticamente a los presidentes/jefes de las aldeas y caseríos.
+          </p>
+        </div>
       </div>
 
       {puedeEliminar ? (

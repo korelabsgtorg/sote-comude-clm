@@ -8,6 +8,8 @@ import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 import DetalleActividadView from "@/components/(comude)/actividades/DetalleActividadView";
 import { Loader2 } from "lucide-react";
 
+import { slugify } from "@/components/(comude)/actividades/lib/slug";
+
 export default function ComudeDetalleClient({ id }: { id: string }) {
   const router = useRouter();
   const { user, effectiveRole } = useUserContext();
@@ -17,6 +19,15 @@ export default function ComudeDetalleClient({ id }: { id: string }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (actividad?.detalles_sesion?.titulo) {
+      const cleanSlug = slugify(actividad.detalles_sesion.titulo);
+      if (cleanSlug) {
+        window.history.replaceState(null, "", `/comude/comude/${cleanSlug}`);
+      }
+    }
+  }, [actividad]);
 
   const puedeGestionar = isSuperOrAdminRole(effectiveRole);
 

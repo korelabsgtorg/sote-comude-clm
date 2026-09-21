@@ -373,31 +373,44 @@ export const InfoPerfil = ({ userId, canEdit, onClose }: InfoPerfilProps) => {
             disabled={!canEdit}
           />
         </div>
+      </div>
+    </div>
+  );
+
+  const SectionEmergencia = (
+    <div className="space-y-6 lg:space-y-4">
+      <div className="flex items-center justify-between pb-2 border-b border-border/40">
+        <div className="flex items-center gap-2">
+          <Heart size={25} className="text-red-500" />
+          <h3 className="text-md font-bold uppercase tracking-tight">
+            Emergencia
+          </h3>
+        </div>
+        {NavButtons}
+      </div>
+      <div className="space-y-4">
         <div>
-          <Label>Organización</Label>
-          <div className="relative">
-            <Building2
-              size={14}
-              className="absolute left-3 top-3 text-muted-foreground z-10"
-            />
-            <Select
-              name="organizacion_id"
-              value={formData.organizacion_id || ""}
-              onChange={handleChange}
-              disabled={!canEdit}
-              className="pl-9"
-            >
-              <option value="">Sin organización</option>
-              {organizaciones.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.nombre}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <Label>Nombre Contacto</Label>
+          <Input
+            name="contacto_emergencia"
+            value={formData.contacto_emergencia || ""}
+            onChange={handleChange}
+            disabled={!canEdit}
+          />
+        </div>
+        <div>
+          <Label>Teléfono Emergencia</Label>
+          <Input
+            name="telefono_emergencia"
+            type="tel"
+            inputMode="numeric"
+            value={formData.telefono_emergencia || ""}
+            onChange={handleChange}
+            disabled={!canEdit}
+          />
         </div>
 
-        {(perfilData?.rol === "super" || formData?.rol === "super" || effectiveRole === "super") && (
+        {effectiveRole === "super" && (
           <>
             <div className="z-20">
               <Label>Departamento</Label>
@@ -453,42 +466,6 @@ export const InfoPerfil = ({ userId, canEdit, onClose }: InfoPerfilProps) => {
             </div>
           </>
         )}
-      </div>
-    </div>
-  );
-
-  const SectionEmergencia = (
-    <div className="space-y-6 lg:space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b border-border/40">
-        <div className="flex items-center gap-2">
-          <Heart size={25} className="text-red-500" />
-          <h3 className="text-md font-bold uppercase tracking-tight">
-            Emergencia
-          </h3>
-        </div>
-        {NavButtons}
-      </div>
-      <div className="space-y-4">
-        <div>
-          <Label>Nombre Contacto</Label>
-          <Input
-            name="contacto_emergencia"
-            value={formData.contacto_emergencia || ""}
-            onChange={handleChange}
-            disabled={!canEdit}
-          />
-        </div>
-        <div>
-          <Label>Teléfono Emergencia</Label>
-          <Input
-            name="telefono_emergencia"
-            type="tel"
-            inputMode="numeric"
-            value={formData.telefono_emergencia || ""}
-            onChange={handleChange}
-            disabled={!canEdit}
-          />
-        </div>
       </div>
     </div>
   );

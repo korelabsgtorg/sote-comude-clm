@@ -27,6 +27,7 @@ import {
   useEstructuraOrganizacional,
   usePuestos,
   useAsignarPersonaAPuesto,
+  useMoverDepartamento,
 } from "./lib/hooks";
 import { departamentoTieneJefe, puestosEnDepartamento } from "./lib/zod";
 import { ESTRUCTURA_SIMULADA } from "./lib/estructura-simulada";
@@ -36,12 +37,14 @@ import { CrearEstructura } from "./forms/Crear";
 import { VerEditarEstructura } from "./forms/VerEditar";
 import { AsignarPersonaPuesto } from "./forms/AsignarPersona";
 import { ReubicarPuestoModal } from "./forms/ReubicarPuesto";
+import { GestorAcreditacionesModal } from "./forms/GestorAcreditacionesModal";
 
 export function OrganizacionJerarquica() {
   const { effectiveRole } = useUserContext();
   const { data, isLoading, isError, refetch } = useEstructuraOrganizacional();
   const { data: puestos = [] } = usePuestos();
   const desasignarPersonaMutation = useAsignarPersonaAPuesto();
+  const moverDepartamentoMutation = useMoverDepartamento();
   const puedeEliminar = isSuperOrAdminRole(effectiveRole);
 
   const estructura = data ?? null;
@@ -82,6 +85,12 @@ export function OrganizacionJerarquica() {
     puestoNombre: "",
     departamentoActualId: null,
   });
+
+  const [acreditacionesModal, setAcreditacionesModal] = useState<{
+    open: boolean;
+    puestoId: string | null;
+    puestoNombre: string;
+  }>({ open: false, puestoId: null, puestoNombre: "" });
 
   const [organigramaOpen, setOrganigramaOpen] = useState(false);
 
@@ -165,8 +174,30 @@ export function OrganizacionJerarquica() {
         });
       },
       onEdit: (tipo, id) => setEditar({ open: true, tipo, id }),
+      onMoverDepartamento: async (id, direccion) => {
+        if (modoSimulacion) {
+          toast.warn("Modo demo: la reorganización no está disponible.");
+          return;
+        }
+        const res = await moverDepartamentoMutation.mutateAsync({ id, direccion });
+        if (!res.success) {
+          toast.error(
+            modalActionMessage(
+              res.error ?? undefined,
+              "No se pudo mover el departamento.",
+            ),
+          );
+        }
+      },
+      onGestionarAcreditaciones: (puestoId, puestoNombre) => {
+        if (modoSimulacion) {
+          toast.warn("Modo demo: las acreditaciones no están disponibles.");
+          return;
+        }
+        setAcreditacionesModal({ open: true, puestoId, puestoNombre });
+      },
     }),
-    [puestos, desasignarPersona, modoSimulacion],
+    [puestos, desasignarPersona, modoSimulacion, moverDepartamentoMutation],
   );
 
   const estaVacio = Boolean(
@@ -362,6 +393,13 @@ export function OrganizacionJerarquica() {
         puestoId={reubicar.puestoId}
         puestoNombre={reubicar.puestoNombre}
         departamentoActualId={reubicar.departamentoActualId}
+      />
+
+      <GestorAcreditacionesModal
+        open={acreditacionesModal.open}
+        onOpenChange={(open) => setAcreditacionesModal((prev) => ({ ...prev, open }))}
+        puestoId={acreditacionesModal.puestoId}
+        puestoNombre={acreditacionesModal.puestoNombre}
       />
     </div>
   );

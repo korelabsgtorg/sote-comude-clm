@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 
 export type AdminHandlers = {
   onAddDepartamento: (parentId: string | null) => void;
@@ -14,6 +15,11 @@ export type AdminHandlers = {
   ) => void;
   onReubicarPuesto: (puestoId: string, puestoNombre: string) => void;
   onEdit: (tipo: "departamento" | "puesto", id: string) => void;
+  onMoverDepartamento?: (
+    id: string,
+    direccion: "arriba" | "abajo" | "inicio" | "fin",
+  ) => void;
+  onGestionarAcreditaciones?: (puestoId: string, puestoNombre: string) => void;
 };
 
 export const ORG_ACTION_BTN =
@@ -53,15 +59,18 @@ export function OrgActionButton({
   label,
   onClick,
   children,
+  disabled = false,
 }: {
   label: string;
   onClick: () => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [tooltip, setTooltip] = useState<DOMRect | null>(null);
 
   const showTooltip = () => {
+    if (disabled) return;
     if (!window.matchMedia("(min-width: 768px)").matches) return;
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) setTooltip(rect);
@@ -74,9 +83,13 @@ export function OrgActionButton({
       <button
         ref={buttonRef}
         type="button"
+        disabled={disabled}
         aria-label={label}
-        className={ORG_ACTION_BTN}
-        onClick={onClick}
+        className={cn(
+          ORG_ACTION_BTN,
+          disabled && "cursor-not-allowed opacity-30 hover:bg-transparent dark:hover:bg-transparent",
+        )}
+        onClick={disabled ? undefined : onClick}
         onMouseEnter={showTooltip}
         onMouseLeave={hideTooltip}
         onFocus={showTooltip}
@@ -84,7 +97,7 @@ export function OrgActionButton({
       >
         {children}
       </button>
-      {tooltip ? <TreeActionTooltip label={label} anchor={tooltip} /> : null}
+      {tooltip && !disabled ? <TreeActionTooltip label={label} anchor={tooltip} /> : null}
     </div>
   );
 }

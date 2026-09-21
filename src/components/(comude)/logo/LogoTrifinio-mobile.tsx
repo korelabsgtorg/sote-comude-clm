@@ -102,13 +102,13 @@ export default function LogoTrifinioMobile({
         )}
 
         <div className="flex flex-row items-center justify-between gap-2 sm:gap-6 w-full px-2 sm:px-6">
-          <motion.div variants={logoVariants} className="flex-shrink-0">
+          <motion.div variants={logoVariants} className="flex-shrink-0 overflow-hidden rounded-2xl shadow-sm">
             <Image
               src="/sote/logo.png"
               alt="COMUDE Concepción Las Minas"
               width={150}
               height={150}
-              className="w-[90px] sm:w-[110px] h-auto object-contain"
+              className="w-[90px] sm:w-[110px] h-auto object-contain rounded-2xl"
               priority
             />
           </motion.div>
