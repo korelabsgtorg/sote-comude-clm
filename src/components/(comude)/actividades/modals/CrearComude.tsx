@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Loader2, CalendarDays, Users } from "lucide-react";
+import { X, Plus, Loader2, CalendarDays, Users, RotateCcw } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useCrearActividad, useEditarActividad } from "../lib/hooks";
 import { CrearActividadValues, ActComudeConParticipantes } from "../lib/zod";
 import { useUsers } from "@/components/(base)/(users)/usuarios/lib/hooks";
+import { useEstructuraOrganizacional } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/hooks";
+import { NodoOrganizacion } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/zod";
 import { toast } from "react-toastify";
+import { notifyActividadPendienteRefresh } from "@/components/push/PushListener";
 
 interface CrearComudeProps {
   isOpen: boolean;
@@ -29,11 +32,44 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
+/** Extrae de forma recursiva únicamente los titulares que tienen jefatura o representan COCODES/líderes */
+function extraerJefaturasYCocodesDeEstructura(nodo: NodoOrganizacion | null | undefined): ParticipanteSeleccionado[] {
+  if (!nodo) return [];
+
+  const participantesMap = new Map<string, ParticipanteSeleccionado>();
+
+  function recorrer(n: NodoOrganizacion) {
+    // Si es un nodo de puesto ("unidad") con titular asignado
+    if (n.tipo === "unidad" && n.titular_id && n.titular) {
+      // Debe tener indicador de jefatura
+      if (n.tiene_jefaturas) {
+        if (!participantesMap.has(n.titular_id)) {
+          participantesMap.set(n.titular_id, {
+            usuario_id: n.titular_id,
+            nombre: n.titular,
+            encargado: false,
+          });
+        }
+      }
+    }
+
+    if (Array.isArray(n.hijos)) {
+      for (const hijo of n.hijos) {
+        recorrer(hijo);
+      }
+    }
+  }
+
+  recorrer(nodo);
+  return Array.from(participantesMap.values());
+}
+
 export default function CrearComude({ isOpen, onClose, actorRole, actividad }: CrearComudeProps) {
   const [tab, setTab] = useState<Tab>("info");
   const [titulo, setTitulo] = useState(actividad?.detalles_sesion?.titulo || "");
   const [acta, setActa] = useState(actividad?.detalles_sesion?.acta || "");
   const [libro, setLibro] = useState(actividad?.detalles_sesion?.libro || "");
+  const [ubicacion, setUbicacion] = useState(actividad?.ubicacion || "Gimnasio Municipal");
 
   // Fecha from ISO to YYYY-MM-DDTHH:MM format for datetime-local
   const parseInitialDate = (isoString?: string) => {
@@ -59,26 +95,38 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
   const isEditMode = !!actividad;
 
   const { data: usuarios } = useUsers(actorRole);
+  const { data: estructuraOrg, isLoading: isLoadingEstructura } = useEstructuraOrganizacional();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Carga inicial o reseteo al abrir el modal
   useEffect(() => {
-    if (isOpen && actividad) {
-      setTitulo(actividad.detalles_sesion?.titulo || "");
-      setActa(actividad.detalles_sesion?.acta || "");
-      setLibro(actividad.detalles_sesion?.libro || "");
-      setFecha(parseInitialDate(actividad.fecha));
-      setParticipantes(
-        (actividad.act_comude_participantes || []).map(p => ({
-          usuario_id: p.usuario_id,
-          nombre: p.profiles?.nombre || "Sin nombre",
-          encargado: p.encargado
-        }))
-      );
+    if (isOpen) {
+      if (actividad) {
+        // Modo Edición
+        setTitulo(actividad.detalles_sesion?.titulo || "");
+        setActa(actividad.detalles_sesion?.acta || "");
+        setLibro(actividad.detalles_sesion?.libro || "");
+        setUbicacion(actividad.ubicacion || "");
+        setFecha(parseInitialDate(actividad.fecha));
+        setParticipantes(
+          (actividad.act_comude_participantes || []).map(p => ({
+            usuario_id: p.usuario_id,
+            nombre: p.profiles?.nombre || "Sin nombre",
+            encargado: p.encargado
+          }))
+        );
+      } else {
+        // Modo Creación: jalar automáticamente las jefaturas y COCODES
+        if (estructuraOrg) {
+          const autoParticipantes = extraerJefaturasYCocodesDeEstructura(estructuraOrg);
+          setParticipantes(autoParticipantes);
+        }
+      }
     }
-  }, [isOpen, actividad]);
+  }, [isOpen, actividad, estructuraOrg]);
 
   // Bloquear scroll
   useEffect(() => {
@@ -95,6 +143,7 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
       setTitulo("");
       setActa("");
       setLibro("");
+      setUbicacion("Gimnasio Municipal");
       setFecha("");
       setParticipantes([]);
     }
@@ -141,6 +190,7 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
       titulo: titulo.trim(),
       acta: acta.trim(),
       libro: libro.trim(),
+      ubicacion: ubicacion.trim() || "Gimnasio Municipal",
       fecha,
       participantes: participantes.map((p) => ({ usuario_id: p.usuario_id, encargado: p.encargado })),
     };
@@ -148,9 +198,11 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
     try {
       if (isEditMode) {
         await editar({ id: actividad.id, values });
+        notifyActividadPendienteRefresh();
         toast.success("✅ COMUDE actualizado exitosamente");
       } else {
         await crear(values);
+        notifyActividadPendienteRefresh();
         toast.success("✅ COMUDE creado exitosamente");
       }
       handleClose();
@@ -258,6 +310,17 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
                   </div>
 
                   <div>
+                    <label className="text-sm font-semibold mb-2 block text-foreground/80">Lugar del COMUDE</label>
+                    <input
+                      type="text"
+                      value={ubicacion}
+                      onChange={(e) => setUbicacion(e.target.value)}
+                      placeholder="Ej. Salón Municipal de Reuniones"
+                      className="w-full rounded-xl border border-border/50 px-4 py-3 text-sm bg-background/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                  </div>
+
+                  <div>
                     <label className="text-sm font-semibold mb-2 block text-foreground/80">Fecha de reunión</label>
                     <input
                       type="datetime-local"
@@ -271,17 +334,63 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
 
               {tab === "participantes" && (
                 <div className="space-y-4">
-                  <input
-                    type="text"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar usuario..."
-                    className="w-full rounded-xl border border-border/50 px-4 py-3 text-sm bg-background/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      value={busqueda}
+                      onChange={(e) => setBusqueda(e.target.value)}
+                      placeholder="Buscar usuario..."
+                      className="w-full rounded-xl border border-border/50 px-4 py-3 text-sm bg-background/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+
+                    {busqueda.trim().length > 0 && (
+                      <div className="mt-2 space-y-1 max-h-48 overflow-y-auto rounded-xl border border-border/50 bg-background/80 p-1">
+                        {usuariosFiltrados.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">No se encontraron usuarios.</p>
+                        ) : (
+                          usuariosFiltrados.map((u) => {
+                            const seleccionado = participantes.some((p) => p.usuario_id === u.id);
+                            if (seleccionado) return null;
+                            return (
+                              <button
+                                key={u.id}
+                                onClick={() => {
+                                  toggleParticipante(u);
+                                  setBusqueda("");
+                                }}
+                                className="w-full flex items-center justify-between text-sm px-3.5 py-2.5 hover:bg-muted/60 rounded-lg transition-colors text-left"
+                              >
+                                <span className="font-medium text-foreground">{u.nombre ?? "Sin nombre"}</span>
+                                <Plus className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {participantes.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Seleccionados ({participantes.length})</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Seleccionados ({participantes.length})
+                        </p>
+                        {estructuraOrg && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const autoParticipantes = extraerJefaturasYCocodesDeEstructura(estructuraOrg);
+                              setParticipantes(autoParticipantes);
+                              toast.info("Participantes restablecidos según la estructura organizacional.");
+                            }}
+                            className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Cargar Jefaturas y COCODES
+                          </button>
+                        )}
+                      </div>
                       {participantes.map((p) => (
                         <div key={p.usuario_id} className="flex items-center justify-between text-sm bg-muted/30 border border-border/50 rounded-xl px-4 py-3">
                           <span className="font-semibold text-foreground">{p.nombre}</span>
@@ -303,26 +412,6 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
                       ))}
                     </div>
                   )}
-
-                  <div className="space-y-1 max-h-60 overflow-y-auto rounded-xl border border-border/50">
-                    {usuariosFiltrados.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-6">No se encontraron usuarios.</p>
-                    )}
-                    {usuariosFiltrados.map((u) => {
-                      const seleccionado = participantes.some((p) => p.usuario_id === u.id);
-                      if (seleccionado) return null;
-                      return (
-                        <button
-                          key={u.id}
-                          onClick={() => toggleParticipante(u)}
-                          className="w-full flex items-center justify-between text-sm px-4 py-3 hover:bg-muted/60 transition-colors text-left"
-                        >
-                          <span className="font-medium text-foreground">{u.nombre ?? "Sin nombre"}</span>
-                          <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
             </div>

@@ -3,9 +3,13 @@ import { getGlobalMunicipioTitle } from "@/components/(base)/layout/actions";
 import { useEffect, useState } from "react";
 
 export function useDynamicTitle() {
-  const defaultTitle = "SISTEMA DE ORGANIZACIÓN TERRITORIAL ESTRATÉGICA";
-  const [mounted, setMounted] = useState(false);
-  const [localTitle, setLocalTitle] = useState(defaultTitle);
+  const defaultTitle = "COMUDE Concepcion Las Minas, Chiquimula";
+  const [localTitle, setLocalTitle] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sote_municipio_title") || defaultTitle;
+    }
+    return defaultTitle;
+  });
 
   const { data: serverTitle } = useQuery({
     queryKey: ["global-municipio-title"],
@@ -20,20 +24,11 @@ export function useDynamicTitle() {
   });
 
   useEffect(() => {
-    setMounted(true);
-    const cached = localStorage.getItem("sote_municipio_title");
-    if (cached) {
-      setLocalTitle(cached);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (serverTitle && serverTitle !== defaultTitle) {
+    if (serverTitle && serverTitle !== localTitle) {
       setLocalTitle(serverTitle);
       localStorage.setItem("sote_municipio_title", serverTitle);
     }
-  }, [serverTitle]);
+  }, [serverTitle, localTitle]);
 
-  if (!mounted) return defaultTitle;
   return localTitle;
 }

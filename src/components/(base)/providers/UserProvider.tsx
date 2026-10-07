@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import { PushListener } from "@/components/push/PushListener";
+import BloqueoConfirmacionModal from "@/components/(comude)/actividades/modals/BloqueoConfirmacionModal";
 
 /** Intervalo de refresco automático de sesión (ms) - 5 minutos */
 const REFRESH_INTERVAL_MS = 300_000;
@@ -89,6 +91,12 @@ export function UserProvider({
 
   return (
     <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole }}>
+      {user && (
+        <>
+          <PushListener />
+          <BloqueoConfirmacionModal />
+        </>
+      )}
       {children}
     </UserContext.Provider>
   );

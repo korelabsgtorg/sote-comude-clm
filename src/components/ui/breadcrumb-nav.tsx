@@ -84,8 +84,12 @@ export function BreadcrumbNav() {
     return !uuidRegex.test(seg) || withoutUuid.length > 0;
   });
 
-  const parentPath =
+  let parentPath =
     rawSegments.length > 1 ? `/${rawSegments.slice(0, -1).join("/")}` : "/comude";
+
+  if (parentPath === "/comude/comude") {
+    parentPath = "/comude";
+  }
 
   return (
     <LayoutGroup id="breadcrumb">
@@ -139,15 +143,19 @@ export function BreadcrumbNav() {
                     damping: 25,
                     mass: 1,
                   }}
-                  className="flex items-center gap-1 shrink-0 whitespace-nowrap group/segment"
+                  className="flex items-center gap-1 shrink-0 group/segment min-w-0"
                 >
                   <ChevronRight className="size-4 md:size-5 text-muted-foreground/40 shrink-0 transition-all duration-300 group-hover/segment:text-celeste-trifinio group-hover/segment:translate-x-0.5" />
                   <Link
                     href={href}
+                    title={displayLabel}
                     className={cn(
                       isLast
-                        ? cn(crumbActive, "capitalize underline underline-offset-4 pointer-events-none text-xs md:text-lg")
-                        : crumbTextLink,
+                        ? cn(
+                            crumbActive,
+                            "capitalize underline underline-offset-4 pointer-events-none text-xs md:text-lg truncate max-w-[210px] sm:max-w-[340px] md:max-w-[480px] lg:max-w-none block"
+                          )
+                        : cn(crumbTextLink, "truncate max-w-[140px] sm:max-w-[220px] md:max-w-none block"),
                     )}
                   >
                     {displayLabel}

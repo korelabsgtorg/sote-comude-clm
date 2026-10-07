@@ -34,7 +34,7 @@ export default function LogoTrifinio({
 
   const handleHover = () => {
     if (!noAnimation && !isFullScreen) {
-      setAnimationKey(prev => prev + 1);
+      setAnimationKey((prev) => prev + 1);
     }
   };
 
@@ -52,34 +52,33 @@ export default function LogoTrifinio({
   } : {};
 
   const textContainerVariants = {
-    hidden: { opacity: 0 },
+    hidden: {},
     visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.12, delayChildren: 0.05 },
+      transition: { staggerChildren: 0.08, delayChildren: 0.04 },
     },
   };
 
   const logoVariants = {
-    hidden: { opacity: 0, scale: 0.8, rotate: -5 },
+    hidden: { opacity: 0, scale: 0.88, rotate: -2 },
     visible: {
       opacity: 1, scale: 1, rotate: 0,
-      transition: { type: "spring" as const, stiffness: 50, damping: 16, duration: 2.4 },
+      transition: { duration: 0.8, ease: "easeOut" as const },
     },
   };
 
   const titleVariants = {
-    hidden: { opacity: 0, x: -20 },
+    hidden: { opacity: 0, x: -14 },
     visible: {
       opacity: 1, x: 0,
-      transition: { type: "spring" as const, stiffness: 40, damping: 18, duration: 1.3, ...repeatConfig },
+      transition: { duration: 0.8, ease: "easeOut" as const, ...repeatConfig },
     },
   };
 
   const sloganVariants = {
-    hidden: { opacity: 0, y: 10 },
+    hidden: { opacity: 0, y: 6 },
     visible: {
       opacity: 1, y: 0,
-      transition: { type: "spring" as const, stiffness: 50, damping: 16, duration: 1.1, ...repeatConfig },
+      transition: { duration: 0.7, ease: "easeOut" as const, ...repeatConfig },
     },
   };
 
@@ -87,31 +86,24 @@ export default function LogoTrifinio({
     hidden: { scaleX: 0 },
     visible: {
       scaleX: 1,
-      transition: { duration: 1.2, ease: "easeInOut" as const, ...repeatConfig },
+      transition: { duration: 0.8, ease: "easeInOut" as const, ...repeatConfig },
     },
   };
 
-  const countriesVariants = {
-    hidden: { opacity: 0, y: 5 },
-    visible: {
-      opacity: 1, y: 0,
-      transition: { duration: 0.3, ease: "easeOut" as const, ...repeatConfig },
-    },
-  };
-
-  const textClass = cn("text-azul-trifinio");
+  const textClass = cn("text-azul-trifinio antialiased");
   const lineClass = cn("bg-azul-trifinio");
   const blurBgClass = forceAzulColors
-    ? "bg-white/55 backdrop-blur-md border border-white/50"
-    : "bg-white/55 backdrop-blur-md border border-white/50";
+    ? "bg-white/55 backdrop-blur-md border border-white/50 transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
+    : "bg-white/55 backdrop-blur-md border border-white/50 transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]";
 
   return (
     <>
       <motion.div
         onMouseEnter={handleHover}
         onClick={handleClick}
-        whileTap={{ scale: 0.96 }}
-        className="relative select-none cursor-pointer flex items-center justify-center p-2 sm:px-4 w-full sm:w-fit mx-auto"
+        whileHover={{ scale: 1.015 }}
+        whileTap={{ scale: 0.97 }}
+        className="relative select-none cursor-pointer flex items-center justify-center p-2 sm:px-4 w-full sm:w-fit mx-auto transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
         style={{ scale: scaleValue }}
         initial="hidden"
         animate="visible"
@@ -124,8 +116,13 @@ export default function LogoTrifinio({
           <div className="absolute inset-x-[-20%] inset-y-[-10%] bg-white/50 dark:bg-transparent blur-[60px] -z-10 rounded-[100px]" />
         )}
 
-        <div className="flex flex-row items-center justify-center sm:justify-start gap-6 lg:gap-8 w-fit px-4 lg:px-8">
-          <motion.div variants={logoVariants} className="flex-shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm">
+        <div key={animationKey} className="flex flex-row items-center justify-center sm:justify-start gap-6 lg:gap-8 w-fit px-4 lg:px-8">
+          <motion.div
+            variants={logoVariants}
+            initial="hidden"
+            animate="visible"
+            className="flex-shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
+          >
             <Image
               src="/sote/logo.png"
               alt="COMUDE Concepción Las Minas"
@@ -137,29 +134,40 @@ export default function LogoTrifinio({
           </motion.div>
 
           <motion.div
-            key={animationKey}
             variants={textContainerVariants}
             initial="hidden"
             animate="visible"
-            className="flex flex-col items-center sm:items-start justify-center text-center sm:text-left py-2 relative"
+            className="flex flex-col items-center sm:items-start justify-center text-center sm:text-left py-2 relative transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
           >
             <motion.h1
               variants={titleVariants}
-              className={cn("font-black leading-[1.1]", textClass)}
-              style={{ fontFamily: "'Arial Black', sans-serif", fontSize: "clamp(1.2rem, 2vw, 1.8rem)" }}
+              className={cn("font-black leading-[1.1] antialiased", textClass)}
+              style={{
+                fontFamily: "'Arial Black', sans-serif",
+                fontSize: "clamp(1.2rem, 2vw, 1.8rem)",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+                transform: "translateZ(0)",
+              }}
             >
               Sistema de Organización<br />Territorial Estratégica
             </motion.h1>
 
             <motion.div
               variants={lineVariants}
-              className={cn("w-full h-[2px] mt-2 origin-left", lineClass)}
+              className={cn("w-full h-[2px] mt-2 origin-left transform-gpu [transform:translateZ(0)]", lineClass)}
             />
 
             <motion.p
               variants={sloganVariants}
-              className={cn("font-bold italic mt-2 leading-tight", textClass)}
-              style={{ fontFamily: "Arial, sans-serif", fontSize: "clamp(0.85rem, 1.2vw, 1.1rem)" }}
+              className={cn("font-bold italic mt-2 leading-tight antialiased", textClass)}
+              style={{
+                fontFamily: "Arial, sans-serif",
+                fontSize: "clamp(0.85rem, 1.2vw, 1.1rem)",
+                WebkitFontSmoothing: "antialiased",
+                MozOsxFontSmoothing: "grayscale",
+                transform: "translateZ(0)",
+              }}
             >
               {dynamicTitle}
             </motion.p>

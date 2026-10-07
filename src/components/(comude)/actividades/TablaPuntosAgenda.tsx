@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ActComudePunto, ActComudeCategoria, CrearPuntoValues } from "./lib/zod";
 import {
+  usePuntosDeActividad,
   useCrearPunto,
   useActualizarPunto,
   useEliminarPunto,
@@ -555,7 +556,9 @@ interface TablaPuntosAgendaProps {
 }
 
 export default function TablaPuntosAgenda({ puntos, actComudeId, canManage, isAddModalOpen, onCloseAddModal, sesionEstado, filtroEstado }: TablaPuntosAgendaProps) {
-  const puntosFiltrados = filtroEstado ? puntos.filter(p => (p.estado ?? "No iniciado") === filtroEstado) : puntos;
+  const { data: puntosServidor } = usePuntosDeActividad(actComudeId);
+  const puntosEfectivos = puntosServidor ?? puntos;
+  const puntosFiltrados = filtroEstado ? puntosEfectivos.filter(p => (p.estado ?? "No iniciado") === filtroEstado) : puntosEfectivos;
   
   const [nuevoPunto, setNuevoPunto] = useState("");
   const [categoriaNueva, setCategoriaNueva] = useState("");

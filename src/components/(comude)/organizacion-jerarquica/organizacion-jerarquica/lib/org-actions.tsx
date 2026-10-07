@@ -20,6 +20,7 @@ export type AdminHandlers = {
     direccion: "arriba" | "abajo" | "inicio" | "fin",
   ) => void;
   onGestionarAcreditaciones?: (puestoId: string, puestoNombre: string) => void;
+  onAsignarAComision?: (profileId: string, personaNombre: string) => void;
 };
 
 export const ORG_ACTION_BTN =

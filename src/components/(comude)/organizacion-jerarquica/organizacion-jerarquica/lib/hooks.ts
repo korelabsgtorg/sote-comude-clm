@@ -41,6 +41,8 @@ export function useEstructuraOrganizacional() {
       }
       return result.data ?? ESTRUCTURA_VACIA;
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache fresco para navegación instantánea
+    gcTime: 1000 * 60 * 30, // Conserva en memoria por 30 minutos
   });
 }
 
@@ -48,6 +50,8 @@ export function useDepartamentos() {
   return useQuery({
     queryKey: DEPARTAMENTOS_KEY,
     queryFn: getDepartamentos,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
   });
 }
 
@@ -55,6 +59,8 @@ export function usePuestos() {
   return useQuery({
     queryKey: PUESTOS_KEY,
     queryFn: getPuestos,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
   });
 }
 

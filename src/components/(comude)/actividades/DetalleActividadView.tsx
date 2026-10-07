@@ -15,6 +15,9 @@ import {
   LogOut,
   MapPin,
   Check,
+  CheckCircle2,
+  CheckSquare,
+  Square,
   Loader2,
   Shield,
   Plus,
@@ -27,15 +30,20 @@ import {
   MoreVertical,
   Info,
   FileText,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActComudeConParticipantes, ActComudeRegistro } from "./lib/zod";
 import { useRegistrarAsistencia, useRegistrosAsistencia, useActualizarAgenda, useEliminarActividad, useActualizarActa, useActualizarImagenesActividad, useSignedUrl, useActualizarEstadoSesion } from "./lib/hooks";
+import { useEstructuraOrganizacional } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/hooks";
+import { NodoOrganizacion } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/zod";
+import { useUsers } from "@/components/(base)/(users)/usuarios/lib/hooks";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import DetalleUbicacionModal from "./modals/DetalleUbicacionModal";
 import CrearComude from "./modals/CrearComude";
 import JustificacionAsistenciaModal from "./modals/JustificacionAsistenciaModal";
+import SustituirParticipanteModal, { OpcionSustituto } from "./modals/SustituirParticipanteModal";
 
 import ImageUploader from "@/components/(uploads)/imgs/ImageUploader";
 import { useStorageDisplayUrl } from "@/components/(uploads)/imgs/useStorageDisplayUrl";
@@ -184,6 +192,20 @@ function formatFechaCorto(isoStr: string) {
   return `${dias[fecha.getDay()]} ${fecha.getDate()} de ${meses[fecha.getMonth()]}, ${fecha.getFullYear()}`;
 }
 
+function formatFechaConfirmacion(isoStr: string) {
+  const fecha = new Date(isoStr);
+  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const diaName = dias[fecha.getDay()];
+  const d = fecha.getDate().toString().padStart(2, "0");
+  const m = (fecha.getMonth() + 1).toString().padStart(2, "0");
+  const y = fecha.getFullYear().toString().slice(-2);
+  let hours = fecha.getHours();
+  const minutes = fecha.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${diaName} ${d}/${m}/${y}, ${hours}:${minutes} ${ampm}`;
+}
+
 function calcDuracion(entrada: string, salida: string) {
   const diff = (new Date(salida).getTime() - new Date(entrada).getTime()) / 1000 / 60;
   if (diff < 0) return "--";
@@ -210,6 +232,8 @@ interface ParticipanteRowProps {
   puedeGestionar: boolean;
   onRegistrar: (tipo: "entrada" | "salida") => void;
   onVerMapa: () => void;
+  onSustituir?: () => void;
+  puedeSustituir?: boolean;
   cargandoGPS: boolean;
   isMuyTemprano?: boolean;
   isPastDate: boolean;
@@ -224,6 +248,8 @@ function ParticipanteRow({
   puedeGestionar,
   onRegistrar,
   onVerMapa,
+  onSustituir,
+  puedeSustituir = false,
   cargandoGPS,
   isMuyTemprano,
   isPastDate,
@@ -237,7 +263,6 @@ function ParticipanteRow({
   );
 
   const esElUsuario = userId === participante.usuario_id;
-  const confirmado = !!regEntrada;
 
   return (
     <div className={cn(
@@ -246,11 +271,21 @@ function ParticipanteRow({
     )}>
       {/* Info de la persona */}
       <div className="flex items-start gap-3 min-w-0">
-
         <div className="min-w-0">
           <p className="font-semibold text-sm truncate">
             {participante.profiles?.nombre ?? "Sin nombre"}
           </p>
+          {participante.confirmed_at ? (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-500 mt-0.5">
+              <CheckSquare className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+              <span>{formatFechaConfirmacion(participante.confirmed_at)}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 italic mt-0.5">
+              <Square className="w-3.5 h-3.5 shrink-0 text-muted-foreground/60" />
+              <span>Sin confirmar</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -292,34 +327,51 @@ function ParticipanteRow({
       </div>
 
       {/* Botones para el propio usuario */}
-      {esElUsuario && (!regEntrada || !regSalida) && !isPastDate && (
-        <div className="w-full sm:w-auto shrink-0 flex justify-center mt-2 sm:mt-0">
-          {!regEntrada ? (
+      {esElUsuario && !isPastDate && (
+        <div className="w-full sm:w-auto shrink-0 flex flex-wrap items-center justify-center sm:justify-end gap-2 mt-2 sm:mt-0">
+          {/* Botón de Sustituir (disponible si aún no ha marcado salida, no es fecha pasada y la sesión no ha finalizado) */}
+          {!regSalida && !isFinalizada && puedeSustituir && onSustituir && (
             <button
-              onClick={() => onRegistrar("entrada")}
-              disabled={cargandoGPS || isMuyTemprano || isFinalizada}
-              className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold text-white px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
-                isFinalizada || isMuyTemprano
-                  ? "bg-gray-400 dark:bg-neutral-700 dark:text-gray-400 cursor-not-allowed shadow-none"
-                  : "bg-green-600 hover:bg-green-700 disabled:opacity-60"
-              }`}
+              onClick={onSustituir}
+              type="button"
+              className="flex justify-center items-center gap-1.5 text-sm sm:text-xs font-semibold border border-azul-trifinio text-azul-trifinio hover:bg-azul-trifinio/10 px-3.5 py-2.5 sm:py-2 rounded-lg transition-colors w-full sm:w-auto"
+              title="Delegar asistencia a un miembro de tu equipo"
             >
-              {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogIn className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
-              {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Entrada"}
+              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+              <span>Sustituir</span>
             </button>
-          ) : (
-            <button
-              onClick={() => onRegistrar("salida")}
-              disabled={cargandoGPS || isFinalizada}
-              className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
-                isFinalizada
-                  ? "bg-gray-400 dark:bg-neutral-700 text-white dark:text-gray-400 cursor-not-allowed shadow-none"
-                  : "bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
-              }`}
-            >
-              {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
-              {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Salida"}
-            </button>
+          )}
+
+          {(!regEntrada || !regSalida) && (
+            <>
+              {!regEntrada ? (
+                <button
+                  onClick={() => onRegistrar("entrada")}
+                  disabled={cargandoGPS || isMuyTemprano || isFinalizada}
+                  className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold text-white px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
+                    isFinalizada || isMuyTemprano
+                      ? "bg-gray-400 dark:bg-neutral-700 dark:text-gray-400 cursor-not-allowed shadow-none"
+                      : "bg-green-600 hover:bg-green-700 disabled:opacity-60"
+                  }`}
+                >
+                  {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogIn className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
+                  {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Entrada"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => onRegistrar("salida")}
+                  disabled={cargandoGPS || isFinalizada}
+                  className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
+                    isFinalizada
+                      ? "bg-gray-400 dark:bg-neutral-700 text-white dark:text-gray-400 cursor-not-allowed shadow-none"
+                      : "bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
+                  }`}
+                >
+                  {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
+                  {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Salida"}
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -417,6 +469,78 @@ export default function DetalleActividadView({
   const [pendingTipoRegistro, setPendingTipoRegistro] = useState<"entrada" | "salida" | null>(null);
   const [isRegistroTarde, setIsRegistroTarde] = useState(false);
   const [horaMostrar, setHoraMostrar] = useState("");
+
+  // Estado y lógica para sustitución de participantes
+  const [isSustituirModalOpen, setIsSustituirModalOpen] = useState(false);
+  const { data: estructuraOrg, isLoading: isLoadingEstructura } = useEstructuraOrganizacional();
+  const { data: allUsers, isLoading: isLoadingUsers } = useUsers(effectiveRole);
+
+  const esSuperOAdmin = effectiveRole === "super" || effectiveRole === "admin";
+
+  // Calcular los sustitutos permitidos para el usuario autenticado
+  const sustitutosDisponibles: OpcionSustituto[] = (() => {
+    if (!userId) return [];
+
+    // Participantes que ya están en esta sesión para no duplicar
+    const participantesIds = new Set(
+      (actividad?.act_comude_participantes || []).map((p) => p.usuario_id)
+    );
+
+    if (esSuperOAdmin) {
+      // Super / Admin puede seleccionar a cualquier usuario activo que no esté en la sesión
+      return (allUsers || [])
+        .filter((u) => u.id !== userId && !participantesIds.has(u.id))
+        .map((u) => ({
+          id: u.id,
+          nombre: u.nombre || "Sin nombre",
+          puestoNombre: u.rol ? `Rol: ${u.rol}` : null,
+        }));
+    }
+
+    // Para una jefatura ordinaria: buscar en el árbol de la estructura organizacional
+    if (!estructuraOrg) return [];
+
+    // 1. Encontrar el nodo del usuario actual
+    let nodoUsuario: NodoOrganizacion | null = null;
+    function buscarNodo(nodo: NodoOrganizacion) {
+      if (nodo.tipo === "unidad" && nodo.titular_id === userId) {
+        nodoUsuario = nodo;
+        return;
+      }
+      for (const hijo of nodo.hijos || []) {
+        buscarNodo(hijo);
+        if (nodoUsuario) return;
+      }
+    }
+    buscarNodo(estructuraOrg);
+
+    if (!nodoUsuario) return [];
+
+    // 2. Extraer los subordinados que descienden del nodo del usuario
+    const subordinadosMap = new Map<string, OpcionSustituto>();
+    function recolectarSubordinados(nodo: NodoOrganizacion) {
+      if (nodo.tipo === "unidad" && nodo.titular_id && nodo.titular) {
+        if (nodo.titular_id !== userId && !participantesIds.has(nodo.titular_id)) {
+          subordinadosMap.set(nodo.titular_id, {
+            id: nodo.titular_id,
+            nombre: nodo.titular,
+            puestoNombre: nodo.nombre,
+          });
+        }
+      }
+      for (const hijo of nodo.hijos || []) {
+        recolectarSubordinados(hijo);
+      }
+    }
+
+    for (const hijo of (nodoUsuario as NodoOrganizacion).hijos || []) {
+      recolectarSubordinados(hijo);
+    }
+
+    return Array.from(subordinadosMap.values());
+  })();
+
+  const puedeSustituir = esSuperOAdmin || sustitutosDisponibles.length > 0;
 
   // Estado optimista para la agenda para respuesta inmediata
   const [optimisticAgenda, setOptimisticAgenda] = useState(actividad?.agenda || []);
@@ -942,9 +1066,9 @@ export default function DetalleActividadView({
         </div>
       </div>
 
-      {/* Banner Superior: Mi Asistencia o Alerta */}
+      {/* Banner Superior: Mi Asistencia */}
       <div className="px-1.5 sm:px-6 py-3">
-        {participanteYo && (regEntradaYo || actividad.estado === "En progreso" || actividad.estado === "Finalizada") ? (
+        {participanteYo ? (
           <div>
             <p className="text-xs font-bold text-muted-foreground dark:text-gray-300 uppercase tracking-widest mb-2">
               Mi Asistencia
@@ -960,6 +1084,8 @@ export default function DetalleActividadView({
               isMuyTemprano={isMuyTemprano}
               isPastDate={isPastDate}
               isFinalizada={esFinalizada}
+              puedeSustituir={puedeSustituir}
+              onSustituir={() => setIsSustituirModalOpen(true)}
               onVerMapa={() => setParticipanteMapa({
                 nombre: participanteYo.profiles?.nombre || "Sin nombre",
                 entrada: registros.find(r => r.usuario_id === participanteYo.usuario_id && r.tipo_registro === "entrada") || null,
@@ -1016,6 +1142,14 @@ export default function DetalleActividadView({
             </h2>
             <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight uppercase">
               {formatHora(actividad.fecha)}
+            </p>
+          </div>
+          <div>
+            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+              Lugar:
+            </h2>
+            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight">
+              {actividad.ubicacion || "Gimnasio Municipal"}
             </p>
           </div>
         </div>
@@ -1293,6 +1427,16 @@ export default function DetalleActividadView({
         actividad={actividad}
         registros={registros}
         evidenciaUrls={evidenciaSignedUrls}
+      />
+
+      <SustituirParticipanteModal
+        isOpen={isSustituirModalOpen}
+        onClose={() => setIsSustituirModalOpen(false)}
+        actComudeId={actividad.id}
+        tituloActividad={actividad.detalles_sesion?.titulo || "Reunión de COMUDE"}
+        sustitutosDisponibles={sustitutosDisponibles}
+        cargandoSustitutos={isLoadingEstructura || isLoadingUsers}
+        esSuperOAdmin={esSuperOAdmin}
       />
     </>
   );

@@ -11,6 +11,7 @@ export type ActComude = {
   inicio: string | null;
   fin: string | null;
   descripcion: string | null;
+  ubicacion?: string | null;
   detalles_sesion: {
     titulo: string;
     acta?: string;
@@ -19,12 +20,15 @@ export type ActComude = {
   acta?: string[] | null;
   actas?: any;
   agenda?: any[] | null;
+  convocatoria?: { emitida?: boolean; created_at?: string } | null;
 };
 
 export type ActComudeParticipante = {
   act_comude_id: string;
   usuario_id: string;
   encargado: boolean;
+  confirmed_at?: string | null;
+  created_by?: string | null;
 };
 
 export type ActComudeRegistro = {
@@ -84,6 +88,7 @@ export const crearActividadSchema = z.object({
   acta: z.string().optional(),
   libro: z.string().optional(),
   descripcion: z.string().optional(),
+  ubicacion: z.string().optional(),
   participantes: z.array(
     z.object({
       usuario_id: z.string(),

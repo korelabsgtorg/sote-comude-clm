@@ -75,7 +75,7 @@ export async function cropImage(
     pixelCrop.height
   );
 
-  const outputType = mimeType === "image/jpeg" ? "image/jpeg" : "image/png";
+  const outputType = mimeType === "image/jpeg" ? "image/jpeg" : mimeType === "image/webp" ? "image/webp" : "image/png";
 
   return new Promise((resolve, reject) => {
     croppedCanvas.toBlob(
@@ -87,7 +87,7 @@ export async function cropImage(
         resolve(blob);
       },
       outputType,
-      outputType === "image/jpeg" ? 0.92 : undefined
+      outputType === "image/jpeg" || outputType === "image/webp" ? 0.92 : undefined
     );
   });
 }

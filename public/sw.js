@@ -10,7 +10,19 @@ self.addEventListener('push', (event) => {
         url: data.url || '/'
       }
     }
-    event.waitUntil(self.registration.showNotification(data.title, options))
+
+    const showNotificationPromise = self.registration.showNotification(data.title, options);
+    
+    const notifyClientsPromise = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({
+          type: 'ACTIVIDAD_PENDIENTE_REFRESH',
+          payload: data
+        });
+      }
+    });
+
+    event.waitUntil(Promise.all([showNotificationPromise, notifyClientsPromise]));
   }
 })
 

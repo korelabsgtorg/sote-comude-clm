@@ -14,6 +14,7 @@ interface ImageEditorModalProps {
   aspectLabel?: string;
   maxSizeMB?: number;
   maxDimension?: number;
+  forceFormat?: "image/webp" | "image/png" | "image/jpeg";
   onClose: () => void;
   onApply: (file: File) => Promise<void>;
 }
@@ -27,6 +28,7 @@ export default function ImageEditorModal({
   aspectLabel = "Proporción libre",
   maxSizeMB = 0.2,
   maxDimension = 1024,
+  forceFormat,
   onClose,
   onApply,
 }: ImageEditorModalProps) {
@@ -57,12 +59,19 @@ export default function ImageEditorModal({
     if (!croppedAreaPixels) return;
     setUploading(true);
     try {
-      const outputMime = "image/png";
+      const outputMime =
+        forceFormat ||
+        (mimeType === "image/webp"
+          ? "image/webp"
+          : mimeType === "image/png"
+          ? "image/png"
+          : "image/jpeg");
       const blob = await cropImage(imageSrc, croppedAreaPixels, rotation, outputMime);
-      let file = new File([blob], "image.png", { type: outputMime });
+      const ext = outputMime === "image/webp" ? "webp" : outputMime === "image/png" ? "png" : "jpg";
+      let file = new File([blob], `image.${ext}`, { type: outputMime });
 
       if (!isAllowedImageType(file.type)) {
-        toast.error("Solo se permiten imágenes JPEG y PNG.");
+        toast.error("Solo se permiten imágenes JPEG, PNG y WebP.");
         return;
       }
 

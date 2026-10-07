@@ -8,7 +8,7 @@ import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 import DetalleActividadView from "@/components/(comude)/actividades/DetalleActividadView";
 import { Loader2 } from "lucide-react";
 
-import { slugify } from "@/components/(comude)/actividades/lib/slug";
+import { getComudeUrl } from "@/components/(comude)/actividades/lib/slug";
 
 export default function ComudeDetalleClient({ id }: { id: string }) {
   const router = useRouter();
@@ -21,11 +21,9 @@ export default function ComudeDetalleClient({ id }: { id: string }) {
   }, []);
 
   useEffect(() => {
-    if (actividad?.detalles_sesion?.titulo) {
-      const cleanSlug = slugify(actividad.detalles_sesion.titulo);
-      if (cleanSlug) {
-        window.history.replaceState(null, "", `/comude/comude/${cleanSlug}`);
-      }
+    if (actividad?.id && actividad?.detalles_sesion?.titulo) {
+      const fullUrl = getComudeUrl(actividad.id, actividad.detalles_sesion.titulo);
+      window.history.replaceState(null, "", fullUrl);
     }
   }, [actividad]);
 

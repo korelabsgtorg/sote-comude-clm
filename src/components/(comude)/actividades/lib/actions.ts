@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { sendPushToUsers } from "@/utils/push-utils";
 import { revalidatePath } from "next/cache";
 import {
   CrearActividadValues,
@@ -14,7 +15,7 @@ import {
   CrearPuntoValues,
 } from "./zod";
 import { getGlobalMunicipioCookie } from "@/components/(base)/layout/actions";
-import { extractUuid } from "./slug";
+import { extractUuid, slugify } from "./slug";
 
 // ----- LECTURA -----
 
@@ -86,7 +87,16 @@ export async function getActividades(year?: number, month?: number): Promise<Act
 
   let query = supabase
     .from("act_comude")
-    .select("*")
+    .select(`
+      *,
+      act_comude_participantes (
+        act_comude_id,
+        usuario_id,
+        encargado,
+        confirmed_at,
+        created_by
+      )
+    `)
     .gte("fecha", startDate)
     .lte("fecha", endDate)
     .order("fecha", { ascending: true });
@@ -120,11 +130,10 @@ export async function getActividades(year?: number, month?: number): Promise<Act
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return [];
   
-  return (data || []).map((act) => ({
-    ...act,
-    act_comude_participantes: act.act_comude_participantes || [],
-  })) as ActComudeConParticipantes[];
+  const actividadesConPerfiles = await attachProfilesToActividades(data, supabase);
+  return actividadesConPerfiles as ActComudeConParticipantes[];
 }
 
 /** Obtiene una actividad con sus participantes, perfiles y puntos de agenda (admite UUID o slug de título) */
@@ -140,7 +149,9 @@ export async function getActividadById(idOrSlug: string): Promise<ActComudeConPa
       act_comude_participantes (
         act_comude_id,
         usuario_id,
-        encargado
+        encargado,
+        confirmed_at,
+        created_by
       ),
       act_comude_puntos (
         *,
@@ -150,19 +161,39 @@ export async function getActividadById(idOrSlug: string): Promise<ActComudeConPa
     `)
     .order("orden", { referencedTable: "act_comude_puntos", ascending: true });
 
-  if (realId) {
-    query = query.eq("id", realId);
-  } else {
-    const rawSearch = idOrSlug.replace(/-/g, " ");
-    query = query.filter("detalles_sesion->>titulo", "ilike", `%${rawSearch}%`);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("municipio_id, rol")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.municipio_id) {
+      query = query.eq("municipio_id", profile.municipio_id);
+    }
   }
 
-  const { data, error } = await query.limit(1).maybeSingle();
+  if (realId) {
+    query = query.eq("id", realId);
+    const { data, error } = await query.limit(1).maybeSingle();
+    if (error || !data) return null;
+    const res = await attachProfilesToActividades([data], supabase);
+    return res[0] as ActComudeConParticipantes;
+  }
 
-  if (error) throw new Error(error.message);
-  if (!data) return null;
+  // Búsqueda por slug limpio sin UUID
+  const { data: actividades, error } = await query;
+  if (error || !actividades || actividades.length === 0) return null;
 
-  const res = await attachProfilesToActividades([data], supabase);
+  const target = actividades.find((act: any) => {
+    const titulo = act.detalles_sesion?.titulo || "";
+    return slugify(titulo) === idOrSlug || act.id === idOrSlug;
+  });
+
+  if (!target) return null;
+
+  const res = await attachProfilesToActividades([target], supabase);
   return res[0] as ActComudeConParticipantes;
 }
 
@@ -218,6 +249,7 @@ export async function crearActividadComude(values: CrearActividadValues): Promis
       },
       fecha: new Date(values.fecha).toISOString(),
       descripcion: values.descripcion ?? null,
+      ubicacion: values.ubicacion?.trim() || "Gimnasio Municipal",
       municipio_id: municipioId,
       estado: "Programada",
     })
@@ -231,6 +263,8 @@ export async function crearActividadComude(values: CrearActividadValues): Promis
     act_comude_id: actividad.id,
     usuario_id: p.usuario_id,
     encargado: p.encargado,
+    created_by: user.id,
+    confirmed_at: null,
   }));
 
   if (participantes.length > 0) {
@@ -245,9 +279,99 @@ export async function crearActividadComude(values: CrearActividadValues): Promis
   return { id: actividad.id };
 }
 
+/** Emite oficialmente la convocatoria para una actividad COMUDE, enviando push y activando la confirmación de asistencia */
+export async function emitirConvocatoriaComude(actComudeId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Obtener la actividad y sus participantes
+  const { data: actividad, error: actErr } = await supabase
+    .from("act_comude")
+    .select(`
+      id,
+      detalles_sesion,
+      act_comude_participantes (usuario_id)
+    `)
+    .eq("id", actComudeId)
+    .single();
+
+  if (actErr || !actividad) throw new Error("Actividad no encontrada");
+
+  const titulo = (actividad.detalles_sesion as any)?.titulo || "Sesión COMUDE";
+
+  // Actualizar la columna convocatoria
+  const { error: updateErr } = await supabase
+    .from("act_comude")
+    .update({
+      convocatoria: {
+        emitida: true,
+        created_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", actComudeId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  // Disparar notificaciones PUSH a los participantes (excluyendo al creador/admin que la emitió)
+  const targetIds = (actividad.act_comude_participantes || [])
+    .map((p: any) => p.usuario_id)
+    .filter((uid: string) => uid !== user.id);
+
+  if (targetIds.length > 0) {
+    try {
+      await sendPushToUsers(targetIds, {
+        title: "📋 Convocatoria COMUDE Emitida",
+        body: `Se ha publicado la convocatoria oficial para: ${titulo}`,
+        url: `/comude/actividades/${actComudeId}`,
+      });
+    } catch (pushErr) {
+      console.error("Error enviando push al emitir convocatoria:", pushErr);
+    }
+  }
+
+  revalidatePath("/comude");
+}
+
 /** Edita una actividad COMUDE existente */
 export async function editarActividadComude(id: string, values: CrearActividadValues): Promise<void> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Obtener la fecha, ubicación y participantes previos con sus confirmaciones
+  const { data: actividadPrevia } = await supabase
+    .from("act_comude")
+    .select(`
+      fecha,
+      ubicacion,
+      act_comude_participantes (
+        usuario_id,
+        confirmed_at
+      )
+    `)
+    .eq("id", id)
+    .single();
+
+  const nuevaFechaIso = new Date(values.fecha).toISOString();
+  const cambioDeFecha = actividadPrevia
+    ? new Date(actividadPrevia.fecha).getTime() !== new Date(nuevaFechaIso).getTime()
+    : false;
+
+  const nuevaUbicacion = values.ubicacion?.trim() || "Gimnasio Municipal";
+  const ubicacionPrevia = actividadPrevia?.ubicacion?.trim() || "Gimnasio Municipal";
+  const cambioDeLugar = actividadPrevia
+    ? ubicacionPrevia.toLowerCase() !== nuevaUbicacion.toLowerCase()
+    : false;
+
+  const requiereNotificacion = cambioDeFecha || cambioDeLugar;
+
+  // Mapa de confirmaciones previas por usuario_id
+  const confirmedMap = new Map<string, string | null>();
+  if (actividadPrevia?.act_comude_participantes) {
+    (actividadPrevia.act_comude_participantes as any[]).forEach((p) => {
+      confirmedMap.set(p.usuario_id, p.confirmed_at);
+    });
+  }
 
   // Actualizar la actividad
   const { error: actError } = await supabase
@@ -258,21 +382,27 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
         acta: values.acta,
         libro: values.libro,
       },
-      fecha: new Date(values.fecha).toISOString(),
+      fecha: nuevaFechaIso,
       descripcion: values.descripcion ?? null,
+      ubicacion: nuevaUbicacion,
     })
     .eq("id", id);
 
   if (actError) throw new Error(actError.message);
 
-  // Reemplazar participantes
+  // Reemplazar participantes respetando confirmaciones existentes si no cambió la fecha ni el lugar
   await supabase.from("act_comude_participantes").delete().eq("act_comude_id", id);
 
-  const participantes = values.participantes.map((p) => ({
-    act_comude_id: id,
-    usuario_id: p.usuario_id,
-    encargado: p.encargado,
-  }));
+  const participantes = values.participantes.map((p) => {
+    const confirmedAtPrevio = confirmedMap.get(p.usuario_id);
+    return {
+      act_comude_id: id,
+      usuario_id: p.usuario_id,
+      encargado: p.encargado,
+      created_by: user?.id ?? null,
+      confirmed_at: requiereNotificacion ? null : (confirmedAtPrevio ?? null),
+    };
+  });
 
   if (participantes.length > 0) {
     const { error: partError } = await supabase
@@ -280,6 +410,44 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
       .insert(participantes);
 
     if (partError) throw new Error(partError.message);
+
+    // Solo enviar notificación PUSH cuando se edite la fecha o el lugar de la reunión
+    if (requiereNotificacion) {
+      const targetIds = values.participantes.map((p) => p.usuario_id);
+
+      if (targetIds.length > 0) {
+        const fechaFormateada = new Date(values.fecha).toLocaleDateString("es-ES", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+
+        let pushTitle = "📅 Cambio en Reunión de COMUDE";
+        let pushBody = "";
+
+        if (cambioDeFecha && cambioDeLugar) {
+          pushTitle = "📅📍 Cambio de Fecha y Lugar";
+          pushBody = `Se ha modificado la fecha y lugar de la reunión a ${fechaFormateada} en "${nuevaUbicacion}". Por favor confirma de enterado.`;
+        } else if (cambioDeFecha) {
+          pushTitle = "📅 Cambio de Fecha de Reunión";
+          pushBody = `Se ha modificado la fecha de la reunión a ${fechaFormateada}. Por favor confirma de enterado.`;
+        } else if (cambioDeLugar) {
+          pushTitle = "📍 Cambio de Lugar de Reunión";
+          pushBody = `Se ha modificado el lugar de la reunión a: "${nuevaUbicacion}". Por favor confirma de enterado.`;
+        }
+
+        try {
+          await sendPushToUsers(targetIds, {
+            title: pushTitle,
+            body: pushBody,
+            url: `/comude`,
+          });
+        } catch (pushErr) {
+          console.error("Error enviando push tras editar actividad:", pushErr);
+        }
+      }
+    }
   }
 
   revalidatePath("/comude");
@@ -600,3 +768,203 @@ export async function actualizarEstadoSesion(
   if (error) throw new Error(error.message);
   revalidatePath("/comude");
 }
+
+// ============================================================
+// ----- CONFIRMACIÓN OBLIGATORIA DE ACTIVIDADES -----
+// ============================================================
+
+export type ActividadPendienteConfirmacion = {
+  participanteId?: string;
+  actComudeId: string;
+  titulo: string;
+  descripcion: string | null;
+  ubicacion: string | null;
+  fecha: string;
+  creadorNombre: string | null;
+  fechaAsignacion: string | null;
+};
+
+/**
+ * Consulta si el usuario actualmente autenticado tiene actividades asignadas no confirmadas (confirmed_at IS NULL).
+ */
+export async function getActividadPendienteConfirmacion(): Promise<ActividadPendienteConfirmacion | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  // Consultar participantes no confirmados del usuario
+  const { data: asignaciones, error } = await supabase
+    .from("act_comude_participantes")
+    .select(`
+      act_comude_id,
+      usuario_id,
+      confirmed_at,
+      created_by,
+      act_comude!inner (
+        id,
+        detalles_sesion,
+        descripcion,
+        ubicacion,
+        fecha,
+        estado,
+        convocatoria
+      )
+    `)
+    .eq("usuario_id", user.id)
+    .is("confirmed_at", null)
+    .limit(10);
+
+  if (error || !asignaciones || asignaciones.length === 0) {
+    return null;
+  }
+
+  // Filtrar asignaciones cuya actividad siga activa (no cancelada/finalizada) y cuya convocatoria haya sido emitida
+  const asignacionValida = asignaciones.find((asig: any) => {
+    const act = asig.act_comude;
+    const estado = (act?.estado || "").toLowerCase();
+    const convocatoriaEmitida = Boolean(
+      act?.convocatoria && (act.convocatoria.emitida || act.convocatoria.created_at)
+    );
+    return estado !== "cancelada" && estado !== "finalizada" && convocatoriaEmitida;
+  });
+
+  if (!asignacionValida) return null;
+
+  const act = (asignacionValida as any).act_comude;
+  const creadorId = (asignacionValida as any).created_by;
+
+  let creadorNombre: string | null = null;
+  if (creadorId) {
+    const { data: perfilCreador } = await supabase
+      .from("profiles")
+      .select("nombre")
+      .eq("id", creadorId)
+      .single();
+    if (perfilCreador) {
+      creadorNombre = perfilCreador.nombre;
+    }
+  }
+
+  const detalles = act?.detalles_sesion || {};
+
+  return {
+    actComudeId: act.id,
+    titulo: detalles.titulo || "Nueva Actividad COMUDE",
+    descripcion: act.descripcion || null,
+    ubicacion: act.ubicacion || "Gimnasio Municipal",
+    fecha: act.fecha,
+    creadorNombre,
+    fechaAsignacion: null,
+  };
+}
+
+/**
+ * Registra la confirmación de enterado para el usuario autenticado en la actividad especificada.
+ */
+export async function confirmarParticipacionComude(actComudeId: string): Promise<void> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("No autenticado");
+
+  const { error } = await supabase
+    .from("act_comude_participantes")
+    .update({ confirmed_at: new Date().toISOString() })
+    .eq("act_comude_id", actComudeId)
+    .eq("usuario_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/comude");
+}
+
+/**
+ * Sustituye al usuario actual (o especificado) por un nuevo usuario participante en una sesión de COMUDE.
+ * Envía notificación PUSH al nuevo usuario asignado.
+ */
+export async function sustituirParticipanteComude(params: {
+  actComudeId: string;
+  nuevoUsuarioId: string;
+}): Promise<void> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("No autenticado");
+
+  // 1. Obtener la asignación actual del participante autenticado
+  const { data: participanteActual, error: errorPart } = await supabase
+    .from("act_comude_participantes")
+    .select("encargado")
+    .eq("act_comude_id", params.actComudeId)
+    .eq("usuario_id", user.id)
+    .maybeSingle();
+
+  if (errorPart || !participanteActual) {
+    throw new Error("No eres participante registrado en esta sesión de COMUDE.");
+  }
+
+  // 2. Obtener datos de la actividad y del usuario sustituto
+  const [{ data: actividad }, { data: perfilActual }] = await Promise.all([
+    supabase
+      .from("act_comude")
+      .select("id, detalles_sesion, fecha, ubicacion")
+      .eq("id", params.actComudeId)
+      .single(),
+    supabase
+      .from("profiles")
+      .select("nombre")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+
+  // 3. Eliminar la participación del titular actual
+  const { error: errorDel } = await supabase
+    .from("act_comude_participantes")
+    .delete()
+    .eq("act_comude_id", params.actComudeId)
+    .eq("usuario_id", user.id);
+
+  if (errorDel) throw new Error(errorDel.message);
+
+  // 4. Insertar la nueva asignación para el sustituto (requerirá confirmación)
+  const { error: errorIns } = await supabase
+    .from("act_comude_participantes")
+    .upsert({
+      act_comude_id: params.actComudeId,
+      usuario_id: params.nuevoUsuarioId,
+      encargado: participanteActual.encargado,
+      created_by: user.id,
+      confirmed_at: null, // Requiere que el sustituto confirme enterado
+    });
+
+  if (errorIns) throw new Error(errorIns.message);
+
+  // 5. Enviar notificación push al sustituto
+  const delegadorNombre = perfilActual?.nombre || "Un titular de jefatura";
+  const tituloSesion = actividad?.detalles_sesion?.titulo || "Reunión de COMUDE";
+
+  try {
+    await sendPushToUsers([params.nuevoUsuarioId], {
+      title: "📋 Has sido delegado al COMUDE",
+      body: `${delegadorNombre} te ha asignado como sustituto para asistir a: "${tituloSesion}".`,
+      url: `/comude`,
+    });
+  } catch (pushErr) {
+    console.error("Error al enviar push de sustitución:", pushErr);
+  }
+
+  revalidatePath("/comude");
+}
+

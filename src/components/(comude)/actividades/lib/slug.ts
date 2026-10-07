@@ -19,5 +19,5 @@ export function slugify(text: string): string {
 export function getComudeUrl(id: string, titulo?: string): string {
   const cleanId = extractUuid(id);
   const slug = titulo ? slugify(titulo) : "";
-  return slug ? `/comude/comude/${cleanId}-${slug}` : `/comude/comude/${cleanId}`;
+  return slug ? `/comude/comude/${slug}` : `/comude/comude/${cleanId}`;
 }

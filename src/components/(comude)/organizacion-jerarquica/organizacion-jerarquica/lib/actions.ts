@@ -537,11 +537,14 @@ function construirArbol(
 async function cargarPuestosConJefaturas(
   supabase: SupabaseServerClient,
   municipioId: number,
+  departamentosDataPreloaded?: Record<string, unknown>[],
 ): Promise<PuestoRecord[]> {
   const [puestosRes, asignacionesRes, departamentosRes] = await Promise.all([
     listarPuestos(supabase, municipioId),
     listarPuestoJefaturas(supabase),
-    listarDepartamentos(supabase, municipioId),
+    departamentosDataPreloaded
+      ? Promise.resolve({ data: departamentosDataPreloaded, error: null })
+      : listarDepartamentos(supabase, municipioId),
   ]);
 
   if (puestosRes.error) return [];
@@ -727,9 +730,9 @@ export async function getEstructuraOrganizacional(): Promise<{
       return { data: null, error };
     }
 
-    const [departamentosRes, puestos, titularesPorPuesto] = await Promise.all([
+    // 1. Cargar departamentos primero para reutilizarlos en cargarPuestosConJefaturas
+    const [departamentosRes, titularesPorPuesto] = await Promise.all([
       listarDepartamentos(supabase, municipioId),
-      cargarPuestosConJefaturas(supabase, municipioId),
       listarTitularesPorPuesto(supabase, municipioId),
     ]);
 
@@ -737,12 +740,34 @@ export async function getEstructuraOrganizacional(): Promise<{
       return { data: ESTRUCTURA_VACIA, error: "LOAD_FAILED" };
     }
 
-    const departamentos = (departamentosRes.data ?? []).map((row) =>
-      normalizarDepartamento(row as Record<string, unknown>),
+    const rawDeptos = (departamentosRes.data ?? []) as Record<string, unknown>[];
+
+    // 2. Cargar puestos reutilizando los departamentos ya obtenidos
+    const puestos = await cargarPuestosConJefaturas(
+      supabase,
+      municipioId,
+      rawDeptos,
+    );
+
+    const departamentos = rawDeptos.map((row) =>
+      normalizarDepartamento(row),
     );
 
     // Separar los departamentos normales de los creados automáticamente por comunidades territoriales
-    const deptosAdministrativos = departamentos.filter((d) => !d.comunidad_id);
+    const deptosAdministrativos = departamentos.filter((d) => {
+      if (d.comunidad_id && String(d.comunidad_id).trim() !== "") {
+        return false;
+      }
+      const nombreLower = d.nombre.trim().toLowerCase();
+      if (
+        nombreLower.startsWith("comunidad:") ||
+        nombreLower.startsWith("cocode:") ||
+        nombreLower.startsWith("consejo comunitario:")
+      ) {
+        return false;
+      }
+      return true;
+    });
 
     const data = construirArbol(deptosAdministrativos, puestos, titularesPorPuesto);
 
@@ -750,7 +775,7 @@ export async function getEstructuraOrganizacional(): Promise<{
     const depsConsolidadores = departamentos.filter((d) => d.jalar_jefes_territoriales);
     if (depsConsolidadores.length > 0 && data) {
       try {
-        const [comunidadesRes, puestosTerritorialesRes] = await Promise.all([
+        const [comunidadesRes, puestosTerritorialesRes, deptosTerritorialesRes] = await Promise.all([
           supabase
             .from("lug_comunidades")
             .select("id, nombre, tipo")
@@ -760,73 +785,77 @@ export async function getEstructuraOrganizacional(): Promise<{
             .select("id, nombre, departamento_id, activo, fecha, acreditaciones")
             .eq("municipio_id", municipioId)
             .not("departamento_id", "is", null),
-        ]);
-
-        if (!comunidadesRes.error && comunidadesRes.data && !puestosTerritorialesRes.error && puestosTerritorialesRes.data) {
-          const comunidadesMap = new Map(comunidadesRes.data.map((c) => [c.id, c]));
-          const deptosTerritorialesRes = await supabase
+          supabase
             .from("departamentos")
             .select("id, comunidad_id")
             .eq("municipio_id", municipioId)
-            .not("comunidad_id", "is", null);
+            .not("comunidad_id", "is", null),
+        ]);
 
-          if (!deptosTerritorialesRes.error && deptosTerritorialesRes.data) {
-            const deptoToComunidadMap = new Map(
-              deptosTerritorialesRes.data.map((d) => [d.id, d.comunidad_id])
+        if (
+          !comunidadesRes.error &&
+          comunidadesRes.data &&
+          !puestosTerritorialesRes.error &&
+          puestosTerritorialesRes.data &&
+          !deptosTerritorialesRes.error &&
+          deptosTerritorialesRes.data
+        ) {
+          const comunidadesMap = new Map(comunidadesRes.data.map((c) => [c.id, c]));
+          const deptoToComunidadMap = new Map(
+            deptosTerritorialesRes.data.map((d) => [d.id, d.comunidad_id])
+          );
+
+          // Obtener jefaturas de puestos territoriales
+          const puestoIdsTerritoriales = puestosTerritorialesRes.data.map((p) => p.id);
+          if (puestoIdsTerritoriales.length > 0) {
+            const { data: jefaturasTerr } = await supabase
+              .from("puesto_jefaturas")
+              .select("puesto_id, departamento_id")
+              .in("puesto_id", puestoIdsTerritoriales);
+
+            const jefesPuestoIds = new Set((jefaturasTerr ?? []).map((j) => j.puesto_id));
+            const puestosLideres = puestosTerritorialesRes.data.filter((p) =>
+              p.departamento_id && deptoToComunidadMap.has(p.departamento_id) && jefesPuestoIds.has(p.id)
             );
 
-            // Obtener jefaturas de puestos territoriales
-            const puestoIdsTerritoriales = puestosTerritorialesRes.data.map((p) => p.id);
-            if (puestoIdsTerritoriales.length > 0) {
-              const { data: jefaturasTerr } = await supabase
-                .from("puesto_jefaturas")
-                .select("puesto_id, departamento_id")
-                .in("puesto_id", puestoIdsTerritoriales);
-
-              const jefesPuestoIds = new Set((jefaturasTerr ?? []).map((j) => j.puesto_id));
-              const puestosLideres = puestosTerritorialesRes.data.filter((p) =>
-                p.departamento_id && deptoToComunidadMap.has(p.departamento_id) && jefesPuestoIds.has(p.id)
-              );
-
-              if (puestosLideres.length > 0) {
-                const nodosLideres: NodoOrganizacion[] = puestosLideres.map((p) => {
-                  const comId = deptoToComunidadMap.get(p.departamento_id!);
-                  const comunidad = comId ? comunidadesMap.get(comId) : null;
-                  const titular = titularesPorPuesto.get(p.id);
-                  let acreditaciones: AcreditacionFile[] = [];
-                  if (Array.isArray(p.acreditaciones)) {
-                    acreditaciones = p.acreditaciones as AcreditacionFile[];
-                  } else if (typeof p.acreditaciones === "string") {
-                    try { acreditaciones = JSON.parse(p.acreditaciones); } catch {}
-                  }
-
-                  return {
-                    id: p.id,
-                    nombre: comunidad ? `${p.nombre} - ${comunidad.nombre}` : p.nombre,
-                    tipo: "unidad",
-                    tiene_jefaturas: true,
-                    titular: titular?.nombre,
-                    titular_id: titular?.id,
-                    fecha: p.fecha ? String(p.fecha).split("T")[0] : null,
-                    activo: p.activo !== false,
-                    acreditaciones,
-                  };
-                });
-
-                // Inyectar en los nodos correspondientes
-                for (const depConsolidador of depsConsolidadores) {
-                  const buscarYInyectar = (nodo: NodoOrganizacion): boolean => {
-                    if (nodo.id === depConsolidador.id) {
-                      nodo.hijos = [...(nodo.hijos ?? []), ...nodosLideres];
-                      return true;
-                    }
-                    for (const hijo of nodo.hijos ?? []) {
-                      if (buscarYInyectar(hijo)) return true;
-                    }
-                    return false;
-                  };
-                  buscarYInyectar(data);
+            if (puestosLideres.length > 0) {
+              const nodosLideres: NodoOrganizacion[] = puestosLideres.map((p) => {
+                const comId = deptoToComunidadMap.get(p.departamento_id!);
+                const comunidad = comId ? comunidadesMap.get(comId) : null;
+                const titular = titularesPorPuesto.get(p.id);
+                let acreditaciones: AcreditacionFile[] = [];
+                if (Array.isArray(p.acreditaciones)) {
+                  acreditaciones = p.acreditaciones as AcreditacionFile[];
+                } else if (typeof p.acreditaciones === "string") {
+                  try { acreditaciones = JSON.parse(p.acreditaciones); } catch {}
                 }
+
+                return {
+                  id: p.id,
+                  nombre: comunidad ? `${p.nombre} - ${comunidad.nombre}` : p.nombre,
+                  tipo: "unidad",
+                  tiene_jefaturas: true,
+                  titular: titular?.nombre,
+                  titular_id: titular?.id,
+                  fecha: p.fecha ? String(p.fecha).split("T")[0] : null,
+                  activo: p.activo !== false,
+                  acreditaciones,
+                };
+              });
+
+              // Inyectar en los nodos correspondientes
+              for (const depConsolidador of depsConsolidadores) {
+                const buscarYInyectar = (nodo: NodoOrganizacion): boolean => {
+                  if (nodo.id === depConsolidador.id) {
+                    nodo.hijos = [...(nodo.hijos ?? []), ...nodosLideres];
+                    return true;
+                  }
+                  for (const hijo of nodo.hijos ?? []) {
+                    if (buscarYInyectar(hijo)) return true;
+                  }
+                  return false;
+                };
+                buscarYInyectar(data);
               }
             }
           }

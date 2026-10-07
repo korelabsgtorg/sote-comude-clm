@@ -46,6 +46,8 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPasskeysOpen, setIsPasskeysOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [testModeOption, setTestModeOption] = useState<1 | 2 | 3>(1);
+  const isSuper = effectiveRole === "super";
   const router = useRouter();
 
   const displayImage = initialPortada;
@@ -53,6 +55,8 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
   const { scrollY } = useScroll();
   const logoY = useTransform(scrollY, [0, 600], [0, -300]);
   const logoOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+  const imgYMobile = useTransform(scrollY, [0, 800], [0, 150]);
+  const imgYTestMode = useTransform(scrollY, [0, 800], [0, 80]);
   // Zoom sutil y suavizado
   const bgScaleRaw = useTransform(scrollY, [0, 800], [1, 1.05]);
   const bgScale = useSpring(bgScaleRaw, {
@@ -123,7 +127,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
             src={displayImage}
             alt="COMUDE Concepción Las Minas"
             style={{
-              y: useTransform(scrollY, [0, 800], [0, 150]),
+              y: imgYMobile,
               scale: bgScale,
             }}
             className="w-full h-auto object-contain block origin-center"
@@ -138,34 +142,27 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         </div>
       </div>
 
-      <div className="hidden md:block relative w-full">
-        <div className="fixed top-0 left-0 w-full h-[75vh] z-0 bg-[#0a1628] overflow-hidden">
-          <motion.div
-            className="absolute inset-0 bg-cover bg-center origin-center"
-            style={{
-              backgroundImage: `url('${displayImage}')`,
-              scale: bgScale,
-            }}
+      <div className="hidden md:flex md:flex-col w-full bg-[#0a1628]">
+        {/* Banner de Portada en PC (70vh relativo a la altura de pantalla) */}
+        <div className="relative w-full h-[70vh] min-h-[440px] overflow-hidden flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={displayImage}
+            alt="COMUDE Concepción Las Minas"
+            className="w-full h-full object-fill block"
           />
-        </div>
-
-        <motion.div
-          className="fixed top-0 left-0 w-full h-[65vh] flex justify-center items-center z-[5] pt-16 pb-[140px]"
-          style={{ y: logoY, opacity: logoOpacity }}
-        >
-          <div className="relative flex justify-center items-center w-full px-4 sm:px-8">
-            <div className="w-full sm:w-auto max-w-[800px] mx-auto">
+          <div className="absolute inset-0 bg-black/15 flex items-center justify-center z-[5] p-4">
+            <div className="w-full sm:w-auto max-w-[750px] mx-auto">
               <LogoTrifinio />
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <div className="relative z-10 w-full mt-[65vh]">
-          <div className="relative w-full bg-muted dark:bg-muted rounded-t-[3rem] px-8 lg:px-12 pt-4 pb-20">
-            <div className={cn("absolute inset-0 rounded-t-[3rem]", DASHBOARD_DOTTED_BG_CLASS)} />
-            <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto pt-0 pb-2">
-              <CardsGrid />
-            </div>
+        {/* Sección de Contenido (Actividades COMUDE) */}
+        <div className="relative z-10 w-full bg-muted dark:bg-muted px-8 lg:px-12 pt-6 pb-20">
+          <div className={cn("absolute inset-0", DASHBOARD_DOTTED_BG_CLASS)} />
+          <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto pt-0 pb-2">
+            <CardsGrid />
           </div>
         </div>
       </div>

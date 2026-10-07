@@ -38,6 +38,9 @@ import { VerEditarEstructura } from "./forms/VerEditar";
 import { AsignarPersonaPuesto } from "./forms/AsignarPersona";
 import { ReubicarPuestoModal } from "./forms/ReubicarPuesto";
 import { GestorAcreditacionesModal } from "./forms/GestorAcreditacionesModal";
+import { ComisionesManager } from "../comisiones/ComisionesManager";
+import { AsignarPersonaDesdePuestoModal } from "../comisiones/modals/AsignarPersonaDesdePuestoModal";
+import { Building2, Users as UsersIcon } from "lucide-react";
 
 export function OrganizacionJerarquica() {
   const { effectiveRole } = useUserContext();
@@ -50,6 +53,7 @@ export function OrganizacionJerarquica() {
   const estructura = data ?? null;
   const [modoSimulacion, setModoSimulacion] = useState(false);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
+  const [subModo, setSubModo] = useState<"organizacional" | "comisiones">("organizacional");
 
   const estructuraMostrada = modoSimulacion
     ? ESTRUCTURA_SIMULADA
@@ -91,6 +95,11 @@ export function OrganizacionJerarquica() {
     puestoId: string | null;
     puestoNombre: string;
   }>({ open: false, puestoId: null, puestoNombre: "" });
+
+  const [asignarComisionPersona, setAsignarComisionPersona] = useState<{
+    open: boolean;
+    persona: { id: string; nombre: string } | null;
+  }>({ open: false, persona: null });
 
   const [organigramaOpen, setOrganigramaOpen] = useState(false);
 
@@ -196,6 +205,16 @@ export function OrganizacionJerarquica() {
         }
         setAcreditacionesModal({ open: true, puestoId, puestoNombre });
       },
+      onAsignarAComision: (profileId, personaNombre) => {
+        if (modoSimulacion) {
+          toast.warn("Modo demo: asignar a comisión no está disponible.");
+          return;
+        }
+        setAsignarComisionPersona({
+          open: true,
+          persona: { id: profileId, nombre: personaNombre },
+        });
+      },
     }),
     [puestos, desasignarPersona, modoSimulacion, moverDepartamentoMutation],
   );
@@ -230,18 +249,71 @@ export function OrganizacionJerarquica() {
                   ? "Simulación · Materiales de construcción"
                   : "COMUDE"}
               </p>
-              <h1 className="text-2xl font-black tracking-tight text-foreground md:text-4xl">
+              <h1 className="text-xl font-black tracking-tight text-foreground md:text-2xl">
                 {modoSimulacion
                   ? estructuraMostrada?.nombre ?? "Organización simulada"
                   : "Organización Administrativa"}
               </h1>
-              <p className="text-sm md:text-base text-muted-foreground max-w-3xl">
-                {modoSimulacion
-                  ? (estructuraMostrada?.descripcion ??
-                    "Estructura de ejemplo para visualizar la jerarquía de una empresa.")
-                  : "Visualización jerárquica de la estructura del COMUDE."}
-              </p>
+              {modoSimulacion && (
+                <p className="text-sm text-muted-foreground max-w-3xl">
+                  {estructuraMostrada?.descripcion ??
+                    "Estructura de ejemplo para visualizar la jerarquía de una empresa."}
+                </p>
+              )}
             </div>
+          </div>
+
+          {/* Switch entre Organización y Comisiones en el centro del header */}
+          <div className="flex items-center gap-3 px-4 md:px-0 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSubModo("organizacional")}
+              className={cn(
+                "cursor-pointer text-xs font-bold transition-all select-none",
+                subModo === "organizacional"
+                  ? "text-foreground font-extrabold text-sm"
+                  : "text-muted-foreground hover:text-foreground/80",
+              )}
+            >
+              Organización
+            </button>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={subModo === "comisiones"}
+              onClick={() =>
+                setSubModo((prev) =>
+                  prev === "organizacional" ? "comisiones" : "organizacional",
+                )
+              }
+              className={cn(
+                "relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner",
+                subModo === "comisiones"
+                  ? "bg-emerald-500"
+                  : "bg-emerald-600/90 dark:bg-emerald-600",
+              )}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none inline-block size-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                  subModo === "comisiones" ? "translate-x-6" : "translate-x-0",
+                )}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSubModo("comisiones")}
+              className={cn(
+                "cursor-pointer text-xs font-bold transition-all select-none",
+                subModo === "comisiones"
+                  ? "text-foreground font-extrabold text-sm"
+                  : "text-muted-foreground hover:text-foreground/80",
+              )}
+            >
+              Comisiones
+            </button>
           </div>
 
           {!isLoading && !isError && (estructura || modoSimulacion) && (
@@ -304,7 +376,10 @@ export function OrganizacionJerarquica() {
           )}
         </div>
 
-        <div className="max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none rounded-2xl border border-border/60 bg-zinc-100 p-0 dark:bg-zinc-800 md:p-8 lg:p-10 md:shadow-sm md:min-h-[calc(100vh-18rem)]">
+        {subModo === "comisiones" ? (
+          <ComisionesManager />
+        ) : (
+          <div className="max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none rounded-2xl border border-border/60 bg-zinc-100 p-0 dark:bg-zinc-800 md:p-8 lg:p-10 md:shadow-sm md:min-h-[calc(100vh-18rem)]">
           {isLoading && <OrganizacionSkeleton />}
 
           {!isLoading && isError && (
@@ -347,6 +422,7 @@ export function OrganizacionJerarquica() {
             </>
           )}
         </div>
+        )}
       </div>
 
       {estructuraMostrada && (
@@ -400,6 +476,14 @@ export function OrganizacionJerarquica() {
         onOpenChange={(open) => setAcreditacionesModal((prev) => ({ ...prev, open }))}
         puestoId={acreditacionesModal.puestoId}
         puestoNombre={acreditacionesModal.puestoNombre}
+      />
+
+      <AsignarPersonaDesdePuestoModal
+        open={asignarComisionPersona.open}
+        onOpenChange={(open) =>
+          setAsignarComisionPersona((prev) => ({ ...prev, open }))
+        }
+        persona={asignarComisionPersona.persona}
       />
     </div>
   );

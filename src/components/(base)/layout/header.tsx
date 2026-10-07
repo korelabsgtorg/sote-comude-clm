@@ -191,7 +191,7 @@ export default function Header() {
           style={{ top: 'calc(var(--banner-height, 0px) + 3rem + env(safe-area-inset-top))' }}
           className="fixed left-0 md:hidden w-full pl-4 pr-3 py-1 min-h-[var(--mobile-breadcrumb-height)] flex items-center justify-between gap-3 bg-card border-b border-border/30 shadow-sm z-[105]"
         >
-          <div className="shrink-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <BreadcrumbNav />
           </div>
         </div>

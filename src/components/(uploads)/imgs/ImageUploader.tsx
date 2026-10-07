@@ -40,6 +40,7 @@ interface ImageUploaderProps {
   maxSizeMB?: number;
   maxDimension?: number;
   folderPath?: string;
+  forceFormat?: "image/webp" | "image/png" | "image/jpeg";
 }
 
 function LogoViewerModal({
@@ -132,6 +133,7 @@ export default function ImageUploader({
   maxSizeMB = 0.2,
   maxDimension = 1024,
   folderPath,
+  forceFormat,
 }: ImageUploaderProps) {
   const compactLogoClass = compactClassName ?? COMPACT_LOGO_CLASS;
   const compactSurfaceClass = compactClassName ? ORG_LIST_LOGO_SURFACE : ORG_LOGO_SURFACE_CLASS;
@@ -166,7 +168,7 @@ export default function ImageUploader({
 
   const validateAndOpenEditor = (file: File) => {
     if (!isAllowedImageType(file.type)) {
-      toast.error("Solo se permiten imágenes JPEG y PNG.");
+      toast.error("Solo se permiten imágenes JPEG, PNG y WebP.");
       return;
     }
     const objectUrl = URL.createObjectURL(file);
@@ -372,6 +374,7 @@ export default function ImageUploader({
             aspectLabel={aspectLabel}
             maxSizeMB={maxSizeMB}
             maxDimension={maxDimension}
+            forceFormat={forceFormat}
             onClose={closeEditor}
             onApply={uploadFile}
           />
@@ -393,7 +396,7 @@ export default function ImageUploader({
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/jpeg,image/png"
+        accept="image/jpeg,image/png,image/webp"
         capture="environment"
         className="hidden"
         onChange={handleFileChange}
@@ -492,6 +495,7 @@ export default function ImageUploader({
           aspectLabel={aspectLabel}
           maxSizeMB={maxSizeMB}
           maxDimension={maxDimension}
+          forceFormat={forceFormat}
           onClose={closeEditor}
           onApply={uploadFile}
         />

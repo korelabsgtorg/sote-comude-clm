@@ -4,10 +4,18 @@ import { createClient } from "@/utils/supabase/server";
 export async function sendPushToUsers(userIds: string[], payload: { title: string; body: string; url?: string }) {
   const supabase = await createClient();
 
+  const vapidPublic = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").replace(/^["']|["']$/g, "").trim();
+  const vapidPrivate = (process.env.VAPID_PRIVATE_KEY || "").replace(/^["']|["']$/g, "").trim();
+
+  if (!vapidPublic || !vapidPrivate) {
+    console.warn("[Push] VAPID keys missing in environment variables.");
+    return;
+  }
+
   webpush.setVapidDetails(
     "mailto:soporte@cermad.com",
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
-    process.env.VAPID_PRIVATE_KEY as string
+    vapidPublic,
+    vapidPrivate
   );
 
   const { data: subscriptions, error } = await supabase
@@ -16,11 +24,14 @@ export async function sendPushToUsers(userIds: string[], payload: { title: strin
     .in("user_id", userIds);
 
   if (error) {
-    console.error("Error fetching subscriptions for push:", error);
+    console.error("[Push] Error fetching subscriptions for push:", error);
     return;
   }
 
-  if (!subscriptions || subscriptions.length === 0) return;
+  if (!subscriptions || subscriptions.length === 0) {
+    console.info(`[Push] No active subscriptions found in DB for user IDs: ${userIds.join(", ")}`);
+    return;
+  }
 
   const pushPayload = JSON.stringify({
     title: payload.title,

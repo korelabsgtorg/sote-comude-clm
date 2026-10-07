@@ -28,6 +28,7 @@ import {
   CalendarDays,
   FileText,
   FileCheck,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NodoOrganizacion } from "./lib/zod";
@@ -480,18 +481,31 @@ function NodoItem({
             onClick={stop}
           >
             {nodo.titular ? (
-              <TreeActionButton
-                label="Desasignar persona"
-                onClick={() =>
-                  admin.onDesasignarPersona(
-                    nodo.id,
-                    nodo.nombre,
-                    nodo.titular!,
-                  )
-                }
-              >
-                <UserMinus className="size-4" />
-              </TreeActionButton>
+              <>
+                <TreeActionButton
+                  label="Desasignar persona"
+                  onClick={() =>
+                    admin.onDesasignarPersona(
+                      nodo.id,
+                      nodo.nombre,
+                      nodo.titular!,
+                    )
+                  }
+                >
+                  <UserMinus className="size-4" />
+                </TreeActionButton>
+
+                {nodo.titular_id && admin.onAsignarAComision && (
+                  <TreeActionButton
+                    label="Asignar a comisión"
+                    onClick={() =>
+                      admin.onAsignarAComision!(nodo.titular_id!, nodo.titular!)
+                    }
+                  >
+                    <Users className="size-4" />
+                  </TreeActionButton>
+                )}
+              </>
             ) : (
               <TreeActionButton
                 label="Asignar persona"

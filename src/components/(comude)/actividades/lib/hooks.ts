@@ -36,7 +36,32 @@ import {
   crearArchivoPunto,
   eliminarArchivoPunto,
   actualizarEstadoSesion,
+  emitirConvocatoriaComude,
+  sustituirParticipanteComude,
 } from "./actions";
+
+export function useSustituirParticipante() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { actComudeId: string; nuevoUsuarioId: string }>({
+    mutationFn: (params) => sustituirParticipanteComude(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["registros-asistencia"] });
+    },
+  });
+}
+
+export function useEmitirConvocatoria() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (actComudeId: string) => emitirConvocatoriaComude(actComudeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+    },
+  });
+}
 
 // ----- QUERIES -----
 
@@ -53,7 +78,7 @@ export function useActividadById(id: string | null) {
     queryKey: ["actividad-comude", id],
     queryFn: () => getActividadById(id!),
     enabled: !!id,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -194,8 +219,8 @@ export function useCrearPunto(actComudeId: string) {
   return useMutation<ActComudePunto, Error, CrearPuntoValues>({
     mutationFn: (values) => crearPunto(actComudeId, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", actComudeId] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
@@ -204,9 +229,9 @@ export function useActualizarPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { puntoId: string; values: Partial<CrearPuntoValues>; actComudeId: string }>({
     mutationFn: ({ puntoId, values }) => actualizarPunto(puntoId, values),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
@@ -215,9 +240,9 @@ export function useActualizarEstadoPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { puntoId: string; estado: string; actComudeId: string }>({
     mutationFn: ({ puntoId, estado }) => actualizarEstadoPunto(puntoId, estado),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
@@ -226,9 +251,9 @@ export function useActualizarVotacionPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { puntoId: string; votacion: string; actComudeId: string }>({
     mutationFn: ({ puntoId, votacion }) => actualizarVotacionPunto(puntoId, votacion),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
@@ -237,9 +262,9 @@ export function useActualizarNotasPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { puntoId: string; notas: string[]; actComudeId: string }>({
     mutationFn: ({ puntoId, notas }) => actualizarNotasPunto(puntoId, notas),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
@@ -248,9 +273,9 @@ export function useEliminarPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { puntoId: string; actComudeId: string }>({
     mutationFn: ({ puntoId }) => eliminarPunto(puntoId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
     },
   });
 }
