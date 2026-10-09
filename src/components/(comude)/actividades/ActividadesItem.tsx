@@ -588,7 +588,7 @@ export default function ActividadesItem({
 
     const result = await Swal.fire({
       title: "Crear Convocatoria Oficial",
-      text: `¿Desea emitir la Convocatoria Oficial para "${actividad.detalles_sesion?.titulo || "esta actividad"}"? Se enviará la notificación PUSH a todos los participantes convocados.`,
+      text: `¿Desea emitir la Convocatoria Oficial para "${actividad.detalles_sesion?.titulo || "esta actividad"}"?`,
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#2563eb",
