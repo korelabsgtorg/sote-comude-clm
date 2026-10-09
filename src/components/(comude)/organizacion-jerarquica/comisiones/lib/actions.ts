@@ -156,7 +156,7 @@ export async function alternarEstadoComision(
   return { success: true, error: null };
 }
 
-export async function listarIntegrantesPorAño(
+export async function listarIntegrantesPorAnio(
   año: number,
 ): Promise<{
   data: Record<string, ComisionIntegranteRecord[]> | null;

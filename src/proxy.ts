@@ -72,7 +72,7 @@ if (user) {
     if (pathname === "/esperando-acceso") {
       if (!requireAuth) {
         const url = request.nextUrl.clone();
-        url.pathname = "/comude ";
+        url.pathname = "/comude";
         return NextResponse.redirect(url);
       }
 

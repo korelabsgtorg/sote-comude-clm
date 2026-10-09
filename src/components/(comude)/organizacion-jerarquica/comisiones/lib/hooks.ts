@@ -4,7 +4,7 @@ import {
   crearComision,
   editarComision,
   alternarEstadoComision,
-  listarIntegrantesPorAño,
+  listarIntegrantesPorAnio,
   asignarIntegrante,
   eliminarIntegrante,
   listarPersonasElegibles,
@@ -32,7 +32,7 @@ export function useIntegrantesComisiones(año: number) {
   return useQuery({
     queryKey: [...COMISION_INTEGRANTES_QUERY_KEY, año],
     queryFn: async () => {
-      const res = await listarIntegrantesPorAño(año);
+      const res = await listarIntegrantesPorAnio(año);
       if (res.error) throw new Error(res.error);
       return res.data ?? {};
     },
