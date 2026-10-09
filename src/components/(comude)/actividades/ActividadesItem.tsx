@@ -8,7 +8,6 @@ import {
   Edit2,
   Trash2,
   ArrowRight,
-  FileText,
   Download,
   Loader2,
   Send,
@@ -20,8 +19,6 @@ import { useEliminarActividad, useEmitirConvocatoria } from "./lib/hooks";
 import { getComudeUrl } from "./lib/slug";
 import Swal from "sweetalert2";
 import CrearComude from "./modals/CrearComude";
-import { useConfiguracionMunicipio } from "@/components/(base)/(settings)/municipio/hooks";
-import { useStorageDisplayUrl } from "@/components/(uploads)/imgs/useStorageDisplayUrl";
 import { getInitialGlobalMunicipioState } from "@/components/(base)/layout/actions";
 import { createClient } from "@/utils/supabase/client";
 import { domToPng } from "modern-screenshot";
@@ -75,7 +72,7 @@ function formatFechaEmisionSpanish(municipioNombre: string, dateStr?: string) {
   return `${mun} ${dia} DE ${mes} DE ${anio}.`;
 }
 
-function formatFechaReunionTexto(fechaStr: string) {
+function formatFechaReunionTexto(fechaStr?: string | null) {
   if (!fechaStr) {
     return {
       fechaTexto: "________",
@@ -148,6 +145,118 @@ function formatFechaReunionTexto(fechaStr: string) {
   };
 }
 
+interface ConvocatoriaConfigCached {
+  municipioNombre: string;
+  departamentoNombre: string;
+  coordinadorNombre: string;
+  coordinadorPuesto: string;
+  destinatarios: string;
+  logoIzqDataUri: string;
+  logoDerDataUri: string;
+  firmaDataUri: string;
+}
+
+let globalConvocatoriaCache: ConvocatoriaConfigCached | null = null;
+let cachePromise: Promise<ConvocatoriaConfigCached> | null = null;
+
+async function getOrFetchConvocatoriaConfig(): Promise<ConvocatoriaConfigCached> {
+  if (globalConvocatoriaCache) {
+    return globalConvocatoriaCache;
+  }
+  if (cachePromise) {
+    return cachePromise;
+  }
+
+  cachePromise = (async () => {
+    const supabase = createClient();
+    let munNombre = "CONCEPCIÓN LAS MINAS";
+    let depNombre = "CHIQUIMULA";
+    let coordNombre = "";
+    let coordPuesto = "";
+    let dest =
+      "Síndicos Y Concejales\nRepresentantes De Los Consejos Comunitarios De Desarrollo De Primer Nivel\nRepresentantes De Las Entidades Públicas Con Presencia En El Municipio.\nApoyo de Oficinas con Presencia en la Municipalidad.";
+    let izqUri = "";
+    let derUri = "";
+    let firUri = "";
+
+    try {
+      const state = await getInitialGlobalMunicipioState();
+      const munId = state.municipioId;
+
+      if (munId) {
+        const [munRes, configRes] = await Promise.all([
+          supabase
+            .from("lug_municipios")
+            .select("nombre, departamento_id, lug_departamentos(nombre)")
+            .eq("id", munId)
+            .maybeSingle(),
+          supabase
+            .from("configuraciones_municipio")
+            .select("convocatoria_config")
+            .eq("municipio_id", munId)
+            .maybeSingle(),
+        ]);
+
+        if (munRes.data) {
+          if (munRes.data.nombre) munNombre = munRes.data.nombre;
+          const dep = (munRes.data.lug_departamentos as any)?.nombre;
+          if (dep) depNombre = dep;
+        }
+
+        const cfg = configRes.data?.convocatoria_config as any;
+        if (cfg) {
+          if (cfg.coordinador_nombre) coordNombre = cfg.coordinador_nombre;
+          if (cfg.coordinador_puesto) coordPuesto = cfg.coordinador_puesto;
+          if (cfg.destinatarios_default) dest = cfg.destinatarios_default;
+
+          const fetchUri = async (path?: string) => {
+            if (!path) return "";
+            try {
+              const { data, error } = await supabase.storage.from(BUCKET).download(path);
+              if (error || !data) return "";
+              return new Promise<string>((res) => {
+                const reader = new FileReader();
+                reader.onloadend = () => res((reader.result as string) || "");
+                reader.onerror = () => res("");
+                reader.readAsDataURL(data);
+              });
+            } catch {
+              return "";
+            }
+          };
+
+          const [izq, der, fir] = await Promise.all([
+            fetchUri(cfg.logo_izquierda_path),
+            fetchUri(cfg.logo_derecha_path),
+            fetchUri(cfg.firma_path),
+          ]);
+          izqUri = izq;
+          derUri = der;
+          firUri = fir;
+        }
+      }
+    } catch (e) {
+      console.error("Error pre-cargando configuración de convocatoria:", e);
+    }
+
+    const result: ConvocatoriaConfigCached = {
+      municipioNombre: munNombre,
+      departamentoNombre: depNombre,
+      coordinadorNombre: coordNombre,
+      coordinadorPuesto: coordPuesto,
+      destinatarios: dest,
+      logoIzqDataUri: izqUri,
+      logoDerDataUri: derUri,
+      firmaDataUri: firUri,
+    };
+
+    globalConvocatoriaCache = result;
+    return result;
+  })();
+
+  return cachePromise;
+}
+
 // ── Componente de Descarga Directa en Segundo Plano (Sin Modales) ─────────────
 function ConvocatoriaDirectDownloader({
   actividad,
@@ -159,18 +268,7 @@ function ConvocatoriaDirectDownloader({
   onComplete: () => void;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
-  const [municipioNombre, setMunicipioNombre] = useState<string>("CONCEPCIÓN LAS MINAS");
-  const [departamentoNombre, setDepartamentoNombre] = useState<string>("CHIQUIMULA");
-  const [coordinadorNombre, setCoordinadorNombre] = useState<string>("");
-  const [coordinadorPuesto, setCoordinadorPuesto] = useState<string>("");
-  const [destinatarios, setDestinatarios] = useState<string>(
-    "Síndicos Y Concejales\nRepresentantes De Los Consejos Comunitarios De Desarrollo De Primer Nivel\nRepresentantes De Las Entidades Públicas Con Presencia En El Municipio.\nApoyo de Oficinas con Presencia en la Municipalidad."
-  );
-
-  const [logoIzqDataUri, setLogoIzqDataUri] = useState<string>("");
-  const [logoDerDataUri, setLogoDerDataUri] = useState<string>("");
-  const [firmaDataUri, setFirmaDataUri] = useState<string>("");
-
+  const [data, setData] = useState<ConvocatoriaConfigCached | null>(globalConvocatoriaCache);
   const [readyToCapture, setReadyToCapture] = useState(false);
 
   useEffect(() => {
@@ -181,72 +279,11 @@ function ConvocatoriaDirectDownloader({
 
     let isMounted = true;
 
-    const prepareAndDownload = async () => {
+    const prepare = async () => {
       try {
-        const supabase = createClient();
-
-        // 1. Obtener municipio del usuario o global
-        const state = await getInitialGlobalMunicipioState();
-        const munId = state.municipioId;
-
-        if (munId) {
-          const { data: munData } = await supabase
-            .from("lug_municipios")
-            .select("nombre, departamento_id, lug_departamentos(nombre)")
-            .eq("id", munId)
-            .maybeSingle();
-
-          if (munData) {
-            if (munData.nombre) setMunicipioNombre(munData.nombre);
-            const depName = (munData.lug_departamentos as any)?.nombre;
-            if (depName) setDepartamentoNombre(depName);
-          }
-
-          // 2. Cargar configuración del municipio
-          const { data: configData } = await supabase
-            .from("configuraciones_municipio")
-            .select("convocatoria_config")
-            .eq("municipio_id", munId)
-            .maybeSingle();
-
-          const cfg = configData?.convocatoria_config as any;
-          if (cfg) {
-            if (cfg.coordinador_nombre) setCoordinadorNombre(cfg.coordinador_nombre);
-            if (cfg.coordinador_puesto) setCoordinadorPuesto(cfg.coordinador_puesto);
-            if (cfg.destinatarios_default) setDestinatarios(cfg.destinatarios_default);
-
-            // 3. Descargar imágenes desde Storage directamente a Data URIs (evita problemas de CORS o cargas incompletas)
-            const fetchUri = async (path?: string) => {
-              if (!path) return "";
-              try {
-                const { data, error } = await supabase.storage.from(BUCKET).download(path);
-                if (error || !data) return "";
-                return new Promise<string>((res) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => res((reader.result as string) || "");
-                  reader.onerror = () => res("");
-                  reader.readAsDataURL(data);
-                });
-              } catch {
-                return "";
-              }
-            };
-
-            const [izq, der, fir] = await Promise.all([
-              fetchUri(cfg.logo_izquierda_path),
-              fetchUri(cfg.logo_derecha_path),
-              fetchUri(cfg.firma_path),
-            ]);
-
-            if (isMounted) {
-              setLogoIzqDataUri(izq);
-              setLogoDerDataUri(der);
-              setFirmaDataUri(fir);
-            }
-          }
-        }
-
+        const config = await getOrFetchConvocatoriaConfig();
         if (isMounted) {
+          setData(config);
           setReadyToCapture(true);
         }
       } catch (err) {
@@ -255,7 +292,7 @@ function ConvocatoriaDirectDownloader({
       }
     };
 
-    void prepareAndDownload();
+    void prepare();
 
     return () => {
       isMounted = false;
@@ -264,14 +301,14 @@ function ConvocatoriaDirectDownloader({
 
   // Capturar DOM a PNG una vez que `readyToCapture` sea true
   useEffect(() => {
-    if (!readyToCapture || !printRef.current) return;
+    if (!readyToCapture || !printRef.current || !data) return;
 
     let isMounted = true;
 
     const capture = async () => {
       try {
-        // Pausa breve para asegurar que las imágenes estén renderizadas en el canvas
-        await new Promise((res) => setTimeout(res, 250));
+        // Pausa ultracorta para ciclo de pintado
+        await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 50)));
         if (!isMounted || !printRef.current) return;
 
         const dataUrl = await domToPng(printRef.current, {
@@ -280,15 +317,45 @@ function ConvocatoriaDirectDownloader({
           quality: 0.95,
         });
 
+        const actaStr = actividad.detalles_sesion?.acta ? `_Acta_${actividad.detalles_sesion.acta}` : "";
+        const fileName = `Convocatoria_COMUDE${actaStr}.png`;
+
+        const isMobileDevice =
+          typeof navigator !== "undefined" &&
+          (/Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
+            (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent)));
+
+        // En dispositivos móviles (iPhone / Android), usar la hoja nativa para "Guardar Imagen" en Fotos / Archivos
+        if (isMobileDevice && typeof navigator !== "undefined" && navigator.canShare) {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], fileName, { type: "image/png" });
+
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: "Convocatoria COMUDE",
+              text: `Convocatoria oficial COMUDE - Acta ${actividad.detalles_sesion?.acta || ""}`,
+            });
+            toast.success("Convocatoria lista.");
+            return;
+          }
+        }
+
+        // En PC / Escritorio, descarga directa al disco
         const link = document.createElement("a");
-        const actaStr = actividad.detalles_sesion?.acta || "Sesion";
-        link.download = `Convocatoria_COMUDE_Acta_${actaStr}.png`;
+        link.download = fileName;
         link.href = dataUrl;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+
         toast.success("Convocatoria descargada con éxito.");
-      } catch (err) {
-        console.error("Error al generar imagen de la convocatoria:", err);
-        toast.error("Hubo un error al generar la imagen de la convocatoria.");
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          console.error("Error al generar imagen de la convocatoria:", err);
+          toast.error("Hubo un error al generar la imagen de la convocatoria.");
+        }
       } finally {
         if (isMounted) onComplete();
       }
@@ -299,18 +366,26 @@ function ConvocatoriaDirectDownloader({
     return () => {
       isMounted = false;
     };
-  }, [readyToCapture, actividad, onComplete]);
+  }, [readyToCapture, data, actividad, onComplete]);
 
   const { fechaTexto, horaTexto } = formatFechaReunionTexto(actividad.fecha);
   const fechaEmisionStr = formatFechaEmisionSpanish(
-    municipioNombre,
+    data?.municipioNombre || "CONCEPCIÓN LAS MINAS",
     actividad.convocatoria?.created_at
   );
 
-  if (!isDownloading) return null;
+  if (!isDownloading || !data) return null;
 
   return (
-    <div className="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none z-[-100]">
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: "-9999px",
+        zIndex: -9999,
+        pointerEvents: "none",
+      }}
+    >
       <div
         ref={printRef}
         style={{ fontFamily: "'Times New Roman', Times, serif" }}
@@ -321,9 +396,9 @@ function ConvocatoriaDirectDownloader({
           <div className="flex items-center justify-between gap-4">
             {/* Logo Izquierdo */}
             <div className="w-20 h-20 flex items-center justify-center shrink-0">
-              {logoIzqDataUri ? (
+              {data.logoIzqDataUri ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={logoIzqDataUri} alt="Logo Izquierdo" className="max-h-full max-w-full object-contain" />
+                <img src={data.logoIzqDataUri} alt="Logo Izquierdo" className="max-h-full max-w-full object-contain" />
               ) : null}
             </div>
 
@@ -333,15 +408,15 @@ function ConvocatoriaDirectDownloader({
                 CONSEJO MUNICIPAL DE DESARROLLO –COMUDE–
               </h1>
               <p className="text-[12px] text-gray-800 font-normal">
-                {municipioNombre}, {departamentoNombre}, Guatemala, C. A.
+                {data.municipioNombre}, {data.departamentoNombre}, Guatemala, C. A.
               </p>
             </div>
 
             {/* Logo Derecho */}
             <div className="w-20 h-20 flex items-center justify-center shrink-0">
-              {logoDerDataUri ? (
+              {data.logoDerDataUri ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={logoDerDataUri} alt="Logo Derecho" className="max-h-full max-w-full object-contain" />
+                <img src={data.logoDerDataUri} alt="Logo Derecho" className="max-h-full max-w-full object-contain" />
               ) : null}
             </div>
           </div>
@@ -355,7 +430,7 @@ function ConvocatoriaDirectDownloader({
           {/* Encabezado en negrita subrayado */}
           <div className="text-center">
             <p className="font-bold underline uppercase tracking-wide">
-              CONSEJO MUNICIPAL DE DESARROLLO -COMUDE- {municipioNombre}, {departamentoNombre}.
+              CONSEJO MUNICIPAL DE DESARROLLO -COMUDE- {data.municipioNombre}, {data.departamentoNombre}.
             </p>
           </div>
 
@@ -368,7 +443,7 @@ function ConvocatoriaDirectDownloader({
           <div className="space-y-1">
             <p className="font-bold">A:</p>
             <div className="font-normal pl-4 whitespace-pre-line leading-snug">
-              {destinatarios}
+              {data.destinatarios}
             </div>
           </div>
 
@@ -386,7 +461,7 @@ function ConvocatoriaDirectDownloader({
               </span>{" "}
               para el día: <span className="font-bold">{fechaTexto}</span>, en el lugar:{" "}
               <span className="font-bold underline">
-                {actividad.ubicacion || "GIMNASIO MUNICIPAL, Casco Urbano, " + municipioNombre}
+                {actividad.ubicacion || "GIMNASIO MUNICIPAL, Casco Urbano, " + data.municipioNombre}
               </span>
               , {horaTexto}.
             </p>
@@ -403,21 +478,21 @@ function ConvocatoriaDirectDownloader({
           <div className="flex justify-center relative">
             <div className="relative text-center flex flex-col items-center">
               {/* Imagen de Firma / Sello superpuesta */}
-              {firmaDataUri && (
+              {data.firmaDataUri && (
                 <div className="absolute -top-16 inset-x-0 flex justify-center pointer-events-none z-10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={firmaDataUri}
+                    src={data.firmaDataUri}
                     alt="Firma y Sello"
                     className="max-h-28 max-w-48 object-contain mix-blend-multiply"
                   />
                 </div>
               )}
 
-              {coordinadorNombre ? (
+              {data.coordinadorNombre ? (
                 <div className="pt-8 border-t border-transparent font-bold text-center z-0">
-                  <p className="uppercase text-[14px]">{coordinadorNombre}</p>
-                  {coordinadorPuesto && <p className="uppercase text-[13px]">{coordinadorPuesto}</p>}
+                  <p className="uppercase text-[14px]">{data.coordinadorNombre}</p>
+                  {data.coordinadorPuesto && <p className="uppercase text-[13px]">{data.coordinadorPuesto}</p>}
                 </div>
               ) : null}
             </div>
@@ -425,7 +500,7 @@ function ConvocatoriaDirectDownloader({
 
           {/* Pie inferior con nombre de municipio */}
           <div className="pt-6 border-t border-gray-300 text-center font-serif text-[12px] italic text-gray-700">
-            <p>{municipioNombre} {departamentoNombre}</p>
+            <p>{data.municipioNombre} {data.departamentoNombre}</p>
           </div>
         </div>
       </div>
@@ -442,15 +517,31 @@ export default function ActividadesItem({
   onToggle,
 }: ActividadesItemProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingConvocatoria, setIsDownloadingConvocatoria] = useState(false);
 
   const { mutateAsync: eliminarActividad } = useEliminarActividad();
   const { mutateAsync: emitirConvocatoria, isPending: emitiendo } = useEmitirConvocatoria();
 
   const hoy = esHoy(actividad.fecha);
+  const isPastDate = (() => {
+    if (!actividad?.fecha) return false;
+    const actDate = new Date(actividad.fecha);
+    actDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return actDate < today;
+  })();
+
   const convocatoriaEmitida = Boolean(
     actividad.convocatoria && (actividad.convocatoria.emitida || actividad.convocatoria.created_at)
   );
+
+  // Pre-cargar en segundo plano la configuración y logos en caché de memoria para descarga instantánea
+  useEffect(() => {
+    if (convocatoriaEmitida) {
+      void getOrFetchConvocatoriaConfig();
+    }
+  }, [convocatoriaEmitida]);
 
   const handleEliminar = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -483,6 +574,18 @@ export default function ActividadesItem({
   // Crear / Emitir Convocatoria (Solo Admin)
   const handleCrearConvocatoria = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    if (isPastDate) {
+      Swal.fire({
+        title: "Fecha Vencida",
+        text: "No es posible emitir una convocatoria para una reunión cuya fecha ya pasó. Por favor edita la actividad y actualiza la fecha a una vigente antes de emitir la convocatoria.",
+        icon: "warning",
+        confirmButtonColor: "#1a73e8",
+        confirmButtonText: "Entendido",
+      });
+      return;
+    }
+
     const result = await Swal.fire({
       title: "Crear Convocatoria Oficial",
       text: `¿Desea emitir la Convocatoria Oficial para "${actividad.detalles_sesion?.titulo || "esta actividad"}"? Se enviará la notificación PUSH a todos los participantes convocados.`,
@@ -508,10 +611,10 @@ export default function ActividadesItem({
     }
   };
 
-  // Descargar Convocatoria directamente (Sin modales ni previsualización)
+  // Descargar Convocatoria Oficial Directamente
   const handleDescargarConvocatoria = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsDownloading(true);
+    setIsDownloadingConvocatoria(true);
   };
 
   return (
@@ -594,13 +697,14 @@ export default function ActividadesItem({
                 <div className="border-t border-border/50 bg-black/5 dark:bg-black/20 px-2.5 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-1 sm:gap-2">
                   {/* Izquierda: Eliminar y Editar (solo administradores / permisos de gestión) */}
                   <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                    {puedeGestionar && (
+                    {effectiveRole === "super" && (
                       <button
                         onClick={handleEliminar}
                         className="flex items-center gap-1.5 text-sm font-semibold text-destructive hover:bg-destructive/10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+                        title="Eliminar Actividad"
                       >
                         <Trash2 className="w-4 h-4 shrink-0" />
-                        <span>Eliminar</span>
+                        <span className="hidden sm:inline">Eliminar</span>
                       </button>
                     )}
 
@@ -619,31 +723,39 @@ export default function ActividadesItem({
                   <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                     {/* Botón de Convocatoria */}
                     {convocatoriaEmitida ? (
-                      /* Descargar Convocatoria (Solo visible si es participante asignado o puedeGestionar) */
-                      (puedeGestionar || Boolean(userId && actividad.act_comude_participantes?.some((p) => p.usuario_id === userId))) && (
-                        <button
-                          onClick={handleDescargarConvocatoria}
-                          disabled={isDownloading}
-                          className="flex items-center gap-1.5 text-sm font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
-                          title="Descargar Convocatoria Oficial en PNG"
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                          ) : (
-                            <Download className="w-4 h-4 shrink-0" />
-                          )}
-                          <span>Descargar</span>
-                          <span className="hidden sm:inline">&nbsp;Convocatoria</span>
-                        </button>
-                      )
+                      /* Descargar Convocatoria (Disponible para todos si ya fue emitida) */
+                      <button
+                        onClick={handleDescargarConvocatoria}
+                        onMouseEnter={() => void getOrFetchConvocatoriaConfig()}
+                        disabled={isDownloadingConvocatoria}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
+                        title="Descargar Convocatoria Oficial Directamente"
+                      >
+                        {isDownloadingConvocatoria ? (
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        ) : (
+                          <Download className="w-4 h-4 shrink-0" />
+                        )}
+                        <span>Descargar</span>
+                        <span className="hidden sm:inline">&nbsp;Convocatoria</span>
+                      </button>
                     ) : (
-                      /* Crear Convocatoria (Solo Admin cuando no ha sido emitida) */
-                      puedeGestionar && (
+                      /* Crear Convocatoria (Solo Admin cuando no ha sido emitida y la sesión NO está finalizada) */
+                      puedeGestionar && actividad.estado !== "Finalizada" && (
                         <button
                           onClick={handleCrearConvocatoria}
                           disabled={emitiendo}
-                          className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
-                          title="Emitir Convocatoria Oficial para esta actividad"
+                          className={cn(
+                            "flex items-center gap-1.5 text-sm font-semibold px-2 py-1 sm:px-3 sm:py-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap",
+                            isPastDate
+                              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 opacity-75"
+                              : "text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                          )}
+                          title={
+                            isPastDate
+                              ? "La fecha del COMUDE ya venció. Edite la fecha para emitir la convocatoria."
+                              : "Emitir Convocatoria Oficial para esta actividad"
+                          }
                         >
                           {emitiendo ? (
                             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
@@ -672,12 +784,12 @@ export default function ActividadesItem({
         </div>
       </motion.div>
 
-      {/* Offscreen Downloader para Descargar la Convocatoria en 1 Clic */}
-      {isDownloading && (
+      {/* Descarga en segundo plano sin modal */}
+      {isDownloadingConvocatoria && (
         <ConvocatoriaDirectDownloader
           actividad={actividad}
-          isDownloading={isDownloading}
-          onComplete={() => setIsDownloading(false)}
+          isDownloading={isDownloadingConvocatoria}
+          onComplete={() => setIsDownloadingConvocatoria(false)}
         />
       )}
 

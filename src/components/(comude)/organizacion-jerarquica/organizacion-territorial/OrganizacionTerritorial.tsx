@@ -245,82 +245,6 @@ export function OrganizacionTerritorial() {
           )}
         </div>
 
-        {/* Tarjetas de Resumen de Jerarquía Territorial */}
-        {!isLoading && !isError && (
-          <div className="px-4 space-y-2 md:px-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Jerarquía Territorial
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {/* Microrregión */}
-              <div className="relative flex items-center justify-between rounded-2xl border-2 border-blue-500/40 bg-blue-50/50 p-4 dark:bg-blue-950/20">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                    <Layers className="size-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-300">
-                      {counts.microrregiones === 1 ? "Microrregión" : "Microrregiones"}
-                    </h3>
-                    <p className="text-[11px] font-semibold text-muted-foreground">
-                      Nivel 1
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-xl bg-blue-500/15 px-3 py-1.5 dark:bg-blue-500/20">
-                  <span className="text-xl font-black tracking-tight text-blue-700 dark:text-blue-300 md:text-2xl">
-                    {counts.microrregiones}
-                  </span>
-                </div>
-              </div>
-
-              {/* Aldea */}
-              <div className="relative flex items-center justify-between rounded-2xl border-2 border-emerald-500/40 bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                    <TreePine className="size-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                      {counts.aldeas === 1 ? "Aldea" : "Aldeas"}
-                    </h3>
-                    <p className="text-[11px] font-semibold text-muted-foreground">
-                      Nivel 2
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 dark:bg-emerald-500/20">
-                  <span className="text-xl font-black tracking-tight text-emerald-700 dark:text-emerald-300 md:text-2xl">
-                    {counts.aldeas}
-                  </span>
-                </div>
-              </div>
-
-              {/* Caserío */}
-              <div className="relative flex items-center justify-between rounded-2xl border-2 border-amber-500/40 bg-amber-50/50 p-4 dark:bg-amber-950/20">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                    <Home className="size-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                      {counts.caserios === 1 ? "Caserío" : "Caseríos"}
-                    </h3>
-                    <p className="text-[11px] font-semibold text-muted-foreground">
-                      Nivel 3
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/15 px-3 py-1.5 dark:bg-amber-500/20">
-                  <span className="text-xl font-black tracking-tight text-amber-700 dark:text-amber-300 md:text-2xl">
-                    {counts.caserios}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Estado de Carga */}
         {isLoading ? (
           <OrganizacionTerritorialSkeleton />
@@ -333,6 +257,7 @@ export function OrganizacionTerritorial() {
         ) : (
           <OrganizacionTerritorialTree
             nodos={nodos}
+            counts={counts}
             adminHandlers={adminHandlers}
           />
         )}
@@ -353,6 +278,7 @@ export function OrganizacionTerritorial() {
           onClose={() => setModalCrear(null)}
           tipo={modalCrear.tipo}
           parentId={modalCrear.parentId}
+          nodos={nodos}
         />
       )}
 
@@ -366,6 +292,7 @@ export function OrganizacionTerritorial() {
           tipo={modalEditar.tipo}
           tieneHijos={modalEditar.tieneHijos}
           parentId={modalEditar.parentId}
+          nodos={nodos}
           onDelete={() => {
             setModalEditar(null);
             setModalEliminar({

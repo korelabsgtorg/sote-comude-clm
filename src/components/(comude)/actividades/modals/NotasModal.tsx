@@ -167,7 +167,7 @@ export default function NotasModal({
                         )}
                       </td>
                       {canManage && (
-                        <td className="px-3 py-2 text-center align-top">
+                        <td className={editingIndex === index ? "px-3 py-2 text-center align-top" : "p-0 w-16 text-center align-middle"}>
                           {editingIndex === index ? (
                             <div className="flex items-center justify-center gap-1">
                               <Button
@@ -191,22 +191,25 @@ export default function NotasModal({
                           ) : (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                <button
+                                  className="w-full h-full min-h-[44px] py-2.5 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors flex items-center justify-center cursor-pointer outline-none group"
                                   disabled={isPending || editingIndex !== null}
                                   title="Acciones"
                                 >
-                                  <MoreVertical size={16} />
-                                </Button>
+                                  <MoreVertical size={16} className="transition-transform group-hover:scale-110" />
+                                </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-32 z-[1100]">
-                                <DropdownMenuItem onClick={() => handleStartEdit(index)} className="cursor-pointer">
-                                  <Pencil size={14} className="mr-2 text-blue-500" />
+                              <DropdownMenuContent
+                                side="left"
+                                align="center"
+                                sideOffset={8}
+                                className="w-32 z-[1100] shadow-none border-2 border-border bg-popover text-popover-foreground"
+                              >
+                                <DropdownMenuItem onClick={() => handleStartEdit(index)} className="cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                                  <Pencil size={14} className="mr-2 text-azul-trifinio" />
                                   <span>Editar</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDelete(index)} className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400">
+                                <DropdownMenuItem onClick={() => handleDelete(index)} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                                   <Trash2 size={14} className="mr-2" />
                                   <span>Eliminar</span>
                                 </DropdownMenuItem>

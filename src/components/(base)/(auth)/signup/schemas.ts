@@ -22,7 +22,7 @@ export const authSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Debe tener un símbolo (/!@#$...)"),
 
   rol: z.enum(
-    ["user", "admin", "super", "observatorio", "admin-observatorio", "comunicacion"],
+    ["cocode", "institucion", "admin", "super", "user"],
     {
       message: "Rol inválido",
     },

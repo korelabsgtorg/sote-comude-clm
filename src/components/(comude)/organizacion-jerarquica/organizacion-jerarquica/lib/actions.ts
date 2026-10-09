@@ -48,6 +48,37 @@ async function requireAdmin(): Promise<
   return { supabase, error: null };
 }
 
+async function requireUserConMunicipio(): Promise<
+  | { supabase: SupabaseServerClient; municipioId: number; error: null }
+  | { supabase: null; municipioId: null; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { supabase: null, municipioId: null, error: "UNAUTHORIZED" };
+  }
+
+  const cookie = await getGlobalMunicipioCookie();
+  if (cookie?.id) {
+    return { supabase, municipioId: cookie.id, error: null };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("municipio_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.municipio_id) {
+    return { supabase: null, municipioId: null, error: "NO_MUNICIPIO" };
+  }
+
+  return { supabase, municipioId: profile.municipio_id as number, error: null };
+}
+
 async function requireAdminConMunicipio(): Promise<
   | { supabase: SupabaseServerClient; municipioId: number; error: null }
   | { supabase: null; municipioId: null; error: string }
@@ -725,7 +756,7 @@ export async function getEstructuraOrganizacional(): Promise<{
   error: string | null;
 }> {
   try {
-    const { supabase, municipioId, error } = await requireAdminConMunicipio();
+    const { supabase, municipioId, error } = await requireUserConMunicipio();
     if (error || !supabase) {
       return { data: null, error };
     }

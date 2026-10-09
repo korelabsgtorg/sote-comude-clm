@@ -14,8 +14,9 @@ export default function BloqueoConfirmacionModal() {
     queryFn: async () => {
       return await getActividadPendienteConfirmacion();
     },
-    refetchOnWindowFocus: false,
-    staleTime: 1000 * 60 * 3,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+    staleTime: 1000 * 10, // 10 segundos para mayor frescura
   });
 
   // Listener para el evento de refresco disparado por el Service Worker / PushListener

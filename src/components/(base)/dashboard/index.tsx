@@ -34,8 +34,6 @@ const MODULES = DASHBOARD_MODULES;
 const DASHBOARD_ICON_PLATE_CLASS =
   "flex items-center justify-center dark:rounded-2xl dark:bg-white";
 
-const DASHBOARD_DOTTED_BG_CLASS =
-  "pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] dark:bg-[radial-gradient(oklch(50%_0_0)_1px,transparent_1px)] opacity-60";
 
 export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { initialPortada?: string }) {
   const { user, effectiveRole } = useUserContext();
@@ -117,25 +115,26 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         user={user}
       />
 
-      <div className="flex flex-col md:hidden w-full bg-muted dark:bg-muted">
-        <div className="w-full pt-2 pb-0 -mb-[6%] relative z-[2] mt-4">
+      <div className="flex flex-col md:hidden w-full bg-muted dark:bg-muted relative">
+        {/* Encabezado con Logo arriba de la portada */}
+        <div className="w-full pt-3 pb-2 bg-card border-b border-border/40 relative z-[2]">
           <LogoTrifinioMobile backgroundEffect="blur" />
         </div>
 
-        <div className="w-full overflow-hidden">
-          <motion.img
-            src={displayImage}
-            alt="COMUDE Concepción Las Minas"
-            style={{
-              y: imgYMobile,
-              scale: bgScale,
-            }}
-            className="w-full h-auto object-contain block origin-center"
-          />
+        {/* Banner de Portada móvil fijo / sticky (solo imagen debajo del logo) */}
+        <div className="sticky top-[calc(var(--banner-height,0px)+3rem+env(safe-area-inset-top)+var(--mobile-breadcrumb-height,0px))] w-full z-0 bg-[#0a1628] overflow-hidden flex flex-col items-center">
+          <div className="w-full overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={displayImage}
+              alt="COMUDE Concepción Las Minas"
+              className="w-full h-auto object-contain block"
+            />
+          </div>
         </div>
 
-        <div className="relative w-full px-[1%] pt-8 pb-20">
-          <div className={cn("absolute inset-0", DASHBOARD_DOTTED_BG_CLASS)} />
+        {/* Sección de Contenido que se desliza sobre la portada fija */}
+        <div className="relative z-10 w-full px-[1%] pt-4 pb-20 bg-muted dark:bg-muted">
           <div className="relative z-10">
             <CardsGrid />
           </div>
@@ -160,7 +159,6 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
 
         {/* Sección de Contenido (Actividades COMUDE) */}
         <div className="relative z-10 w-full bg-muted dark:bg-muted px-8 lg:px-12 pt-6 pb-20">
-          <div className={cn("absolute inset-0", DASHBOARD_DOTTED_BG_CLASS)} />
           <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto pt-0 pb-2">
             <CardsGrid />
           </div>

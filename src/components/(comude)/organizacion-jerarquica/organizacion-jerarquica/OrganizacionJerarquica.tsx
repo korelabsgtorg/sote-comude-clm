@@ -264,7 +264,7 @@ export function OrganizacionJerarquica() {
           </div>
 
           {/* Switch entre Organización y Comisiones en el centro del header */}
-          <div className="flex items-center gap-3 px-4 md:px-0 shrink-0">
+          <div className="flex items-center justify-center lg:justify-start gap-3 px-4 md:px-0 shrink-0 w-full lg:w-auto">
             <button
               type="button"
               onClick={() => setSubModo("organizacional")}

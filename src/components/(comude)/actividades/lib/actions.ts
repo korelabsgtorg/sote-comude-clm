@@ -290,6 +290,8 @@ export async function emitirConvocatoriaComude(actComudeId: string): Promise<voi
     .from("act_comude")
     .select(`
       id,
+      fecha,
+      estado,
       detalles_sesion,
       act_comude_participantes (usuario_id)
     `)
@@ -297,6 +299,20 @@ export async function emitirConvocatoriaComude(actComudeId: string): Promise<voi
     .single();
 
   if (actErr || !actividad) throw new Error("Actividad no encontrada");
+
+  if (actividad.estado === "Finalizada") {
+    throw new Error("No se puede emitir la convocatoria porque la sesión ya ha finalizado.");
+  }
+
+  if (actividad.fecha) {
+    const actDate = new Date(actividad.fecha);
+    actDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (actDate < today) {
+      throw new Error("No se puede emitir la convocatoria porque la fecha del COMUDE ya venció. Por favor actualice la fecha primero.");
+    }
+  }
 
   const titulo = (actividad.detalles_sesion as any)?.titulo || "Sesión COMUDE";
 
@@ -373,19 +389,25 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
     });
   }
 
-  // Actualizar la actividad
+  // Actualizar la actividad (si cambió la fecha, reiniciar la convocatoria)
+  const actUpdatePayload: Record<string, any> = {
+    detalles_sesion: {
+      titulo: values.titulo,
+      acta: values.acta,
+      libro: values.libro,
+    },
+    fecha: nuevaFechaIso,
+    descripcion: values.descripcion ?? null,
+    ubicacion: nuevaUbicacion,
+  };
+
+  if (cambioDeFecha) {
+    actUpdatePayload.convocatoria = null;
+  }
+
   const { error: actError } = await supabase
     .from("act_comude")
-    .update({
-      detalles_sesion: {
-        titulo: values.titulo,
-        acta: values.acta,
-        libro: values.libro,
-      },
-      fecha: nuevaFechaIso,
-      descripcion: values.descripcion ?? null,
-      ubicacion: nuevaUbicacion,
-    })
+    .update(actUpdatePayload)
     .eq("id", id);
 
   if (actError) throw new Error(actError.message);

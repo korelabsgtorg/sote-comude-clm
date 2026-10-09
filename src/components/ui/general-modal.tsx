@@ -216,6 +216,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   JEFE_REQUIRED_LEAVE: "No se puede eliminar: quedaría un equipo sin jefe.",
   DROP_ES_JEFATURA: "No se puede quitar la jefatura si el puesto es de tipo jefe.",
   JEFATURAS_SYNC_FAILED: "No se pudieron sincronizar las jefaturas.",
+  ALREADY_EXISTS: "Ya existe un registro con este nombre en el municipio.",
   PUESTO_HAS_CHILDREN: "No se puede eliminar este puesto porque tiene dependencias bajo su cargo.",
   PUESTO_NOT_FOUND: "El puesto no fue encontrado.",
 };

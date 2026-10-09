@@ -40,6 +40,8 @@ import {
   sustituirParticipanteComude,
 } from "./actions";
 
+import { notifyActividadPendienteRefresh } from "@/components/push/PushListener";
+
 export function useSustituirParticipante() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { actComudeId: string; nuevoUsuarioId: string }>({
@@ -48,6 +50,8 @@ export function useSustituirParticipante() {
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
       queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
       queryClient.invalidateQueries({ queryKey: ["registros-asistencia"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-pendiente-confirmacion"] });
+      notifyActividadPendienteRefresh();
     },
   });
 }
@@ -59,6 +63,8 @@ export function useEmitirConvocatoria() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
       queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-pendiente-confirmacion"] });
+      notifyActividadPendienteRefresh();
     },
   });
 }

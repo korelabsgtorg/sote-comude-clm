@@ -114,3 +114,62 @@ export interface PeriodoConHistorico extends CocodePeriodo {
   historico_puestos?: CocodeHistoricoPuesto[];
 }
 
+// ─── Helpers de Búsqueda y Validación de Duplicados ───────────────────────────
+
+export function normalizeText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export interface LugarPlano {
+  id: string;
+  nombre: string;
+  tipo: TipoLugar;
+  parentId: string | null;
+  parentNombre: string | null;
+  fullPath: string;
+}
+
+export function aplanarLugares(
+  nodos: NodoTerritorial[],
+  parentId: string | null = null,
+  parentNombre: string | null = null,
+  ancestorPath: string[] = [],
+): LugarPlano[] {
+  const result: LugarPlano[] = [];
+  for (const nodo of nodos) {
+    const currentPath = [...ancestorPath, nodo.nombre];
+    result.push({
+      id: nodo.id,
+      nombre: nodo.nombre,
+      tipo: nodo.tipo,
+      parentId,
+      parentNombre,
+      fullPath: currentPath.join(" → "),
+    });
+    if (nodo.hijos && nodo.hijos.length > 0) {
+      result.push(
+        ...aplanarLugares(nodo.hijos, nodo.id, nodo.nombre, currentPath),
+      );
+    }
+  }
+  return result;
+}
+
+export function buscarLugarDuplicado(
+  nombre: string,
+  lugares: LugarPlano[],
+  ignoreId?: string | null,
+): LugarPlano | null {
+  const norm = normalizeText(nombre);
+  if (!norm) return null;
+  return (
+    lugares.find(
+      (l) => l.id !== ignoreId && normalizeText(l.nombre) === norm,
+    ) ?? null
+  );
+}
+

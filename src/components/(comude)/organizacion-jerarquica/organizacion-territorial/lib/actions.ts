@@ -307,13 +307,27 @@ export async function createComunidad(
     const parsed = comunidadFormSchema.safeParse(values);
     if (!parsed.success) return { success: false, error: "INVALID_INPUT" };
 
+    const nombreLimpio = parsed.data.nombre.trim();
+
+    // Validar duplicados en el mismo municipio
+    const { data: existente } = await supabase
+      .from("lug_comunidades")
+      .select("id")
+      .eq("municipio_id", municipioId)
+      .ilike("nombre", nombreLimpio)
+      .maybeSingle();
+
+    if (existente) {
+      return { success: false, error: "ALREADY_EXISTS" };
+    }
+
     const id = `${parsed.data.tipo}_${Date.now()}`;
 
     const { error: insertError } = await supabase.from("lug_comunidades").insert({
       id,
       municipio_id: municipioId,
       parent_id: parsed.data.parent_id,
-      nombre: parsed.data.nombre.trim(),
+      nombre: nombreLimpio,
       tipo: parsed.data.tipo,
     });
 
@@ -335,10 +349,25 @@ export async function updateComunidad(
     const parsed = comunidadFormSchema.safeParse(values);
     if (!parsed.success) return { success: false, error: "INVALID_INPUT" };
 
+    const nombreLimpio = parsed.data.nombre.trim();
+
+    // Validar duplicados en el mismo municipio (excluyendo el registro actual)
+    const { data: existente } = await supabase
+      .from("lug_comunidades")
+      .select("id")
+      .eq("municipio_id", municipioId)
+      .neq("id", id)
+      .ilike("nombre", nombreLimpio)
+      .maybeSingle();
+
+    if (existente) {
+      return { success: false, error: "ALREADY_EXISTS" };
+    }
+
     const { error: updateError } = await supabase
       .from("lug_comunidades")
       .update({
-        nombre: parsed.data.nombre.trim(),
+        nombre: nombreLimpio,
         parent_id: parsed.data.parent_id,
       })
       .eq("id", id)

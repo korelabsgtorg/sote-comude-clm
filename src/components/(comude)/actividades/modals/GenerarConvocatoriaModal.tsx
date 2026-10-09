@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { X, Download, Loader2, RefreshCw, FileText, Image as ImageIcon, Sparkles } from "lucide-react";
 import { ActComudeConParticipantes } from "../lib/zod";
 import { useConfiguracionMunicipio, useIntegrantesEstructuraMunicipio } from "@/components/(base)/(settings)/municipio/hooks";
-import { useStorageDisplayUrl } from "@/components/(uploads)/imgs/useStorageDisplayUrl";
 import { getInitialGlobalMunicipioState } from "@/components/(base)/layout/actions";
 import { createClient } from "@/utils/supabase/client";
 import { domToPng } from "modern-screenshot";
@@ -175,10 +174,59 @@ export default function GenerarConvocatoriaModal({
     setFechaEmision(formatFechaEmisionSpanish(municipioNombre));
   }, [config, municipioNombre]);
 
-  // URLs de almacenamiento de logos y firma
-  const { url: logoIzqUrl } = useStorageDisplayUrl(BUCKET, logoIzqPath);
-  const { url: logoDerUrl } = useStorageDisplayUrl(BUCKET, logoDerPath);
-  const { url: firmaUrl } = useStorageDisplayUrl(BUCKET, firmaPath);
+  // Data URIs para logos y firma (garantiza cero errores de CORS y carga inmediata en canvas)
+  const [logoIzqDataUri, setLogoIzqDataUri] = useState<string>("");
+  const [logoDerDataUri, setLogoDerDataUri] = useState<string>("");
+  const [firmaDataUri, setFirmaDataUri] = useState<string>("");
+
+  useEffect(() => {
+    let isMounted = true;
+    const supabase = createClient();
+
+    const fetchUri = async (path?: string) => {
+      if (!path) return "";
+      try {
+        const { data, error } = await supabase.storage.from(BUCKET).download(path);
+        if (error || !data) return "";
+        return new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onloadend = () => res((reader.result as string) || "");
+          reader.onerror = () => res("");
+          reader.readAsDataURL(data);
+        });
+      } catch {
+        return "";
+      }
+    };
+
+    if (logoIzqPath) {
+      fetchUri(logoIzqPath).then((uri) => {
+        if (isMounted) setLogoIzqDataUri(uri);
+      });
+    } else {
+      setLogoIzqDataUri("");
+    }
+
+    if (logoDerPath) {
+      fetchUri(logoDerPath).then((uri) => {
+        if (isMounted) setLogoDerDataUri(uri);
+      });
+    } else {
+      setLogoDerDataUri("");
+    }
+
+    if (firmaPath) {
+      fetchUri(firmaPath).then((uri) => {
+        if (isMounted) setFirmaDataUri(uri);
+      });
+    } else {
+      setFirmaDataUri("");
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [logoIzqPath, logoDerPath, firmaPath]);
 
   const logosDisponibles = Array.isArray(config?.logo) ? config.logo : [];
   const firmasDisponibles = Array.isArray(config?.firmas) ? config.firmas : [];
@@ -196,13 +244,43 @@ export default function GenerarConvocatoriaModal({
         quality: 0.95,
       });
 
+      const actaStr = actividad.detalles_sesion?.acta ? `_Acta_${actividad.detalles_sesion.acta}` : "";
+      const fileName = `Convocatoria_COMUDE${actaStr}.png`;
+
+      const isMobileDevice =
+        typeof navigator !== "undefined" &&
+        (/Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
+          (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent)));
+
+      if (isMobileDevice && typeof navigator !== "undefined" && navigator.canShare) {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], fileName, { type: "image/png" });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: "Convocatoria COMUDE",
+            text: `Convocatoria oficial COMUDE - Acta ${actividad.detalles_sesion?.acta || ""}`,
+          });
+          toast.success("Convocatoria lista.");
+          return;
+        }
+      }
+
       const link = document.createElement("a");
-      link.download = `Convocatoria_COMUDE_${actividad.detalles_sesion?.acta || "Sesion"}.png`;
+      link.download = fileName;
       link.href = dataUrl;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+
       toast.success("Imagen de convocatoria descargada con éxito.");
     } catch (err: any) {
-      toast.error("Error al generar la imagen de la convocatoria.");
+      if (err?.name !== "AbortError") {
+        console.error("Error al exportar imagen:", err);
+        toast.error("Error al generar la imagen de la convocatoria.");
+      }
     } finally {
       setGenerando(false);
     }
@@ -221,17 +299,51 @@ export default function GenerarConvocatoriaModal({
 
       const pdf = new jsPDF("p", "mm", "letter");
       const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeightPage = pdf.internal.pageSize.getHeight();
+
       const img = new Image();
       img.src = dataUrl;
-      await new Promise((res) => (img.onload = res));
+      await new Promise<void>((res) => {
+        img.onload = () => res();
+      });
 
-      const pdfHeight = (img.height * pdfWidth) / img.width;
+      const imgHeight = (img.height * pdfWidth) / img.width;
+      const finalWidth = imgHeight > pdfHeightPage ? (pdfHeightPage * img.width) / img.height : pdfWidth;
+      const finalHeight = imgHeight > pdfHeightPage ? pdfHeightPage : imgHeight;
+      const posX = (pdfWidth - finalWidth) / 2;
 
-      pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Convocatoria_COMUDE_${actividad.detalles_sesion?.acta || "Sesion"}.pdf`);
+      pdf.addImage(dataUrl, "PNG", posX, 0, finalWidth, finalHeight);
+
+      const actaStr = actividad.detalles_sesion?.acta ? `_Acta_${actividad.detalles_sesion.acta}` : "";
+      const fileName = `Convocatoria_COMUDE${actaStr}.pdf`;
+
+      const isMobileDevice =
+        typeof navigator !== "undefined" &&
+        (/Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
+          (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent)));
+
+      if (isMobileDevice && typeof navigator !== "undefined" && navigator.canShare) {
+        const pdfBlob = pdf.output("blob");
+        const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+        if (navigator.canShare({ files: [pdfFile] })) {
+          await navigator.share({
+            files: [pdfFile],
+            title: "Convocatoria COMUDE PDF",
+            text: `Documento PDF de Convocatoria COMUDE - Acta ${actividad.detalles_sesion?.acta || ""}`,
+          });
+          toast.success("Documento PDF listo.");
+          return;
+        }
+      }
+
+      pdf.save(fileName);
       toast.success("Documento PDF de convocatoria descargado.");
     } catch (err: any) {
-      toast.error("Error al generar el PDF de la convocatoria.");
+      if (err?.name !== "AbortError") {
+        console.error("Error al exportar PDF:", err);
+        toast.error("Error al generar el PDF de la convocatoria.");
+      }
     } finally {
       setGenerando(false);
     }
@@ -400,9 +512,9 @@ export default function GenerarConvocatoriaModal({
                 <div className="flex items-center justify-between gap-4">
                   {/* Logo Izquierdo */}
                   <div className="w-20 h-20 flex items-center justify-center shrink-0">
-                    {logoIzqUrl ? (
+                    {logoIzqDataUri ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={logoIzqUrl} alt="Logo Izquierdo" className="max-h-full max-w-full object-contain" />
+                      <img src={logoIzqDataUri} alt="Logo Izquierdo" className="max-h-full max-w-full object-contain" />
                     ) : (
                       <div className="w-16 h-16 border border-dashed border-gray-300 rounded flex items-center justify-center text-[10px] text-gray-400">
                         Logo Izq
@@ -422,9 +534,9 @@ export default function GenerarConvocatoriaModal({
 
                   {/* Logo Derecho */}
                   <div className="w-20 h-20 flex items-center justify-center shrink-0">
-                    {logoDerUrl ? (
+                    {logoDerDataUri ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={logoDerUrl} alt="Logo Derecho" className="max-h-full max-w-full object-contain" />
+                      <img src={logoDerDataUri} alt="Logo Derecho" className="max-h-full max-w-full object-contain" />
                     ) : (
                       <div className="w-16 h-16 border border-dashed border-gray-300 rounded flex items-center justify-center text-[10px] text-gray-400">
                         Logo Der
@@ -485,11 +597,11 @@ export default function GenerarConvocatoriaModal({
                 <div className="flex justify-center relative">
                   <div className="relative text-center flex flex-col items-center">
                     {/* Imagen de Firma / Sello superpuesta */}
-                    {firmaUrl && (
+                    {firmaDataUri && (
                       <div className="absolute -top-16 inset-x-0 flex justify-center pointer-events-none z-10">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={firmaUrl}
+                          src={firmaDataUri}
                           alt="Firma y Sello"
                           className="max-h-28 max-w-48 object-contain mix-blend-multiply"
                         />

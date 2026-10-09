@@ -2,7 +2,7 @@
 import { domToJpeg } from 'modern-screenshot';
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { compressImageFile, isAllowedImageType, generateStoragePath } from "@/components/(uploads)/imgs/constants";
 import Link from "next/link";
 import {
@@ -35,15 +35,12 @@ import {
 import { cn } from "@/lib/utils";
 import { ActComudeConParticipantes, ActComudeRegistro } from "./lib/zod";
 import { useRegistrarAsistencia, useRegistrosAsistencia, useActualizarAgenda, useEliminarActividad, useActualizarActa, useActualizarImagenesActividad, useSignedUrl, useActualizarEstadoSesion } from "./lib/hooks";
-import { useEstructuraOrganizacional } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/hooks";
-import { NodoOrganizacion } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/zod";
-import { useUsers } from "@/components/(base)/(users)/usuarios/lib/hooks";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import DetalleUbicacionModal from "./modals/DetalleUbicacionModal";
 import CrearComude from "./modals/CrearComude";
 import JustificacionAsistenciaModal from "./modals/JustificacionAsistenciaModal";
-import SustituirParticipanteModal, { OpcionSustituto } from "./modals/SustituirParticipanteModal";
+import SustituirParticipanteModal from "./modals/SustituirParticipanteModal";
 
 import ImageUploader from "@/components/(uploads)/imgs/ImageUploader";
 import { useStorageDisplayUrl } from "@/components/(uploads)/imgs/useStorageDisplayUrl";
@@ -60,6 +57,8 @@ const ComudePdfModal = dynamic(() => import("./modals/ComudePdfModal"), { ssr: f
 import TablaPuntosAgenda, { ContadoresEstado } from "./TablaPuntosAgenda";
 import { useConfiguracionMunicipio } from "@/components/(base)/(settings)/municipio/hooks";
 import { createClient } from "@/utils/supabase/client";
+import { useEstructuraOrganizacional } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/hooks";
+import { NodoOrganizacion } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/zod";
 
 function StorageImage({ path }: { path: string }) {
   const { data: url, isLoading } = useSignedUrl(path);
@@ -94,7 +93,7 @@ function EvidenciaVisorModal({
   return (
     <div className="fixed inset-0 z-[200] flex flex-col justify-end sm:justify-center items-center bg-black/80 backdrop-blur-sm sm:p-4" onClick={onClose}>
       <div className="relative w-full h-[calc(100dvh-4rem)] sm:h-auto sm:max-h-[90dvh] sm:max-w-6xl flex flex-col bg-background rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        
+
         <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/30">
           <h3 className="text-foreground font-bold text-sm tracking-wider uppercase">Visor de Evidencia</h3>
           <button onClick={onClose} className="p-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
@@ -112,7 +111,7 @@ function EvidenciaVisorModal({
 
         {paths.length > 1 && (
           <div className="flex items-center justify-center gap-8 p-4 border-t border-border/50 bg-muted/30">
-            <button 
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 setCurrentIndex((i) => (i - 1 + paths.length) % paths.length);
@@ -124,7 +123,7 @@ function EvidenciaVisorModal({
             <span className="text-sm font-semibold text-muted-foreground tracking-widest">
               {currentIndex + 1} / {paths.length}
             </span>
-            <button 
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 setCurrentIndex((i) => (i + 1) % paths.length);
@@ -328,50 +327,63 @@ function ParticipanteRow({
 
       {/* Botones para el propio usuario */}
       {esElUsuario && !isPastDate && (
-        <div className="w-full sm:w-auto shrink-0 flex flex-wrap items-center justify-center sm:justify-end gap-2 mt-2 sm:mt-0">
-          {/* Botón de Sustituir (disponible si aún no ha marcado salida, no es fecha pasada y la sesión no ha finalizado) */}
+        <div className="w-full sm:w-auto shrink-0 flex flex-col items-center sm:items-end gap-1.5 mt-2 sm:mt-0">
+          <div className="w-full sm:w-auto flex flex-wrap items-center justify-center sm:justify-end gap-2">
+            {/* Botón de PC (visible en pantallas medianas y grandes) */}
+            {!regSalida && !isFinalizada && puedeSustituir && onSustituir && (
+              <button
+                onClick={onSustituir}
+                type="button"
+                className="hidden sm:flex justify-center items-center gap-1.5 text-xs font-semibold border border-azul-trifinio text-azul-trifinio hover:bg-azul-trifinio/10 px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
+                title="Asignar un suplente para que asista en tu lugar"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+                <span>Asignar Suplente</span>
+              </button>
+            )}
+
+            {(!regEntrada || !regSalida) && (
+              <>
+                {!regEntrada ? (
+                  <button
+                    onClick={() => onRegistrar("entrada")}
+                    disabled={cargandoGPS || isMuyTemprano || isFinalizada}
+                    className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold text-white px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto cursor-pointer ${isFinalizada || isMuyTemprano
+                      ? "bg-gray-400 dark:bg-neutral-700 dark:text-gray-400 cursor-not-allowed shadow-none"
+                      : "bg-green-600 hover:bg-green-700 disabled:opacity-60"
+                      }`}
+                  >
+                    {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogIn className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
+                    {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Entrada"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onRegistrar("salida")}
+                    disabled={cargandoGPS || isFinalizada}
+                    className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto cursor-pointer ${isFinalizada
+                      ? "bg-gray-400 dark:bg-neutral-700 text-white dark:text-gray-400 cursor-not-allowed shadow-none"
+                      : "bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
+                      }`}
+                  >
+                    {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
+                    {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Salida"}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Enlace sutil de Asignar Suplente (Solo visible en Móvil) */}
           {!regSalida && !isFinalizada && puedeSustituir && onSustituir && (
             <button
               onClick={onSustituir}
               type="button"
-              className="flex justify-center items-center gap-1.5 text-sm sm:text-xs font-semibold border border-azul-trifinio text-azul-trifinio hover:bg-azul-trifinio/10 px-3.5 py-2.5 sm:py-2 rounded-lg transition-colors w-full sm:w-auto"
-              title="Delegar asistencia a un miembro de tu equipo"
+              className="sm:hidden inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-azul-trifinio dark:hover:text-blue-400 transition-colors py-1 px-1.5 rounded cursor-pointer group mt-0.5 text-center"
+              title="Asignar un suplente para que asista en tu lugar"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
-              <span>Sustituir</span>
+              <ArrowRightLeft className="w-3 h-3 shrink-0 text-muted-foreground group-hover:text-azul-trifinio transition-transform group-hover:scale-110" />
+              <span>¿No puedes asistir? <span className="font-semibold text-azul-trifinio dark:text-blue-400 underline underline-offset-2">Asignar un suplente</span></span>
             </button>
-          )}
-
-          {(!regEntrada || !regSalida) && (
-            <>
-              {!regEntrada ? (
-                <button
-                  onClick={() => onRegistrar("entrada")}
-                  disabled={cargandoGPS || isMuyTemprano || isFinalizada}
-                  className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold text-white px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
-                    isFinalizada || isMuyTemprano
-                      ? "bg-gray-400 dark:bg-neutral-700 dark:text-gray-400 cursor-not-allowed shadow-none"
-                      : "bg-green-600 hover:bg-green-700 disabled:opacity-60"
-                  }`}
-                >
-                  {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogIn className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
-                  {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Entrada"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => onRegistrar("salida")}
-                  disabled={cargandoGPS || isFinalizada}
-                  className={`flex justify-center items-center gap-2 sm:gap-1.5 text-sm sm:text-xs font-semibold px-4 py-4 sm:py-2 rounded-lg transition-colors w-full sm:w-auto ${
-                    isFinalizada
-                      ? "bg-gray-400 dark:bg-neutral-700 text-white dark:text-gray-400 cursor-not-allowed shadow-none"
-                      : "bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
-                  }`}
-                >
-                  {cargandoGPS ? <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin shrink-0" /> : <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />}
-                  {cargandoGPS ? "Obteniendo ubicación..." : "Marcar Salida"}
-                </button>
-              )}
-            </>
           )}
         </div>
       )}
@@ -397,13 +409,13 @@ export default function DetalleActividadView({
     entrada: ActComudeRegistro | null;
     salida: ActComudeRegistro | null;
   } | null>(null);
-  
+
   const [evidenciaSelectedIndex, setEvidenciaSelectedIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"agenda" | "participantes">("agenda");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isActaVisorOpen, setIsActaVisorOpen] = useState(false);
   const [actaUrlToView, setActaUrlToView] = useState<string | null>(null);
-  
+
   // Nuevo Punto Modal
   const [isNuevoPuntoModalOpen, setIsNuevoPuntoModalOpen] = useState(false);
   const [isGenerandoUrl, setIsGenerandoUrl] = useState(false);
@@ -441,17 +453,17 @@ export default function DetalleActividadView({
   // Filtro de estado para la tabla de agenda
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
   const actaFileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const isOpen = !!actividad;
-  
+
   const esFinalizada = actividad?.estado === "Finalizada";
   const esEncargado = !!(userId && actividad?.act_comude_participantes?.some((p) => p.usuario_id === userId && p.encargado));
 
   // Super usuario puede gestionar siempre; Admin o Encargado del COMUDE solo si no está finalizada.
   const puedeGestionarAgenda = effectiveRole === "super" || ((puedeGestionar || esEncargado) && !esFinalizada);
-  
+
   const puedeGestionarFotos = effectiveRole === "super" || ((puedeGestionar || esEncargado) && !esFinalizada);
-  
+
   const isPastDate = (() => {
     if (!actividad?.fecha) return false;
     const actDate = new Date(actividad.fecha);
@@ -462,7 +474,7 @@ export default function DetalleActividadView({
   })();
 
   const canManageActive = puedeGestionarAgenda && !isPastDate;
-  
+
   // Estado para la justificación de asistencia tardía
   const { data: municipioSettings } = useConfiguracionMunicipio(actividad?.municipio_id);
   const [showJustificationModal, setShowJustificationModal] = useState(false);
@@ -470,37 +482,16 @@ export default function DetalleActividadView({
   const [isRegistroTarde, setIsRegistroTarde] = useState(false);
   const [horaMostrar, setHoraMostrar] = useState("");
 
-  // Estado y lógica para sustitución de participantes
+  // Estado para la sustitución de participantes
   const [isSustituirModalOpen, setIsSustituirModalOpen] = useState(false);
-  const { data: estructuraOrg, isLoading: isLoadingEstructura } = useEstructuraOrganizacional();
-  const { data: allUsers, isLoading: isLoadingUsers } = useUsers(effectiveRole);
+  const { data: estructuraOrg } = useEstructuraOrganizacional();
 
-  const esSuperOAdmin = effectiveRole === "super" || effectiveRole === "admin";
+  const puedeSustituir = useMemo(() => {
+    // Si es super, tiene acceso completo a sustituir
+    if (effectiveRole === "super") return true;
+    if (!userId || !estructuraOrg) return false;
 
-  // Calcular los sustitutos permitidos para el usuario autenticado
-  const sustitutosDisponibles: OpcionSustituto[] = (() => {
-    if (!userId) return [];
-
-    // Participantes que ya están en esta sesión para no duplicar
-    const participantesIds = new Set(
-      (actividad?.act_comude_participantes || []).map((p) => p.usuario_id)
-    );
-
-    if (esSuperOAdmin) {
-      // Super / Admin puede seleccionar a cualquier usuario activo que no esté en la sesión
-      return (allUsers || [])
-        .filter((u) => u.id !== userId && !participantesIds.has(u.id))
-        .map((u) => ({
-          id: u.id,
-          nombre: u.nombre || "Sin nombre",
-          puestoNombre: u.rol ? `Rol: ${u.rol}` : null,
-        }));
-    }
-
-    // Para una jefatura ordinaria: buscar en el árbol de la estructura organizacional
-    if (!estructuraOrg) return [];
-
-    // 1. Encontrar el nodo del usuario actual
+    // Buscar el nodo del usuario actual
     let nodoUsuario: NodoOrganizacion | null = null;
     function buscarNodo(nodo: NodoOrganizacion) {
       if (nodo.tipo === "unidad" && nodo.titular_id === userId) {
@@ -514,33 +505,28 @@ export default function DetalleActividadView({
     }
     buscarNodo(estructuraOrg);
 
-    if (!nodoUsuario) return [];
+    if (!nodoUsuario) return false;
 
-    // 2. Extraer los subordinados que descienden del nodo del usuario
-    const subordinadosMap = new Map<string, OpcionSustituto>();
-    function recolectarSubordinados(nodo: NodoOrganizacion) {
-      if (nodo.tipo === "unidad" && nodo.titular_id && nodo.titular) {
-        if (nodo.titular_id !== userId && !participantesIds.has(nodo.titular_id)) {
-          subordinadosMap.set(nodo.titular_id, {
-            id: nodo.titular_id,
-            nombre: nodo.titular,
-            puestoNombre: nodo.nombre,
-          });
-        }
+    // Verificar si tiene al menos un subordinado válido bajo su cargo
+    let tieneSubordinados = false;
+    function verificarSubordinados(nodo: NodoOrganizacion) {
+      if (nodo.tipo === "unidad" && nodo.titular_id && nodo.titular_id !== userId) {
+        tieneSubordinados = true;
+        return;
       }
       for (const hijo of nodo.hijos || []) {
-        recolectarSubordinados(hijo);
+        verificarSubordinados(hijo);
+        if (tieneSubordinados) return;
       }
     }
 
     for (const hijo of (nodoUsuario as NodoOrganizacion).hijos || []) {
-      recolectarSubordinados(hijo);
+      verificarSubordinados(hijo);
+      if (tieneSubordinados) break;
     }
 
-    return Array.from(subordinadosMap.values());
-  })();
-
-  const puedeSustituir = esSuperOAdmin || sustitutosDisponibles.length > 0;
+    return tieneSubordinados;
+  }, [effectiveRole, userId, estructuraOrg]);
 
   // Estado optimista para la agenda para respuesta inmediata
   const [optimisticAgenda, setOptimisticAgenda] = useState(actividad?.agenda || []);
@@ -623,11 +609,11 @@ export default function DetalleActividadView({
       }
     }
   };
-  
+
   const handleCargarActa = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !actividad) return;
-    
+
     if (file.type !== "application/pdf") {
       toast.error("Solo se permiten archivos PDF");
       return;
@@ -668,7 +654,7 @@ export default function DetalleActividadView({
     if (result.isConfirmed) {
       try {
         const supabase = createClient();
-        
+
         // Si no es una URL pública, extraer la ruta (como se guarda ahora)
         let filePath = primerActa;
         if (filePath.startsWith('http')) {
@@ -679,7 +665,7 @@ export default function DetalleActividadView({
         // Eliminar del bucket
         const { error: storageError } = await supabase.storage.from("actas").remove([filePath]);
         if (storageError) console.error("Error al borrar del bucket:", storageError);
-        
+
         // Actualizar la base de datos a null
         try {
           await actualizarActa({ id: actividad.id, actaUrl: null });
@@ -713,14 +699,14 @@ export default function DetalleActividadView({
     if (!actividad) return;
     try {
       const supabase = createClient();
-      
+
       // Borrar archivo del bucket
       const { error: storageError } = await supabase.storage.from("portada_imagenes").remove([pathToRemove]);
       if (storageError) console.error("Error al borrar del bucket:", storageError);
 
       const currentImages = actividad.img || [];
       const newImages = currentImages.filter(p => p !== pathToRemove);
-      
+
       await actualizarImagenes({ id: actividad.id, imgPaths: newImages.length > 0 ? newImages : [] });
       toast.success("Imagen eliminada de la actividad.");
     } catch (err: unknown) {
@@ -742,7 +728,7 @@ export default function DetalleActividadView({
 
   const handleVerActa = async () => {
     if (!actividad || !actividad.actas) return;
-    
+
     // Si ya es una URL completa antigua, la usamos directo aunque falle
     if (actividad.actas.startsWith("http")) {
       setActaUrlToView(actividad.actas);
@@ -756,7 +742,7 @@ export default function DetalleActividadView({
       // Firmar la URL por 1 hora (3600 segundos)
       const { data, error } = await supabase.storage.from("actas").createSignedUrl(actividad.actas, 3600);
       if (error || !data) throw new Error();
-      
+
       setActaUrlToView(data.signedUrl);
       setIsActaVisorOpen(true);
     } catch (err) {
@@ -799,7 +785,7 @@ export default function DetalleActividadView({
       toast.success(tipo === "entrada" ? "✅ Entrada registrada" : "👋 Salida registrada");
       setShowJustificationModal(false);
       setPendingTipoRegistro(null);
-      
+
       if (tipo === "entrada") {
         setActiveTab("agenda");
       }
@@ -818,7 +804,7 @@ export default function DetalleActividadView({
 
   const handleRegistrar = async (tipo: "entrada" | "salida") => {
     if (!actividad || !municipioSettings) return;
-    
+
     const ahora = new Date().getTime();
     const horaProgramada = new Date(actividad.fecha).getTime();
     const minAntes = (municipioSettings.minutos_antes_permitidos ?? 0) * 60000;
@@ -831,7 +817,7 @@ export default function DetalleActividadView({
 
     const esTarde = tipo === "entrada" && ahora > horaProgramada + minDespues;
     setIsRegistroTarde(esTarde);
-    
+
     if (esTarde) {
       const fechaLimite = new Date(horaProgramada + minDespues);
       setHoraMostrar(fechaLimite.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -846,7 +832,7 @@ export default function DetalleActividadView({
 
   const handleToggleAgenda = async (itemId: string) => {
     if (!puedeGestionar || !actividad) return;
-    
+
     // Optimistic Update
     const prevAgenda = optimisticAgenda;
     const nuevaAgenda = optimisticAgenda.map((item) =>
@@ -866,7 +852,7 @@ export default function DetalleActividadView({
   const handleAgregarPunto = async () => {
     if (!nuevoPunto.trim() || !actividad || isUpdatingAgenda) return;
     const nuevo = { id: crypto.randomUUID(), titulo: nuevoPunto.trim(), completado: false };
-    
+
     const prevAgenda = optimisticAgenda;
     const nuevaAgenda = [...optimisticAgenda, nuevo];
     setOptimisticAgenda(nuevaAgenda);
@@ -883,7 +869,7 @@ export default function DetalleActividadView({
 
   const handleGuardarEdicion = async (itemId: string) => {
     if (!textoEdicion.trim() || !actividad || isUpdatingAgenda) return;
-    
+
     const prevAgenda = optimisticAgenda;
     const nuevaAgenda = optimisticAgenda.map((item) =>
       item.id === itemId ? { ...item, titulo: textoEdicion.trim() } : item
@@ -902,7 +888,7 @@ export default function DetalleActividadView({
 
   const handleEliminarPunto = async (itemId: string) => {
     if (!actividad || isUpdatingAgenda) return;
-    
+
     const result = await Swal.fire({
       title: '¿Estás seguro?',
       text: "Se eliminará este punto de la agenda. ¡Esta acción no se puede deshacer!",
@@ -918,7 +904,7 @@ export default function DetalleActividadView({
       const prevAgenda = optimisticAgenda;
       const nuevaAgenda = optimisticAgenda.filter((item) => item.id !== itemId);
       setOptimisticAgenda(nuevaAgenda);
-      
+
       try {
         await actualizarAgenda({ id: actividad.id, agenda: nuevaAgenda });
         toast.success("Punto eliminado");
@@ -959,7 +945,7 @@ export default function DetalleActividadView({
   if (!mounted || !actividad) return null;
 
   const hoy = esHoy(actividad.fecha);
-  const isMuyTemprano = municipioSettings 
+  const isMuyTemprano = municipioSettings
     ? Date.now() < new Date(actividad.fecha).getTime() - ((municipioSettings.minutos_antes_permitidos ?? 0) * 60000)
     : false;
   const encargados = actividad.act_comude_participantes.filter((p) => p.encargado && p.usuario_id !== userId);
@@ -975,7 +961,7 @@ export default function DetalleActividadView({
           onClick={onClose}
           className="flex items-center gap-1.5 text-azul-trifinio font-medium hover:underline text-sm w-fit"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           Volver
         </button>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -998,7 +984,7 @@ export default function DetalleActividadView({
 
           {/* Ver Acta / Subir Acta */}
           {actividad.acta && actividad.acta.length > 0 ? (
-            <button 
+            <button
               onClick={async () => {
                 const filePath = actividad.acta![0];
                 if (filePath.startsWith('http')) {
@@ -1028,7 +1014,7 @@ export default function DetalleActividadView({
               Ver Acta
             </button>
           ) : puedeGestionarAgenda ? (
-            <button 
+            <button
               onClick={() => actaFileInputRef.current?.click()}
               disabled={isUploadingActa}
               className="border border-zinc-700 text-zinc-700 dark:border-zinc-300 dark:text-zinc-200 bg-transparent hover:bg-zinc-500/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
@@ -1038,17 +1024,17 @@ export default function DetalleActividadView({
             </button>
           ) : null}
 
-          <input 
-            type="file" 
-            ref={actaFileInputRef} 
-            className="hidden" 
-            accept="application/pdf" 
-            onChange={handleCargarActa} 
+          <input
+            type="file"
+            ref={actaFileInputRef}
+            className="hidden"
+            accept="application/pdf"
+            onChange={handleCargarActa}
           />
 
           {actividad.estado === "Finalizada" ? (
-            <button 
-              onClick={handleGeneratePdf} 
+            <button
+              onClick={handleGeneratePdf}
               disabled={isCargandoPdfData}
               className="border border-red-600 text-red-600 dark:text-red-400 dark:border-red-500 bg-transparent hover:bg-red-600/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
@@ -1056,7 +1042,7 @@ export default function DetalleActividadView({
               Generar PDF
             </button>
           ) : puedeGestionarAgenda ? (
-            <button 
+            <button
               onClick={() => setIsNuevoPuntoModalOpen(true)}
               className="border border-purple-500 text-purple-600 dark:text-purple-400 dark:border-purple-400 bg-transparent hover:bg-purple-500/10 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center justify-center whitespace-nowrap flex-1 sm:flex-none gap-2"
             >
@@ -1128,21 +1114,23 @@ export default function DetalleActividadView({
 
         {/* Col 2 */}
         <div className="flex flex-col gap-4">
-          <div>
-            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
-              Fecha:
-            </h2>
-            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight capitalize">
-              {formatFechaCorto(actividad.fecha)}
-            </p>
-          </div>
-          <div>
-            <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
-              Hora:
-            </h2>
-            <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight uppercase">
-              {formatHora(actividad.fecha)}
-            </p>
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <div>
+              <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+                Fecha:
+              </h2>
+              <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight capitalize">
+                {formatFechaCorto(actividad.fecha)}
+              </p>
+            </div>
+            <div>
+              <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
+                Hora:
+              </h2>
+              <p className="text-foreground dark:text-white font-bold text-[15px] leading-tight uppercase">
+                {formatHora(actividad.fecha)}
+              </p>
+            </div>
           </div>
           <div>
             <h2 className="text-[15px] font-bold text-[#0d47a1] dark:text-blue-400 leading-tight">
@@ -1162,8 +1150,8 @@ export default function DetalleActividadView({
             onClick={() => setActiveTab("agenda")}
             className={cn(
               "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
-              activeTab === "agenda" 
-                ? "border-azul-trifinio text-azul-trifinio" 
+              activeTab === "agenda"
+                ? "border-azul-trifinio text-azul-trifinio"
                 : "border-transparent text-muted-foreground dark:text-gray-300 hover:text-foreground dark:hover:text-white hover:bg-muted/30"
             )}
           >
@@ -1174,8 +1162,8 @@ export default function DetalleActividadView({
             onClick={() => setActiveTab("participantes")}
             className={cn(
               "flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm",
-              activeTab === "participantes" 
-                ? "border-azul-trifinio text-azul-trifinio" 
+              activeTab === "participantes"
+                ? "border-azul-trifinio text-azul-trifinio"
                 : "border-transparent text-muted-foreground dark:text-gray-300 hover:text-foreground dark:hover:text-white hover:bg-muted/30"
             )}
           >
@@ -1183,12 +1171,12 @@ export default function DetalleActividadView({
             Participantes
           </button>
         </div>
-        
+
         {/* ContadoresEstado (solo se ven si estamos en la pestaña Agenda) */}
         {activeTab === "agenda" && (
           <div className="hidden sm:flex w-full sm:w-auto justify-center sm:justify-end border-t sm:border-t-0 border-border/50 sm:border-none py-2 sm:py-0">
-            <ContadoresEstado 
-              puntos={actividad.act_comude_puntos ?? []} 
+            <ContadoresEstado
+              puntos={actividad.act_comude_puntos ?? []}
               filtroEstado={filtroEstado}
               onFiltroChange={setFiltroEstado}
             />
@@ -1198,7 +1186,7 @@ export default function DetalleActividadView({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-24 sm:pb-8">
-        
+
         {activeTab === "agenda" && (
           <div className="px-1 sm:px-6 py-4">
 
@@ -1215,154 +1203,149 @@ export default function DetalleActividadView({
 
 
             {/* Evidencia / Fotos */}
-            <div className="mt-8 border-t border-border/50 pt-6 pb-2">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  Evidencia / Fotos
-                </p>
-                <span className="text-xs font-medium text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-md">
-                  {(actividad.img?.length || 0)}/4
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {actividad.img?.map((path, idx) => (
-                  <div key={idx} className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-border/50 shadow-sm">
-                    <button 
-                      onClick={() => setEvidenciaSelectedIndex(idx)}
-                      className="absolute inset-0 w-full h-full cursor-pointer z-0"
-                    >
-                      <StorageImage path={path} />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </button>
-                    {puedeGestionarFotos && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEliminarEvidencia(path);
-                        }}
-                        className="absolute top-2 right-2 p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer z-10"
-                        title="Eliminar imagen"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                
-                {puedeGestionarFotos && (actividad.img?.length || 0) < 4 && (
-                  <div className="relative aspect-[4/3]">
-                    <ImageUploader
-                      bucketName="portada_imagenes"
-                      currentImagePath={null}
-                      onUploadSuccess={handleSubirEvidencia}
-                      onDeleteSuccess={() => {}}
-                      disabled={isUploadingImg}
-                      aspect={4/3}
-                      aspectLabel="Horizontal 4:3"
-                      maxSizeMB={0.2}
-                      maxDimension={1920}
-                      folderPath={`comudes/municipio_${actividad.municipio_id}/actividad_${actividad.id}`}
-                      compact={true}
-                      compactClassName="w-full h-full rounded-lg border-2 border-dashed border-muted-foreground/20 hover:border-azul-trifinio/50 transition-colors"
-                    />
-                  </div>
-                )}
-              </div>
-              
-              {!puedeGestionarFotos && (!actividad.img || actividad.img.length === 0) && (
-                <div className="text-center py-6 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-lg">
-                  <ImagePlus className="w-6 h-6 mx-auto mb-2 opacity-30" />
-                  No hay evidencia fotográfica disponible.
+            {(puedeGestionarFotos || (actividad.img && actividad.img.length > 0)) && (
+              <div className="mt-8 border-t border-border/50 pt-6 pb-2">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    Evidencia / Fotos
+                  </p>
+                  <span className="text-xs font-medium text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-md">
+                    {(actividad.img?.length || 0)}/4
+                  </span>
                 </div>
-              )}
-            </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {actividad.img?.map((path, idx) => (
+                    <div key={idx} className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-border/50 shadow-sm">
+                      <button
+                        onClick={() => setEvidenciaSelectedIndex(idx)}
+                        className="absolute inset-0 w-full h-full cursor-pointer z-0"
+                      >
+                        <StorageImage path={path} />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                      {puedeGestionarFotos && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEliminarEvidencia(path);
+                          }}
+                          className="absolute top-2 right-2 p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all cursor-pointer z-10"
+                          title="Eliminar imagen"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {puedeGestionarFotos && (actividad.img?.length || 0) < 4 && (
+                    <div className="relative aspect-[4/3]">
+                      <ImageUploader
+                        bucketName="portada_imagenes"
+                        currentImagePath={null}
+                        onUploadSuccess={handleSubirEvidencia}
+                        onDeleteSuccess={() => { }}
+                        disabled={isUploadingImg}
+                        aspect={4 / 3}
+                        aspectLabel="Horizontal 4:3"
+                        maxSizeMB={0.2}
+                        maxDimension={1920}
+                        folderPath={`comudes/municipio_${actividad.municipio_id}/actividad_${actividad.id}`}
+                        compact={true}
+                        compactClassName="w-full h-full rounded-lg border-2 border-dashed border-muted-foreground/20 hover:border-azul-trifinio/50 transition-colors"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === "participantes" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
 
-          {/* Encargados */}
-          {encargados.length > 0 && (
-            <div className="px-1 sm:px-6 py-4 border-b border-border/30">
-              <div className="flex items-center gap-2 mb-3">
-                <Shield className="w-4 h-4 text-azul-trifinio" />
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  Encargados
-                </p>
+            {/* Encargados */}
+            {encargados.length > 0 && (
+              <div className="px-1 sm:px-6 py-4 border-b border-border/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4 text-azul-trifinio" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    Encargados
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {encargados.map((p) => (
+                    <ParticipanteRow
+                      key={p.usuario_id}
+                      participante={p}
+                      registros={registros}
+                      userId={userId}
+                      esActividadHoy={hoy}
+                      puedeGestionar={canManageActive}
+                      onRegistrar={handleRegistrar}
+                      cargandoGPS={cargandoGPS}
+                      onVerMapa={() => setParticipanteMapa({
+                        nombre: p.profiles?.nombre || "Sin nombre",
+                        entrada: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "entrada") || null,
+                        salida: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "salida") || null
+                      })}
+                      isMuyTemprano={isMuyTemprano}
+                      isPastDate={isPastDate}
+                      isFinalizada={esFinalizada}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                {encargados.map((p) => (
-                  <ParticipanteRow
-                    key={p.usuario_id}
-                    participante={p}
-                    registros={registros}
-                    userId={userId}
-                    esActividadHoy={hoy}
-                    puedeGestionar={canManageActive}
-                    onRegistrar={handleRegistrar}
-                    cargandoGPS={cargandoGPS}
-                    onVerMapa={() => setParticipanteMapa({
-                      nombre: p.profiles?.nombre || "Sin nombre",
-                      entrada: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "entrada") || null,
-                      salida: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "salida") || null
-                    })}
-                    isMuyTemprano={isMuyTemprano}
-                    isPastDate={isPastDate}
-                    isFinalizada={esFinalizada}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Integrantes */}
-          {integrantes.length > 0 && (
-            <div className="px-1 sm:px-6 py-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  Integrantes
-                </p>
+            {/* Integrantes */}
+            {integrantes.length > 0 && (
+              <div className="px-1 sm:px-6 py-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    Integrantes
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {integrantes.map((p) => (
+                    <ParticipanteRow
+                      key={p.usuario_id}
+                      participante={p}
+                      registros={registros}
+                      userId={userId}
+                      esActividadHoy={hoy}
+                      puedeGestionar={canManageActive}
+                      onRegistrar={handleRegistrar}
+                      cargandoGPS={cargandoGPS}
+                      onVerMapa={() => setParticipanteMapa({
+                        nombre: p.profiles?.nombre || "Sin nombre",
+                        entrada: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "entrada") || null,
+                        salida: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "salida") || null
+                      })}
+                      isMuyTemprano={isMuyTemprano}
+                      isPastDate={isPastDate}
+                      isFinalizada={esFinalizada}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                {integrantes.map((p) => (
-                  <ParticipanteRow
-                    key={p.usuario_id}
-                    participante={p}
-                    registros={registros}
-                    userId={userId}
-                    esActividadHoy={hoy}
-                    puedeGestionar={canManageActive}
-                    onRegistrar={handleRegistrar}
-                    cargandoGPS={cargandoGPS}
-                    onVerMapa={() => setParticipanteMapa({
-                      nombre: p.profiles?.nombre || "Sin nombre",
-                      entrada: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "entrada") || null,
-                      salida: registros.find(r => r.usuario_id === p.usuario_id && r.tipo_registro === "salida") || null
-                    })}
-                    isMuyTemprano={isMuyTemprano}
-                    isPastDate={isPastDate}
-                    isFinalizada={esFinalizada}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {actividad.act_comude_participantes.length === 0 && (
-            <div className="px-3 sm:px-6 py-10 text-center text-muted-foreground text-sm">
-              <UserCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p>No hay miembros asignados a esta actividad.</p>
-            </div>
-          )}
+            {actividad.act_comude_participantes.length === 0 && (
+              <div className="px-3 sm:px-6 py-10 text-center text-muted-foreground text-sm">
+                <UserCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No hay miembros asignados a esta actividad.</p>
+              </div>
+            )}
           </div>
         )}
-        </div>
       </div>
+    </div>
   );
 
   return (
@@ -1414,7 +1397,7 @@ export default function DetalleActividadView({
         />
       )}
 
-      <EvidenciaVisorModal 
+      <EvidenciaVisorModal
         isOpen={evidenciaSelectedIndex !== null}
         paths={actividad?.img || []}
         initialIndex={evidenciaSelectedIndex ?? 0}
@@ -1434,9 +1417,9 @@ export default function DetalleActividadView({
         onClose={() => setIsSustituirModalOpen(false)}
         actComudeId={actividad.id}
         tituloActividad={actividad.detalles_sesion?.titulo || "Reunión de COMUDE"}
-        sustitutosDisponibles={sustitutosDisponibles}
-        cargandoSustitutos={isLoadingEstructura || isLoadingUsers}
-        esSuperOAdmin={esSuperOAdmin}
+        userId={userId}
+        effectiveRole={effectiveRole}
+        participantesActuales={actividad.act_comude_participantes}
       />
     </>
   );

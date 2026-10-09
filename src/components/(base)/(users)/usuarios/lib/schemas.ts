@@ -26,7 +26,7 @@ const baseFields = z.object({
     })
     .optional(),
   rol: z
-    .enum(["user", "admin", "super", "observatorio", "admin-observatorio"])
+    .enum(["cocode", "institucion", "admin", "super", "user"])
     .optional(),
   username: z
     .string()

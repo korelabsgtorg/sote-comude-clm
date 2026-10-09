@@ -502,30 +502,39 @@ function FilaPunto({
 
       {/* ACCIONES */}
       {canManage && (
-        <td className="px-2 py-2.5 w-16 text-center">
+        <td className="p-0 w-14 text-center align-middle">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors mx-auto flex items-center justify-center"
+                className="w-full h-full min-h-[44px] py-2.5 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors flex items-center justify-center cursor-pointer outline-none group"
                 title="Acciones"
               >
-                {eliminando ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
+                {eliminando ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="w-4 h-4 transition-transform group-hover:scale-110" />
+                )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36 z-[1100] bg-white dark:bg-zinc-950 shadow-lg border-border">
+            <DropdownMenuContent
+              side="left"
+              align="center"
+              sideOffset={8}
+              className="w-36 z-[1100] shadow-none border-2 border-border bg-popover text-popover-foreground"
+            >
               <DropdownMenuItem 
                 onClick={() => { setEditando(true); setTituloEdit(punto.titulo); }}
-                className="cursor-pointer"
+                className="cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
               >
-                <Pencil className="mr-2" />
+                <Pencil className="mr-2 w-4 h-4 text-azul-trifinio" />
                 <span>Editar</span>
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleEliminar}
                 disabled={eliminando}
-                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950"
+                className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
               >
-                <Trash2 className="mr-2" />
+                <Trash2 className="mr-2 w-4 h-4" />
                 <span>Eliminar</span>
               </DropdownMenuItem>
             </DropdownMenuContent>

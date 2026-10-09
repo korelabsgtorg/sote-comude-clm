@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useComisiones, useIntegrantesComisiones } from "./lib/hooks";
-import { ComisionesHeader } from "./components/ComisionesHeader";
-import { ComisionesList } from "./components/ComisionesList";
+import { ComisionesHeader } from "./ui/ComisionesHeader";
+import { ComisionesList } from "./ui/ComisionesList";
 import { CrearEditarComisionModal } from "./modals/CrearEditarComisionModal";
 import { AsignarIntegranteModal } from "./modals/AsignarIntegranteModal";
 import type { ComisionRecord } from "./lib/zod";
