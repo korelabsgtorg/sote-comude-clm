@@ -10,10 +10,13 @@ export interface LogoMunicipioItem {
   created_at: string;
 }
 
+export type TipoRegistroFirmaSello = "firma" | "sello";
+
 export interface FirmaMunicipioItem {
   id: string;
   titulo: string;
   path: string;
+  tipo?: TipoRegistroFirmaSello;
   created_at: string;
 }
 
@@ -24,6 +27,7 @@ export interface ConvocatoriaConfig {
   coordinador_nombre?: string | null;
   coordinador_puesto?: string | null;
   firma_path?: string | null;
+  sello_path?: string | null;
   destinatarios_default?: string | null;
 }
 

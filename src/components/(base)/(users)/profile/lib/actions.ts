@@ -34,6 +34,23 @@ export async function getProfileById(userId: string) {
     throw new Error(error.message);
   }
 
+  if (data) {
+    if (data.rol === "cocode") {
+      data.rol = "comude";
+    } else if (!data.rol) {
+      try {
+        const supabaseAdmin = getAdminClient();
+        const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (authData?.user?.user_metadata?.rol) {
+          const metaRol = authData.user.user_metadata.rol;
+          data.rol = metaRol === "cocode" ? "comude" : metaRol;
+        }
+      } catch (e) {
+        console.error("Error fetching auth user metadata fallback:", e);
+      }
+    }
+  }
+
   return data;
 }
 
@@ -43,16 +60,18 @@ export async function getUserAuthData(userId: string) {
   const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
 
   if (error || !data.user) {
-    return { username: "", phone: "", banned_until: null };
+    return { username: "", phone: "", banned_until: null, rol: null };
   }
 
   const meta = data.user.user_metadata || {};
   const userWithBan = data.user as { banned_until?: string } & typeof data.user;
+  const metaRol = meta.rol === "cocode" ? "comude" : meta.rol;
 
   return {
     username: meta.username || data.user.email?.split("@")[0] || "",
     phone: meta.phone || data.user.phone || "",
     banned_until: userWithBan.banned_until || null,
+    rol: metaRol || null,
   };
 }
 

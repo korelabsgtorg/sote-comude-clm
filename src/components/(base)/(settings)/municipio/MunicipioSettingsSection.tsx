@@ -11,6 +11,7 @@ import {
   Plus,
   FileImage,
   PenTool,
+  Stamp,
   FileText,
   UserCheck,
 } from "lucide-react";
@@ -23,7 +24,7 @@ import {
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { useStorageDisplayUrl } from "@/components/(uploads)/imgs/useStorageDisplayUrl";
 import { getInitialGlobalMunicipioState } from "@/components/(base)/layout/actions";
-import { LogoMunicipioItem, FirmaMunicipioItem, ConvocatoriaConfig } from "./actions";
+import { LogoMunicipioItem, FirmaMunicipioItem, ConvocatoriaConfig, TipoRegistroFirmaSello } from "./actions";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "react-toastify";
 
@@ -121,7 +122,18 @@ function FirmaCardItem({
         )}
       </div>
 
-      <div className="w-full text-center min-w-0">
+      <div className="w-full text-center min-w-0 space-y-1">
+        <div className="flex justify-center">
+          {item.tipo === "sello" ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <Stamp className="size-3" /> Sello
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+              <PenTool className="size-3" /> Firma
+            </span>
+          )}
+        </div>
         <h4 className="text-xs font-bold text-foreground truncate" title={item.titulo}>
           {item.titulo}
         </h4>
@@ -166,6 +178,7 @@ export default function MunicipioSettingsSection() {
 
   // Estado local para Banco de Firmas
   const [nuevoTituloFirma, setNuevoTituloFirma] = useState("");
+  const [nuevoTipoFirma, setNuevoTipoFirma] = useState<TipoRegistroFirmaSello>("firma");
   const [mostrarFormNuevaFirma, setMostrarFormNuevaFirma] = useState(false);
 
   // Estado local para Plantilla de Convocatoria
@@ -176,6 +189,7 @@ export default function MunicipioSettingsSection() {
     coordinador_nombre: "",
     coordinador_puesto: "",
     firma_path: "",
+    sello_path: "",
     destinatarios_default:
       "Síndicos Y Concejales\nRepresentantes De Los Consejos Comunitarios De Desarrollo De Primer Nivel\nRepresentantes De Las Entidades Públicas Con Presencia En El Municipio.\nApoyo de Oficinas con Presencia en la Municipalidad.",
   });
@@ -192,6 +206,7 @@ export default function MunicipioSettingsSection() {
           coordinador_nombre: config.convocatoria_config.coordinador_nombre ?? "",
           coordinador_puesto: config.convocatoria_config.coordinador_puesto ?? "",
           firma_path: config.convocatoria_config.firma_path ?? "",
+          sello_path: config.convocatoria_config.sello_path ?? "",
           destinatarios_default:
             config.convocatoria_config.destinatarios_default ??
             "Síndicos Y Concejales\nRepresentantes De Los Consejos Comunitarios De Desarrollo De Primer Nivel\nRepresentantes De Las Entidades Públicas Con Presencia En El Municipio.\nApoyo de Oficinas con Presencia en la Municipalidad.",
@@ -324,11 +339,13 @@ export default function MunicipioSettingsSection() {
 
   // Manejadores para Banco de Firmas
   const handleFirmaUploadSuccess = async (newPath: string) => {
-    const tituloFinal = nuevoTituloFirma.trim() || `Firma ${currentFirmas.length + 1}`;
+    const tipoLabel = nuevoTipoFirma === "sello" ? "Sello" : "Firma";
+    const tituloFinal = nuevoTituloFirma.trim() || `${tipoLabel} ${currentFirmas.length + 1}`;
     const newItem: FirmaMunicipioItem = {
-      id: `firma_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: `${nuevoTipoFirma}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       titulo: tituloFinal,
       path: newPath,
+      tipo: nuevoTipoFirma,
       created_at: new Date().toISOString(),
     };
 
@@ -345,8 +362,10 @@ export default function MunicipioSettingsSection() {
       },
       {
         onSuccess: () => {
-          toast.success(`Firma "${tituloFinal}" agregada al banco.`);
+          const tipoLabel = nuevoTipoFirma === "sello" ? "Sello" : "Firma";
+          toast.success(`${tipoLabel} "${tituloFinal}" agregado al banco con éxito.`);
           setNuevoTituloFirma("");
+          setNuevoTipoFirma("firma");
           setMostrarFormNuevaFirma(false);
         },
         onError: (err) => toast.error(err.message),
@@ -566,8 +585,8 @@ export default function MunicipioSettingsSection() {
                   onUploadSuccess={handleLogoUploadSuccess}
                   onDeleteSuccess={async () => {}}
                   disabled={isPending || !nuevoTituloLogo.trim()}
-                  aspect={1}
-                  aspectLabel="Cuadrado 1:1"
+                  aspect={nuevoTipoFirma === "sello" ? 1 : 2.5}
+                  aspectLabel={nuevoTipoFirma === "sello" ? "Cuadrado 1:1" : "Panorámico (Firma)"}
                   maxSizeMB={0.5}
                   maxDimension={1024}
                   folderPath={logoFolderPath}
@@ -655,11 +674,35 @@ export default function MunicipioSettingsSection() {
               <input
                 id="firma-titulo"
                 type="text"
-                placeholder="Ej: Firma Telmo (Coordinador), Sello Oficial COMUDE..."
+                placeholder={nuevoTipoFirma === "sello" ? "Ej: Sello Oficial" : "Ej: Firma del Coordinador"}
                 value={nuevoTituloFirma}
                 onChange={(e) => setNuevoTituloFirma(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
+            </div>
+
+            <div className="space-y-1.5 max-w-md">
+              <label className="text-xs font-semibold text-foreground">
+                Tipo de Registro
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNuevoTipoFirma("firma")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${nuevoTipoFirma === "firma" ? "bg-purple-600 text-white border-purple-600 shadow-xs" : "bg-background text-muted-foreground border-border hover:bg-muted"}`}
+                >
+                  <PenTool className="size-3.5" />
+                  Firma Digital
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNuevoTipoFirma("sello")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${nuevoTipoFirma === "sello" ? "bg-amber-600 text-white border-amber-600 shadow-xs" : "bg-background text-muted-foreground border-border hover:bg-muted"}`}
+                >
+                  <Stamp className="size-3.5" />
+                  Sello Oficial
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -686,7 +729,7 @@ export default function MunicipioSettingsSection() {
               )}
               {!nuevoTituloFirma.trim() && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                  * Ingrese un título arriba para habilitar la carga de la firma.
+                  * Ingrese un título arriba para habilitar la carga {nuevoTipoFirma === "sello" ? "del sello" : "de la firma"}.
                 </p>
               )}
             </div>
@@ -813,25 +856,49 @@ export default function MunicipioSettingsSection() {
             )}
           </div>
 
-          {/* Firma / Sello Predeterminado */}
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <PenTool className="size-4 text-purple-500" /> Firma / Sello Predeterminado
-            </label>
-            <select
-              value={convocatoriaForm.firma_path || ""}
-              onChange={(e) =>
-                setConvocatoriaForm((prev) => ({ ...prev, firma_path: e.target.value }))
-              }
-              className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Sin firma / sello por defecto --</option>
-              {currentFirmas.map((firma) => (
-                <option key={firma.id} value={firma.path}>
-                  {firma.titulo}
-                </option>
-              ))}
-            </select>
+          {/* Columna Derecha: Firma y Sello Predeterminados (a la par de Coordinador y Firmante) */}
+          <div className="space-y-4">
+            {/* Firma Predeterminada */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <PenTool className="size-4 text-purple-500" /> Firma Predeterminada
+              </label>
+              <select
+                value={convocatoriaForm.firma_path || ""}
+                onChange={(e) =>
+                  setConvocatoriaForm((prev) => ({ ...prev, firma_path: e.target.value }))
+                }
+                className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Sin firma por defecto --</option>
+                {currentFirmas.map((firma) => (
+                  <option key={firma.id} value={firma.path}>
+                    {firma.tipo === "sello" ? `[Sello] ${firma.titulo}` : firma.titulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sello Oficial Predeterminado (debajo de Firma y a la par de la caja de Firmante) */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <Stamp className="size-4 text-amber-500" /> Sello Oficial Predeterminado
+              </label>
+              <select
+                value={convocatoriaForm.sello_path || ""}
+                onChange={(e) =>
+                  setConvocatoriaForm((prev) => ({ ...prev, sello_path: e.target.value }))
+                }
+                className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Sin sello por defecto --</option>
+                {currentFirmas.map((firma) => (
+                  <option key={firma.id} value={firma.path}>
+                    {firma.tipo === "sello" ? firma.titulo : `[Firma] ${firma.titulo}`}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 

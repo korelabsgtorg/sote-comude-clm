@@ -62,7 +62,7 @@ if (user) {
         return NextResponse.redirect(url);
       }
     } else {
-      if (pathname === "/comude/cambiar-password" || pathname === "/login") {
+      if (pathname === "/comude/cambiar-password" || pathname === "/login" || pathname === "/") {
         const url = request.nextUrl.clone();
         url.pathname = "/comude";
         return NextResponse.redirect(url);

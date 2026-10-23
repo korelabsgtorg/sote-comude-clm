@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Loader2, CalendarDays, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarClock, CalendarCheck } from "lucide-react";
+import { Search, Loader2, CalendarDays, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarClock, CalendarCheck, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useActividades } from "./lib/hooks";
+import { useActividades, useTodasActividadesComude } from "./lib/hooks";
 import ActividadesItem from "./ActividadesItem";
 import MonthPicker from "./modals/MonthPicker";
+import ListaActividadesAsignadasComude from "./ListaActividadesAsignadasComude";
 
 interface ListActividadesProps {
   userId?: string | null;
@@ -15,7 +16,7 @@ interface ListActividadesProps {
   onCrearClick: () => void;
 }
 
-type VistaType = 'hoy' | 'proximas' | 'terminadas';
+type VistaType = 'hoy' | 'proximas' | 'terminadas' | 'actividades';
 
 function diasRestantes(fechaStr: string) {
   const fecha = new Date(fechaStr);
@@ -36,6 +37,15 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: actividades, isLoading, isError, refetch } = useActividades(year, month);
+  const { data: todasActividades = [], isLoading: cargandoTodasActividades } = useTodasActividadesComude();
+
+  const handleIrASesion = (comudeId: string, comudeFecha: string) => {
+    const dias = diasRestantes(comudeFecha);
+    if (dias === 0) setVista('hoy');
+    else if (dias > 0) setVista('proximas');
+    else setVista('terminadas');
+    setExpandedId(comudeId);
+  };
 
   // Calcular counts y filtrar por vista
   const actividadesFiltradas = useMemo(() => {
@@ -75,12 +85,16 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
 
   useEffect(() => {
     if (!isLoading && !hasAutoSelected && actividades) {
+      if (vista === 'actividades') {
+        setHasAutoSelected(true);
+        return;
+      }
       if (counts.hoy > 0) setVista('hoy');
       else if (counts.proximas > 0) setVista('proximas');
       else if (counts.terminadas > 0) setVista('terminadas');
       setHasAutoSelected(true);
     }
-  }, [isLoading, hasAutoSelected, actividades, counts]);
+  }, [isLoading, hasAutoSelected, actividades, counts, vista]);
 
   // Reset auto-select flag when month/year changes
   useEffect(() => {
@@ -145,63 +159,112 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
               {vista === 'terminadas' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-600 dark:bg-red-400" />}
             </button>
           )}
+
+          {/* Pestaña Actividades Asignadas — empujada a la derecha en PC mediante sm:ml-auto */}
+          {(todasActividades.length > 0 || vista === 'actividades' || cargandoTodasActividades) && (
+            <button
+              onClick={() => setVista('actividades')}
+              className={cn(
+                "relative flex shrink-0 items-center gap-1.5 px-2 py-1 text-sm font-medium transition-colors whitespace-nowrap sm:ml-auto",
+                vista === 'actividades'
+                  ? "text-purple-600 dark:text-purple-400"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <ClipboardList className="h-4 w-4" />
+              <span>Actividades Asignadas</span>
+              {todasActividades.length > 0 && (
+                <span
+                  className={cn(
+                    "ml-0.5 rounded-full px-1.5 py-0.2 text-[11px] font-semibold",
+                    vista === 'actividades'
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {todasActividades.length}
+                </span>
+              )}
+              {vista === 'actividades' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-purple-600 dark:bg-purple-400"
+                />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Estados de carga / error / vacío */}
-      {isLoading && (
-        <div className="flex justify-center py-8">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-        </div>
-      )}
-
-      {isError && (
-        <div className="text-center py-6 text-sm text-destructive">
-          Error al cargar las actividades.
-          <button onClick={() => refetch()} className="ml-1 underline">
-            Reintentar
-          </button>
-        </div>
-      )}
-
-      {!isLoading && !isError && actividadesFiltradas.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-8 text-muted-foreground text-sm"
-        >
-          <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p>
-            {searchQuery 
-              ? "No se encontraron actividades con esa búsqueda." 
-              : "No hay actividades registradas en este mes."}
-          </p>
-          {puedeGestionar && (
-            <button
-              onClick={onCrearClick}
-              className="mt-3 text-azul-trifinio font-semibold underline underline-offset-2 text-xs"
-            >
-              Crear primera actividad
-            </button>
+      {/* Renderizado condicional según vista */}
+      {vista === 'actividades' ? (
+        <ListaActividadesAsignadasComude
+          filtroAnio={year}
+          filtroMes={month}
+          searchQuery={searchQuery}
+          puedeGestionar={puedeGestionar}
+          effectiveRole={effectiveRole}
+          userId={userId}
+          onIrASesion={handleIrASesion}
+        />
+      ) : (
+        <>
+          {/* Estados de carga / error / vacío para sesiones */}
+          {isLoading && (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
           )}
-        </motion.div>
-      )}
 
-      {/* Lista */}
-      {!isLoading && !isError && actividadesFiltradas.length > 0 && (
-        <div className="space-y-2.5">
-          {actividadesFiltradas.map((act) => (
-            <ActividadesItem
-              key={act.id}
-              actividad={act}
-              userId={userId}
-              puedeGestionar={puedeGestionar}
-              effectiveRole={effectiveRole}
-              isExpanded={expandedId === act.id}
-              onToggle={() => setExpandedId(expandedId === act.id ? null : act.id)}
-            />
-          ))}
-        </div>
+          {isError && (
+            <div className="text-center py-6 text-sm text-destructive">
+              Error al cargar las actividades.
+              <button onClick={() => refetch()} className="ml-1 underline">
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !isError && actividadesFiltradas.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-8 text-muted-foreground text-sm"
+            >
+              <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p>
+                {searchQuery 
+                  ? "No se encontraron actividades con esa búsqueda." 
+                  : "No hay actividades registradas en este mes."}
+              </p>
+              {puedeGestionar && (
+                <button
+                  onClick={onCrearClick}
+                  className="mt-3 text-azul-trifinio font-semibold underline underline-offset-2 text-xs"
+                >
+                  Crear primera actividad
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* Lista de sesiones */}
+          {!isLoading && !isError && actividadesFiltradas.length > 0 && (
+            <div className="space-y-2.5">
+              {actividadesFiltradas.map((act) => (
+                <ActividadesItem
+                  key={act.id}
+                  actividad={act}
+                  userId={userId}
+                  puedeGestionar={puedeGestionar}
+                  effectiveRole={effectiveRole}
+                  isExpanded={expandedId === act.id}
+                  onToggle={() => setExpandedId(expandedId === act.id ? null : act.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

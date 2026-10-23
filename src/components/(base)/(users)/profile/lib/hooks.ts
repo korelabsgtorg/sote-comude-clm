@@ -14,7 +14,7 @@ export const useProfile = (userId: string, isEnabled: boolean = true) => {
     queryKey: ["profile", userId],
     queryFn: () => getProfileById(userId),
     enabled: !!userId && isEnabled,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
 

@@ -354,12 +354,13 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Obtener la fecha, ubicación y participantes previos con sus confirmaciones
+  // Obtener la fecha, ubicación, convocatoria y participantes previos con sus confirmaciones
   const { data: actividadPrevia } = await supabase
     .from("act_comude")
     .select(`
       fecha,
       ubicacion,
+      convocatoria,
       act_comude_participantes (
         usuario_id,
         confirmed_at
@@ -367,6 +368,11 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
     `)
     .eq("id", id)
     .single();
+
+  const tieneConvocatoriaActiva = Boolean(
+    actividadPrevia?.convocatoria &&
+    (actividadPrevia.convocatoria.emitida || actividadPrevia.convocatoria.created_at)
+  );
 
   const nuevaFechaIso = new Date(values.fecha).toISOString();
   const cambioDeFecha = actividadPrevia
@@ -379,7 +385,8 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
     ? ubicacionPrevia.toLowerCase() !== nuevaUbicacion.toLowerCase()
     : false;
 
-  const requiereNotificacion = cambioDeFecha || cambioDeLugar;
+  const cambioReunion = cambioDeFecha || cambioDeLugar;
+  const requiereNotificacion = tieneConvocatoriaActiva && cambioReunion;
 
   // Mapa de confirmaciones previas por usuario_id
   const confirmedMap = new Map<string, string | null>();
@@ -389,7 +396,7 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
     });
   }
 
-  // Actualizar la actividad (si cambió la fecha, reiniciar la convocatoria)
+  // Actualizar la actividad
   const actUpdatePayload: Record<string, any> = {
     detalles_sesion: {
       titulo: values.titulo,
@@ -401,8 +408,18 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
     ubicacion: nuevaUbicacion,
   };
 
-  if (cambioDeFecha) {
-    actUpdatePayload.convocatoria = null;
+  // Gestión de convocatoria:
+  // Si hay convocatoria activa, no se resetea a null; si cambió fecha o lugar, se actualiza created_at con timestamptz
+  if (tieneConvocatoriaActiva && actividadPrevia?.convocatoria) {
+    if (cambioReunion) {
+      actUpdatePayload.convocatoria = {
+        ...actividadPrevia.convocatoria,
+        emitida: true,
+        created_at: new Date().toISOString(),
+      };
+    } else {
+      actUpdatePayload.convocatoria = actividadPrevia.convocatoria;
+    }
   }
 
   const { error: actError } = await supabase
@@ -433,7 +450,7 @@ export async function editarActividadComude(id: string, values: CrearActividadVa
 
     if (partError) throw new Error(partError.message);
 
-    // Solo enviar notificación PUSH cuando se edite la fecha o el lugar de la reunión
+    // Solo enviar notificación PUSH cuando haya convocatoria activa Y se edite la fecha o el lugar de la reunión
     if (requiereNotificacion) {
       const targetIds = values.participantes.map((p) => p.usuario_id);
 
@@ -582,7 +599,24 @@ export async function getPuntosDeActividad(actComudeId: string): Promise<ActComu
     .order("orden", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as ActComudePunto[];
+  const puntos = (data ?? []) as ActComudePunto[];
+  if (puntos.length === 0) return [];
+
+  const puntoIds = puntos.map((p) => p.id);
+  const { data: enlaces } = await supabase
+    .from("tra_actividad_comude_enlaces")
+    .select("punto_comude_id")
+    .in("punto_comude_id", puntoIds);
+
+  const conteos: Record<string, number> = {};
+  (enlaces || []).forEach((e: any) => {
+    conteos[e.punto_comude_id] = (conteos[e.punto_comude_id] || 0) + 1;
+  });
+
+  return puntos.map((p) => ({
+    ...p,
+    actividades_count: conteos[p.id] || 0,
+  }));
 }
 
 /** Crea un nuevo punto de agenda */

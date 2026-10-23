@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
-import { Paperclip, Trash2, Pencil, Plus, Loader2, ChevronDown, FileText, X, MoreVertical } from "lucide-react";
+import { Paperclip, Trash2, Pencil, Plus, Loader2, ChevronDown, FileText, X, MoreVertical, ClipboardList } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ import Swal from "sweetalert2";
 import GestorArchivosPuntoModal from "./modals/GestorArchivosPuntoModal";
 import CategoriasModal from "./modals/CategoriasModal";
 import NotasModal from "./modals/NotasModal";
+import ActividadesPuntoModal from "./modals/ActividadesPuntoModal";
 
 // ─── Constantes ────────────────────────────────────────────
 const ESTADOS = ["No iniciado", "En progreso", "En espera", "Aprobado", "No aprobado", "Realizado"];
@@ -170,6 +171,7 @@ function FilaPunto({
   const [editando, setEditando] = useState(false);
   const [tituloEdit, setTituloEdit] = useState(punto.titulo);
   const [isArchivosModalOpen, setIsArchivosModalOpen] = useState(false);
+  const [isActividadesModalOpen, setIsActividadesModalOpen] = useState(false);
 
   const { mutateAsync: actualizarPunto, isPending: actualizando } = useActualizarPunto();
   const { mutateAsync: eliminarPunto, isPending: eliminando } = useEliminarPunto();
@@ -199,6 +201,7 @@ function FilaPunto({
   };
 
   const totalArchivos = punto.act_comude_archivos?.length ?? 0;
+  const totalActividades = punto.actividades_count ?? 0;
 
   if (isMobile) {
     return (
@@ -214,6 +217,23 @@ function FilaPunto({
               <span className={cn("text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-current/15", colorEstado(punto.estado))}>
                 {punto.estado ?? "No iniciado"}
               </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsActividadesModalOpen(true);
+                }}
+                className={cn(
+                  "text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all flex items-center gap-1 cursor-pointer select-none",
+                  totalActividades > 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
+                    : "bg-muted/60 text-muted-foreground border-border/70 hover:border-emerald-500/50"
+                )}
+                title="Ver actividades y acuerdos del punto"
+              >
+                <ClipboardList className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                <span>{totalActividades} {totalActividades === 1 ? "actividad" : "actividades"}</span>
+              </button>
             </div>
             {editando ? (
               <div className="flex gap-1.5 items-center mt-1" onClick={e => e.stopPropagation()}>
@@ -380,6 +400,13 @@ function FilaPunto({
         actComudeId={actComudeId}
         canManage={canManage}
       />
+      <ActividadesPuntoModal
+        isOpen={isActividadesModalOpen}
+        onClose={() => setIsActividadesModalOpen(false)}
+        punto={punto}
+        actComudeId={actComudeId}
+        canManage={canManage}
+      />
       </>
     );
   }
@@ -409,7 +436,7 @@ function FilaPunto({
       </td>
 
       {/* PUNTO A TRATAR */}
-      <td className="px-3 py-2.5 min-w-[180px] border-r border-zinc-200 dark:border-zinc-800/80">
+      <td className="px-1 py-2.5 w-[24%] min-w-[200px] max-w-[340px] border-r border-zinc-200 dark:border-zinc-800/80">
         {editando ? (
           <div className="flex gap-1.5 items-center">
             <input
@@ -428,7 +455,7 @@ function FilaPunto({
             <button onClick={() => { setEditando(false); setTituloEdit(punto.titulo); }} className="text-xs bg-muted px-2 py-0.5 rounded">✕</button>
           </div>
         ) : (
-          <span className="text-sm text-foreground font-medium">{punto.titulo}</span>
+          <span className="text-sm text-foreground font-medium break-words leading-snug block">{punto.titulo}</span>
         )}
       </td>
 
@@ -455,23 +482,22 @@ function FilaPunto({
       </td>
 
       {/* CATEGORÍA */}
-      <td className="px-3 py-2.5 w-36 border-r border-zinc-200 dark:border-zinc-800/80">
-        {canManage ? (
-          <button
-            onClick={() => onOpenCategoriasModal(punto.id)}
-            className="flex justify-between items-center text-xs text-foreground bg-transparent outline-none cursor-pointer border-0 w-full hover:bg-muted/50 rounded px-1.5 py-1 transition-colors"
-          >
-            <span className="truncate">{punto.categoria?.nombre ?? "Sin categoría"}</span>
-            <ChevronDown className="w-3 h-3 opacity-60 ml-1 shrink-0" />
-          </button>
-        ) : (
-          <span className="text-xs text-foreground">{punto.categoria?.nombre ?? "—"}</span>
+      <td
+        onClick={() => canManage && onOpenCategoriasModal(punto.id)}
+        className={cn(
+          "px-3 py-2.5 w-36 border-r border-zinc-200 dark:border-zinc-800/80 text-center transition-colors select-none",
+          canManage && "cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
         )}
+        title={canManage ? "Clic para cambiar categoría" : undefined}
+      >
+        <span className="text-xs text-foreground font-medium block truncate">
+          {punto.categoria?.nombre ?? (canManage ? "Sin categoría" : "—")}
+        </span>
       </td>
 
       {/* NOTAS */}
       {(sesionEstado !== "Programada" && sesionEstado != null) && (
-        <td className="px-3 py-2.5 min-w-[200px] max-w-[300px] border-r border-zinc-200 dark:border-zinc-800/80">
+        <td className="px-1 py-2.5 min-w-[280px] border-r border-zinc-200 dark:border-zinc-800/80">
           <div className="flex flex-col gap-2 w-full justify-start items-start">
             {punto.notas && punto.notas.length > 0 ? (
               <div className="w-full flex flex-col gap-1 max-h-24 overflow-y-auto custom-scrollbar pr-1" onClick={() => canManage && onOpenNotasModal(punto)}>
@@ -499,6 +525,31 @@ function FilaPunto({
           </div>
         </td>
       )}
+
+      {/* ACTIVIDADES / ACUERDOS */}
+      <td
+        onClick={() => setIsActividadesModalOpen(true)}
+        className={cn(
+          "px-2 py-2.5 text-center w-36 align-middle cursor-pointer select-none group",
+          canManage && "border-r border-zinc-200 dark:border-zinc-800/80"
+        )}
+        title={canManage ? "Clic para ver o asignar actividades" : "Clic para ver actividades"}
+      >
+        <div className="w-full h-full flex items-center justify-center">
+          {totalActividades === 0 ? (
+            <span className="text-xs text-gray-400 dark:text-gray-500 italic transition-colors select-none group-hover:text-foreground dark:group-hover:text-zinc-200">
+              Sin actividades
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-150 border shadow-2xs select-none w-full max-w-[130px] bg-emerald-50 text-emerald-700 border-emerald-300 group-hover:bg-emerald-100 group-hover:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 dark:group-hover:bg-emerald-900/60 dark:group-hover:border-emerald-700">
+              <ClipboardList className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="truncate">
+                {totalActividades} {totalActividades === 1 ? "actividad" : "actividades"}
+              </span>
+            </span>
+          )}
+        </div>
+      </td>
 
       {/* ACCIONES */}
       {canManage && (
@@ -545,6 +596,13 @@ function FilaPunto({
     <GestorArchivosPuntoModal
       isOpen={isArchivosModalOpen}
       onClose={() => setIsArchivosModalOpen(false)}
+      punto={punto}
+      actComudeId={actComudeId}
+      canManage={canManage}
+    />
+    <ActividadesPuntoModal
+      isOpen={isActividadesModalOpen}
+      onClose={() => setIsActividadesModalOpen(false)}
       punto={punto}
       actComudeId={actComudeId}
       canManage={canManage}
@@ -639,20 +697,21 @@ export default function TablaPuntosAgenda({ puntos, actComudeId, canManage, isAd
             <tr className="border-b border-zinc-300 dark:border-zinc-700 text-foreground dark:text-zinc-200 bg-muted/40 dark:bg-zinc-900/80 font-semibold">
               <th className="px-2 py-2.5 text-center w-8 border-r border-zinc-300 dark:border-zinc-700/70">#</th>
               <th className="px-2 py-2.5 text-center w-12 border-r border-zinc-300 dark:border-zinc-700/70">DOCS</th>
-              <th className="px-3 py-2.5 text-left border-r border-zinc-300 dark:border-zinc-700/70">PUNTO A TRATAR</th>
+              <th className="px-1 py-2.5 text-left w-[24%] min-w-[200px] max-w-[340px] border-r border-zinc-300 dark:border-zinc-700/70">PUNTO A TRATAR</th>
               <th className="px-2 py-2.5 text-center w-36 border-r border-zinc-300 dark:border-zinc-700/70">ESTADO</th>
               <th className="px-2 py-2.5 text-center w-32 border-r border-zinc-300 dark:border-zinc-700/70">VOTACIÓN</th>
-              <th className="px-3 py-2.5 text-left w-36 border-r border-zinc-300 dark:border-zinc-700/70">CATEGORÍA</th>
+              <th className="px-3 py-2.5 text-center w-36 border-r border-zinc-300 dark:border-zinc-700/70">CATEGORÍA</th>
               {(sesionEstado !== "Programada" && sesionEstado != null) && (
-                <th className="px-3 py-2.5 text-left min-w-[160px] border-r border-zinc-300 dark:border-zinc-700/70">NOTAS</th>
+                <th className="px-1 py-2.5 text-left min-w-[280px] border-r border-zinc-300 dark:border-zinc-700/70">NOTAS</th>
               )}
+              <th className={cn("px-2 py-2.5 text-center w-36", canManage && "border-r border-zinc-300 dark:border-zinc-700/70")}>ACTIVIDADES</th>
               {canManage && <th className="px-2 py-2.5 text-center w-16">ACCIONES</th>}
             </tr>
           </thead>
           <tbody>
             {puntosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={canManage ? (sesionEstado !== "Programada" && sesionEstado != null ? 8 : 7) : (sesionEstado !== "Programada" && sesionEstado != null ? 7 : 6)} className="text-center py-8 text-sm text-muted-foreground dark:text-gray-300 italic">
+                <td colSpan={7 + (sesionEstado !== "Programada" && sesionEstado != null ? 1 : 0) + (canManage ? 1 : 0)} className="text-center py-8 text-sm text-muted-foreground dark:text-gray-300 italic">
                   {filtroEstado ? "No hay puntos con este estado." : `No hay puntos de agenda. ${canManage ? "Agrega el primero abajo." : ""}`}
                 </td>
               </tr>

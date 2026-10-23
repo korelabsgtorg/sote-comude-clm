@@ -35,6 +35,14 @@ export const DASHBOARD_MODULES: DashboardModule[] = [
   },
   */
   {
+    id: "actividades",
+    title: "Actividades",
+    subtitle: "Colaborativas",
+    desc: "Gestión de actividades individuales, colaborativas y acuerdos del COMUDE.",
+    animatedIcon: "kthelypq",
+    href: "/comude/actividades",
+  },
+  {
     id: "estructuras",
     title: "Estructuras",
     subtitle: "Org. y Territorial",
@@ -71,6 +79,52 @@ export const OBSERVATORIO_MENU_OPTIONS = [
     animatedIcon: "qqvpjphn",
   },
 ] as const;
+
+export const ACTIVIDADES_MENU_OPTIONS = [
+  {
+    id: "mis-actividades",
+    title: "Mis Actividades",
+    desc: "Tus actividades personales y acuerdos asignados.",
+    href: "/comude/actividades",
+  },
+  {
+    id: "jefatura-actividades",
+    title: "Actividades de mi Equipo",
+    desc: "Seguimiento de miembros de tu equipo u oficina.",
+    href: "/comude/actividades/jefatura",
+  },
+  {
+    id: "supervision-actividades",
+    title: "Actividades Globales",
+    desc: "Actividades de todo el municipio divididas por dependencia.",
+    href: "/comude/actividades/supervision",
+  },
+] as const;
+
+export function isSuperRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return role.toLowerCase().trim() === "super";
+}
+
+export function getVisibleActividadesOptions<T extends { id: string }>(
+  options: readonly T[],
+  role: string,
+  esJefe: boolean = false,
+): T[] {
+  const isSuper = isSuperRole(role);
+  const isSuperOrAdmin = isSuperOrAdminRole(role);
+
+  return options.filter((opt) => {
+    if (opt.id === "mis-actividades") return true;
+    if (opt.id === "jefatura-actividades") {
+      return isSuper || esJefe;
+    }
+    if (opt.id === "supervision-actividades") {
+      return isSuperOrAdmin;
+    }
+    return true;
+  });
+}
 
 export const PERFIL_MENU_OPTIONS = [
   {
@@ -117,8 +171,10 @@ export const ADMIN_MENU_OPTIONS = [
   },
 ] as const;
 
-export function isSuperOrAdminRole(role: string): boolean {
-  return role === "super" || role === "admin";
+export function isSuperOrAdminRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const normalized = role.toLowerCase().trim();
+  return normalized === "super" || normalized === "admin" || normalized === "administrador";
 }
 
 export function getVisibleAdminOptions<T extends { id: string }>(

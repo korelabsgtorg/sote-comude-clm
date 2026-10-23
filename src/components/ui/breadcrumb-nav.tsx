@@ -124,7 +124,8 @@ export function BreadcrumbNav() {
 
               const href = `/${rawSegments.slice(0, index + 1).join("/")}`;
               const isLast = index === segments.length - 1;
-              const displayLabel = segment.replace(uuidRegex, "").replace(/^-/, "").replace(/-/g, " ");
+              const cleanSeg = segment.replace(uuidRegex, "").replace(/^-/, "").replace(/-/g, " ");
+              const displayLabel = cleanSeg.toLowerCase() === "tareas" ? "Actividades" : cleanSeg;
 
               return (
                 <motion.div

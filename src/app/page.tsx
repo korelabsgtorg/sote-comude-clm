@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/(base)/providers/UserProvider";
 import { Suspense } from "react";
 import LoginForm from "@/components/(base)/(auth)/login/LogIn";
+import { Loader2 } from "lucide-react";
 
 export default function HomePage() {
   const user = useUser();
@@ -12,12 +13,16 @@ export default function HomePage() {
 
   useEffect(() => {
     if (user) {
-      router.push("/comude");
+      router.replace("/comude");
     }
   }, [user, router]);
 
   if (user) {
-    return null;
+    return (
+      <div className="flex h-[60vh] w-full items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-azul-trifinio" />
+      </div>
+    );
   }
 
   return (

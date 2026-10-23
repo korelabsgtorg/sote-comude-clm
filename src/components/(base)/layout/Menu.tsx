@@ -7,7 +7,9 @@ import { usePathname } from "next/navigation";
 import Swal from "sweetalert2";
 import {
   BookOpen,
+  Building2,
   ChevronDown,
+  ClipboardList,
   FileText,
   Globe,
   Home,
@@ -26,11 +28,12 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { AuroraText } from "@/components/ui/aurora-text";
-import { PushNotificationToggle } from "@/components/ui/PushNotificationToggle";
 import {
+  ACTIVIDADES_MENU_OPTIONS,
   ADMIN_MENU_OPTIONS,
   OBSERVATORIO_MENU_OPTIONS,
   getPerfilMenuOptions,
+  getVisibleActividadesOptions,
   getVisibleAdminOptions,
   getVisibleDashboardModules,
   type DashboardModule,
@@ -43,6 +46,9 @@ import { GlobalMunicipioSelector } from "./GlobalMunicipioSelector";
 import { ROLE_LABELS } from "@/components/(base)/(users)/usuarios/lib/permissions";
 
 const MENU_OPTION_ICONS: Record<string, LucideIcon> = {
+  "mis-actividades": ClipboardList,
+  "jefatura-actividades": Users,
+  "supervision-actividades": Building2,
   "movilidad-humana": Globe,
   "mi-perfil": User,
   "ingreso-seguro": KeyRound,
@@ -52,6 +58,8 @@ const MENU_OPTION_ICONS: Record<string, LucideIcon> = {
 };
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
+  actividades: ClipboardList,
+  tareas: ClipboardList,
   observatorio: Globe,
   perfil: User,
   admin: Settings,
@@ -66,12 +74,25 @@ type MenuAccordionOption = {
   href?: string;
 };
 
-function MenuAccordionIcon({ optionId }: { optionId: string }) {
+function MenuAccordionIcon({
+  optionId,
+  variant = "modules",
+}: {
+  optionId: string;
+  variant?: MenuSectionVariant;
+}) {
   const Icon = MENU_OPTION_ICONS[optionId] ?? User;
-  return <Icon className="size-4 shrink-0 text-celeste-trifinio" strokeWidth={2} aria-hidden />;
+  const iconColor =
+    variant === "actividades"
+      ? "text-blue-600 dark:text-blue-400"
+      : variant === "account"
+        ? "text-violet-600 dark:text-violet-400"
+        : "text-celeste-trifinio";
+
+  return <Icon className={cn("size-4 shrink-0", iconColor)} strokeWidth={2} aria-hidden />;
 }
 
-type MenuSectionVariant = "modules" | "account" | "admin";
+type MenuSectionVariant = "modules" | "account" | "admin" | "actividades";
 
 const MENU_SECTION_STYLES: Record<
   MenuSectionVariant,
@@ -101,6 +122,14 @@ const MENU_SECTION_STYLES: Record<
     itemHover: "hover:bg-sky-100/70 dark:hover:bg-sky-900/35",
     itemActive: "bg-celeste-trifinio/15 dark:bg-celeste-trifinio/25 ring-1 ring-inset ring-celeste-trifinio/35",
   },
+  actividades: {
+    label: "text-blue-600 dark:text-blue-400",
+    dot: "bg-blue-500",
+    panel: "bg-blue-50/80 dark:bg-blue-950/35 ring-1 ring-blue-200/60 dark:ring-blue-800/40",
+    item: "bg-white/85 dark:bg-blue-950/45",
+    itemHover: "hover:bg-blue-100/70 dark:hover:bg-blue-900/35",
+    itemActive: "bg-blue-100/80 dark:bg-blue-900/50 ring-1 ring-inset ring-blue-300/60 dark:ring-blue-600/50",
+  },
 };
 
 function MenuActiveIndicator({
@@ -111,9 +140,11 @@ function MenuActiveIndicator({
   variant?: MenuSectionVariant;
 }) {
   const accent =
-    variant === "account"
-      ? "bg-violet-500"
-      : "bg-celeste-trifinio";
+    variant === "actividades"
+      ? "bg-blue-500"
+      : variant === "account"
+        ? "bg-violet-500"
+        : "bg-celeste-trifinio";
 
   return (
     <span
@@ -213,13 +244,17 @@ function MenuAccordion({
   const isExpanded = open || isRouteActive;
   const styles = MENU_SECTION_STYLES[variant];
   const titleAccent =
-    variant === "account"
+    variant === "actividades"
       ? isExpanded
-        ? "text-violet-700 dark:text-violet-300"
+        ? "text-blue-600 dark:text-blue-400"
         : "text-foreground"
-      : isExpanded
-        ? "text-celeste-trifinio"
-        : "text-foreground";
+      : variant === "account"
+        ? isExpanded
+          ? "text-violet-700 dark:text-violet-300"
+          : "text-foreground"
+        : isExpanded
+          ? "text-celeste-trifinio"
+          : "text-foreground";
 
   return (
     <MenuItemShell variant={variant} active={isExpanded} id={id}>
@@ -234,16 +269,22 @@ function MenuAccordion({
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-lg",
             isExpanded
-              ? variant === "account"
-                ? "bg-violet-500/15 dark:bg-violet-500/25"
-                : "bg-celeste-trifinio/15 dark:bg-celeste-trifinio/25"
+              ? variant === "actividades"
+                ? "bg-blue-500/15 dark:bg-blue-500/25"
+                : variant === "account"
+                  ? "bg-violet-500/15 dark:bg-violet-500/25"
+                  : "bg-celeste-trifinio/15 dark:bg-celeste-trifinio/25"
               : "bg-zinc-100 dark:bg-zinc-800",
           )}
         >
           <HeaderIcon
             className={cn(
               "size-4",
-              variant === "account" ? "text-violet-600 dark:text-violet-300" : "text-celeste-trifinio",
+              variant === "actividades"
+                ? "text-blue-600 dark:text-blue-400"
+                : variant === "account"
+                  ? "text-violet-600 dark:text-violet-300"
+                  : "text-celeste-trifinio",
             )}
             strokeWidth={2.25}
           />
@@ -291,12 +332,14 @@ function MenuAccordion({
                   <div
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                      variant === "account"
-                        ? "bg-violet-500/10 dark:bg-violet-500/20"
-                        : "bg-celeste-trifinio/10 dark:bg-celeste-trifinio/15",
+                      variant === "actividades"
+                        ? "bg-blue-500/10 dark:bg-blue-500/20"
+                        : variant === "account"
+                          ? "bg-violet-500/10 dark:bg-violet-500/20"
+                          : "bg-celeste-trifinio/10 dark:bg-celeste-trifinio/15",
                     )}
                   >
-                    <MenuAccordionIcon optionId={opt.id} />
+                    <MenuAccordionIcon optionId={opt.id} variant={variant} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold leading-tight text-foreground">{opt.title}</p>
@@ -447,11 +490,11 @@ function MenuModuleLink({
   );
 }
 
-type MenuAccordionId = "observatorio" | "perfil" | "admin";
+type MenuAccordionId = "observatorio" | "perfil" | "admin" | "actividades";
 
 export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   const pathname = usePathname();
-  const { realRole, effectiveRole, simulatedRole, setSimulatedRole } = useUserContext();
+  const { realRole, effectiveRole, simulatedRole, setSimulatedRole, esJefe } = useUserContext();
   const { data: appSettings } = useAppSettings();
   const [openAccordionId, setOpenAccordionId] = useState<MenuAccordionId | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -474,13 +517,24 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
 
   const visibleModules = user ? getVisibleDashboardModules(effectiveRole) : [];
   const mainModules = visibleModules.filter(
-    (mod) => mod.id !== "admin" && mod.id !== "observatorio" && mod.id !== "perfil",
+    (mod) =>
+      mod.id !== "admin" &&
+      mod.id !== "observatorio" &&
+      mod.id !== "perfil" &&
+      mod.id !== "actividades" &&
+      mod.id !== "tareas",
   );
   const adminModule = visibleModules.find((mod) => mod.id === "admin");
   const observatorioModule = visibleModules.find((mod) => mod.id === "observatorio");
   const perfilModule = visibleModules.find((mod) => mod.id === "perfil");
   const isAdminRoute = pathname.startsWith("/comude/admin");
   const isObservatorioRoute = pathname.startsWith("/comude/observatorio");
+  const isActividadesRoute =
+    pathname.startsWith("/comude/actividades") || pathname.startsWith("/comude/tareas");
+  const effectiveEsJefe = simulatedRole ? false : esJefe;
+  const visibleActividadesOptions = user
+    ? getVisibleActividadesOptions(ACTIVIDADES_MENU_OPTIONS, effectiveRole, effectiveEsJefe)
+    : [];
   const passkeysEnabled = appSettings?.enable_passkeys ?? false;
   const perfilMenuOptions = getPerfilMenuOptions(passkeysEnabled);
   const manualUsuarioPath = appSettings?.manual_usuario_url ?? null;
@@ -489,6 +543,10 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   const toggleAccordion = (id: MenuAccordionId) => {
     setOpenAccordionId((current) => (current === id ? null : id));
   };
+
+  useEffect(() => {
+    if (isActividadesRoute) setOpenAccordionId("actividades");
+  }, [isActividadesRoute]);
 
   useEffect(() => {
     if (isAdminRoute) setOpenAccordionId("admin");
@@ -557,7 +615,7 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
             >
         {user ? (
           <div className="shrink-0 border-b border-celeste-trifinio/15 bg-gradient-to-b from-celeste-trifinio/12 via-celeste-trifinio/5 to-transparent dark:from-celeste-trifinio/20 dark:via-celeste-trifinio/8 dark:to-transparent">
-            <div className="flex w-full items-center justify-between px-5 h-[var(--mobile-breadcrumb-height)] md:h-auto md:pt-5 md:pb-3">
+            <div className="flex w-full items-center justify-start px-5 h-[var(--mobile-breadcrumb-height)] md:h-auto md:pt-5 md:pb-3">
               <button
                 type="button"
                 onClick={handleLogout}
@@ -568,7 +626,6 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                   Cerrar Sesión
                 </span>
               </button>
-              <PushNotificationToggle />
             </div>
 
             <div className="px-5 pb-4">
@@ -627,6 +684,25 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                     onNavigate={() => setIsOpen(false)}
                   />
                 </MenuSection>
+
+                {visibleActividadesOptions.length > 0 && (
+                  <MenuSection label="Actividades" variant="actividades">
+                    <MenuAccordion
+                      id="menu-actividades"
+                      title="Actividades"
+                      subtitle="Colaborativas"
+                      desc="Gestión de actividades individuales, colaborativas y acuerdos del COMUDE."
+                      options={visibleActividadesOptions}
+                      pathname={pathname}
+                      open={openAccordionId === "actividades"}
+                      onToggle={() => toggleAccordion("actividades")}
+                      isRouteActive={isActividadesRoute}
+                      onNavigate={() => setIsOpen(false)}
+                      variant="actividades"
+                      icon={ClipboardList}
+                    />
+                  </MenuSection>
+                )}
 
                 {(observatorioModule || mainModules.length > 0) && (
                     <MenuSection label="Módulos SOTE-COMUDE" variant="modules">
@@ -724,7 +800,7 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
               >
                 <option value="">Rol Real: {realRole.toUpperCase()}</option>
                 <option value="admin">Simular: ADMINISTRADOR</option>
-                <option value="cocode">Simular: COMUDE</option>
+                <option value="comude">Simular: COMUDE</option>
                 <option value="institucion">Simular: INSTITUCIÓN</option>
               </select>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Download, Loader2, RefreshCw, FileText, Image as ImageIcon, Sparkles } from "lucide-react";
+import { X, Download, Loader2, RefreshCw, FileText, Image as ImageIcon, Sparkles, PenTool, Stamp } from "lucide-react";
 import { ActComudeConParticipantes } from "../lib/zod";
 import { useConfiguracionMunicipio, useIntegrantesEstructuraMunicipio } from "@/components/(base)/(settings)/municipio/hooks";
 import { getInitialGlobalMunicipioState } from "@/components/(base)/layout/actions";
@@ -147,6 +147,7 @@ export default function GenerarConvocatoriaModal({
   const [logoIzqPath, setLogoIzqPath] = useState<string>("");
   const [logoDerPath, setLogoDerPath] = useState<string>("");
   const [firmaPath, setFirmaPath] = useState<string>("");
+  const [selloPath, setSelloPath] = useState<string>("");
   const [coordinadorNombre, setCoordinadorNombre] = useState<string>("");
   const [coordinadorPuesto, setCoordinadorPuesto] = useState<string>("");
   const [destinatarios, setDestinatarios] = useState<string>(
@@ -167,6 +168,7 @@ export default function GenerarConvocatoriaModal({
       if (cfg.logo_izquierda_path) setLogoIzqPath(cfg.logo_izquierda_path);
       if (cfg.logo_derecha_path) setLogoDerPath(cfg.logo_derecha_path);
       if (cfg.firma_path) setFirmaPath(cfg.firma_path);
+      if (cfg.sello_path) setSelloPath(cfg.sello_path);
       if (cfg.coordinador_nombre) setCoordinadorNombre(cfg.coordinador_nombre);
       if (cfg.coordinador_puesto) setCoordinadorPuesto(cfg.coordinador_puesto);
       if (cfg.destinatarios_default) setDestinatarios(cfg.destinatarios_default);
@@ -178,6 +180,7 @@ export default function GenerarConvocatoriaModal({
   const [logoIzqDataUri, setLogoIzqDataUri] = useState<string>("");
   const [logoDerDataUri, setLogoDerDataUri] = useState<string>("");
   const [firmaDataUri, setFirmaDataUri] = useState<string>("");
+  const [selloDataUri, setSelloDataUri] = useState<string>("");
 
   useEffect(() => {
     let isMounted = true;
@@ -223,10 +226,18 @@ export default function GenerarConvocatoriaModal({
       setFirmaDataUri("");
     }
 
+    if (selloPath) {
+      fetchUri(selloPath).then((uri) => {
+        if (isMounted) setSelloDataUri(uri);
+      });
+    } else {
+      setSelloDataUri("");
+    }
+
     return () => {
       isMounted = false;
     };
-  }, [logoIzqPath, logoDerPath, firmaPath]);
+  }, [logoIzqPath, logoDerPath, firmaPath, selloPath]);
 
   const logosDisponibles = Array.isArray(config?.logo) ? config.logo : [];
   const firmasDisponibles = Array.isArray(config?.firmas) ? config.firmas : [];
@@ -459,21 +470,43 @@ export default function GenerarConvocatoriaModal({
               />
             </div>
 
-            {/* Seleccionar Firma / Sello */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">Firma / Sello</label>
-              <select
-                value={firmaPath}
-                onChange={(e) => setFirmaPath(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-background border border-input rounded-lg"
-              >
-                <option value="">-- Sin firma --</option>
-                {firmasDisponibles.map((f) => (
-                  <option key={f.id} value={f.path}>
-                    {f.titulo}
-                  </option>
-                ))}
-              </select>
+            {/* Seleccionar Firma y Sello */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <PenTool className="size-3.5 text-purple-500" /> Firma
+                </label>
+                <select
+                  value={firmaPath}
+                  onChange={(e) => setFirmaPath(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-background border border-input rounded-lg"
+                >
+                  <option value="">-- Sin firma --</option>
+                  {firmasDisponibles.map((f) => (
+                    <option key={f.id} value={f.path}>
+                      {f.tipo === "sello" ? `[Sello] ${f.titulo}` : f.titulo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <Stamp className="size-3.5 text-amber-500" /> Sello Oficial
+                </label>
+                <select
+                  value={selloPath}
+                  onChange={(e) => setSelloPath(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-background border border-input rounded-lg"
+                >
+                  <option value="">-- Sin sello --</option>
+                  {firmasDisponibles.map((f) => (
+                    <option key={f.id} value={f.path}>
+                      {f.tipo === "sello" ? f.titulo : `[Firma] ${f.titulo}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Destinatarios */}
@@ -593,17 +626,47 @@ export default function GenerarConvocatoriaModal({
               </div>
 
               {/* Pie de página con Firma y Sello */}
-              <div className="mt-12 space-y-6">
-                <div className="flex justify-center relative">
+              <div className="mt-28 space-y-6">
+                <div className="flex justify-center relative w-full">
                   <div className="relative text-center flex flex-col items-center">
-                    {/* Imagen de Firma / Sello superpuesta */}
+                    {/* Imagen de Firma ancha de extremo a extremo, anclada sobre el nombre */}
                     {firmaDataUri && (
-                      <div className="absolute -top-16 inset-x-0 flex justify-center pointer-events-none z-10">
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-10 flex items-center justify-center"
+                        style={{
+                          bottom: "-45px",
+                          width: "770px",
+                          maxWidth: "none",
+                        }}
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={firmaDataUri}
-                          alt="Firma y Sello"
-                          className="max-h-28 max-w-48 object-contain mix-blend-multiply"
+                          alt="Firma"
+                          style={{ width: "770px", maxWidth: "none", height: "auto", maxHeight: "350px" }}
+                          className="object-contain mix-blend-multiply"
+                        />
+                      </div>
+                    )}
+
+                    {/* Imagen de Sello Oficial a la derecha de la firma */}
+                    {selloDataUri && (
+                      <div
+                        className="absolute pointer-events-none z-10 flex items-center justify-center"
+                        style={{
+                          bottom: "-10px",
+                          left: "calc(50% + 4.6rem)",
+                          width: "165px",
+                          height: "165px",
+                          maxWidth: "none",
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selloDataUri}
+                          alt="Sello Oficial"
+                          style={{ width: "165px", height: "165px", maxWidth: "none" }}
+                          className="object-contain mix-blend-multiply opacity-95"
                         />
                       </div>
                     )}

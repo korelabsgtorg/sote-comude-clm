@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
 import { urlBase64ToUint8Array } from '@/utils/vapid'
@@ -15,44 +15,60 @@ export function PushNotificationToggle({ className }: { className?: string }) {
   const [loading, setLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const { theme } = useTheme()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const isDark = theme === 'dark'
 
   useEffect(() => {
-    const checkStatus = async () => {
-      if ('serviceWorker' in navigator && userId) {
-        try {
-          const reg = await navigator.serviceWorker.getRegistration()
-          if (reg) {
-            const sub = await reg.pushManager.getSubscription()
-            if (sub) {
-              const subJson = JSON.parse(JSON.stringify(sub))
-              
-              const { data } = await supabase
-                .from('push_subscriptions')
-                .select('id')
-                .match({ user_id: userId, endpoint: subJson.endpoint })
-                .maybeSingle()
+    let isMounted = true
 
-              if (data) {
-                setIsSubscribed(true)
-              } else {
-                await sub.unsubscribe()
-                setIsSubscribed(false)
-              }
+    const checkStatus = async () => {
+      if (!userId || typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+        if (isMounted) setIsInitializing(false)
+        return
+      }
+
+      try {
+        const reg = await navigator.serviceWorker.getRegistration()
+        if (!isMounted) return
+
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription()
+          if (!isMounted) return
+
+          if (sub) {
+            const subJson = JSON.parse(JSON.stringify(sub))
+            const { data } = await supabase
+              .from('push_subscriptions')
+              .select('id')
+              .match({ user_id: userId, endpoint: subJson.endpoint })
+              .maybeSingle()
+
+            if (!isMounted) return
+            if (data) {
+              setIsSubscribed(true)
+            } else {
+              await sub.unsubscribe().catch(() => {})
+              setIsSubscribed(false)
             }
+          } else {
+            setIsSubscribed(false)
           }
-        } catch (e) {
-          console.error("Error checking push status:", e)
-        } finally {
-          setIsInitializing(false)
+        } else {
+          setIsSubscribed(false)
         }
-      } else {
-        setIsInitializing(false)
+      } catch (e) {
+        console.error("Error checking push status:", e)
+      } finally {
+        if (isMounted) setIsInitializing(false)
       }
     }
+
     checkStatus()
+
+    return () => {
+      isMounted = false
+    }
   }, [userId, supabase])
 
   const handleToggle = async () => {
@@ -130,8 +146,7 @@ export function PushNotificationToggle({ className }: { className?: string }) {
   if (isInitializing) {
     return (
       <div 
-        className="flex-shrink-0 flex items-center justify-center p-2"
-        style={{ width: '42px', height: '42px', backgroundColor: 'transparent' }}
+        className={cn("size-7 md:size-6 shrink-0 flex items-center justify-center", className)}
       />
     )
   }
@@ -139,21 +154,16 @@ export function PushNotificationToggle({ className }: { className?: string }) {
   const activeBellClassName =
     "text-yellow-500 fill-yellow-500 dark:text-yellow-400 dark:fill-yellow-400";
   const inactiveBellClassName =
-    "text-gray-400 dark:text-neutral-500 group-hover/bell:text-yellow-500 dark:group-hover/bell:text-yellow-400";
+    "text-azul-trifinio/80 hover:text-azul-trifinio dark:text-white/80 dark:hover:text-white group-hover/bell:text-yellow-500 dark:group-hover/bell:text-yellow-400";
 
   return (
     <button
       onClick={handleToggle}
       disabled={loading}
       className={cn(
-        "group/bell flex shrink-0 items-center justify-center cursor-pointer transition-all duration-300 active:scale-95 rounded-xl",
+        "group/bell size-7 md:size-6 flex shrink-0 items-center justify-center cursor-pointer transition-all duration-300 active:scale-95 bg-transparent",
         className,
       )}
-      style={{
-        width: '42px',
-        height: '42px',
-        backgroundColor: 'transparent',
-      }}
       title={isSubscribed ? 'Desactivar notificaciones' : 'Activar notificaciones'}
     >
       {loading ? (
@@ -163,7 +173,7 @@ export function PushNotificationToggle({ className }: { className?: string }) {
           <Bell
             strokeWidth={2}
             className={cn(
-              "size-[26px] transition-transform duration-500 ease-out group-hover/bell:scale-110 group-hover/bell:-rotate-12",
+              "size-7 md:size-6 transition-transform duration-500 ease-out group-hover/bell:scale-110 group-hover/bell:-rotate-12",
               activeBellClassName,
             )}
           />
@@ -187,7 +197,7 @@ export function PushNotificationToggle({ className }: { className?: string }) {
         <BellOff
           strokeWidth={2}
           className={cn(
-            "size-[26px] transition-all duration-500 ease-out group-hover/bell:scale-110 group-hover/bell:-rotate-12",
+            "size-7 md:size-6 transition-all duration-500 ease-out group-hover/bell:scale-110 group-hover/bell:-rotate-12",
             inactiveBellClassName,
           )}
         />

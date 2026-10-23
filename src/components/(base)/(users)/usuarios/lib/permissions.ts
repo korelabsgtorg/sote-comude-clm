@@ -1,4 +1,5 @@
 export const ROLE_LABELS: Record<string, string> = {
+  comude: "Comude",
   cocode: "Comude",
   institucion: "Institución",
   admin: "Administrador",
@@ -8,11 +9,11 @@ export const ROLE_LABELS: Record<string, string> = {
 export const ROLE_ORDER = [
   "super",
   "admin",
-  "cocode",
+  "comude",
   "institucion",
 ] as const;
 
-const ALL_KNOWN_ROLES = [...ROLE_ORDER];
+const ALL_KNOWN_ROLES = [...ROLE_ORDER, "cocode"];
 
 /** Roles que contienen "observatorio" en su slug */
 export function isObservatorioRole(role: string | null | undefined): boolean {
@@ -42,7 +43,7 @@ export function isUserVisibleToActor(
   targetRole: string | null | undefined,
   actorRole: string,
 ): boolean {
-  const role = targetRole || "cocode";
+  const role = targetRole || "comude";
   return getManageableRoles(actorRole).includes(role);
 }
 

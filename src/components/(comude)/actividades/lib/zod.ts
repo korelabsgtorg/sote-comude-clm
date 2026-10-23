@@ -71,7 +71,67 @@ export type ActComudePunto = {
   // Relaciones opcionales
   categoria?: ActComudeCategoria;
   act_comude_archivos?: ActComudeArchivo[];
+  actividades_count?: number;
 };
+
+export interface ActividadPuntoMiembro {
+  id: string;
+  actividad_id: string;
+  usuario_id: string;
+  asignaciones: { title: string; is_complete: boolean }[];
+  fecha_confirmacion: string | null;
+  fecha_finalizacion: string | null;
+  nombre_usuario: string;
+  puesto?: string | null;
+}
+
+export interface ActividadPunto {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  fecha_limite: string;
+  estado: string;
+  encargado_id: string;
+  encargado_nombre: string;
+  encargado_puesto?: string | null;
+  creador_id?: string;
+  creador_nombre?: string;
+  fecha_confirmacion: string | null;
+  checklist: { title: string; is_completed: boolean }[];
+  miembros: ActividadPuntoMiembro[];
+  archivos: any[];
+  revisado_por?: { nombre: string; fecha: string } | null;
+  created_at: string;
+  actualizado_en?: string | null;
+}
+
+export interface UsuarioAsignablePunto {
+  id: string;
+  nombre: string;
+  email?: string;
+  puesto?: string | null;
+  departamento?: string | null;
+  rol?: string | null;
+}
+
+export interface ActividadComudeConContexto extends ActividadPunto {
+  punto_id: string;
+  punto_titulo: string;
+  comude_id: string;
+  comude_titulo: string;
+  comude_fecha: string;
+  comude_estado: string;
+  comude_descripcion?: string | null;
+}
+
+export interface GrupoActividadesComude {
+  comudeId: string;
+  comudeTitulo: string;
+  comudeFecha: string;
+  comudeEstado: string;
+  comudeDescripcion?: string | null;
+  items: ActividadComudeConContexto[];
+}
 
 export type ActComudeConParticipantes = ActComude & {
   act_comude_participantes: (ActComudeParticipante & {

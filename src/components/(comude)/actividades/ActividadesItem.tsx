@@ -154,6 +154,7 @@ interface ConvocatoriaConfigCached {
   logoIzqDataUri: string;
   logoDerDataUri: string;
   firmaDataUri: string;
+  selloDataUri: string;
 }
 
 let globalConvocatoriaCache: ConvocatoriaConfigCached | null = null;
@@ -178,6 +179,7 @@ async function getOrFetchConvocatoriaConfig(): Promise<ConvocatoriaConfigCached>
     let izqUri = "";
     let derUri = "";
     let firUri = "";
+    let selUri = "";
 
     try {
       const state = await getInitialGlobalMunicipioState();
@@ -225,14 +227,16 @@ async function getOrFetchConvocatoriaConfig(): Promise<ConvocatoriaConfigCached>
             }
           };
 
-          const [izq, der, fir] = await Promise.all([
+          const [izq, der, fir, sel] = await Promise.all([
             fetchUri(cfg.logo_izquierda_path),
             fetchUri(cfg.logo_derecha_path),
             fetchUri(cfg.firma_path),
+            fetchUri(cfg.sello_path),
           ]);
           izqUri = izq;
           derUri = der;
           firUri = fir;
+          selUri = sel;
         }
       }
     } catch (e) {
@@ -248,6 +252,7 @@ async function getOrFetchConvocatoriaConfig(): Promise<ConvocatoriaConfigCached>
       logoIzqDataUri: izqUri,
       logoDerDataUri: derUri,
       firmaDataUri: firUri,
+      selloDataUri: selUri,
     };
 
     globalConvocatoriaCache = result;
@@ -474,17 +479,47 @@ function ConvocatoriaDirectDownloader({
         </div>
 
         {/* Pie de página con Firma y Sello */}
-        <div className="mt-12 space-y-6">
-          <div className="flex justify-center relative">
+        <div className="mt-28 space-y-6">
+          <div className="flex justify-center relative w-full">
             <div className="relative text-center flex flex-col items-center">
-              {/* Imagen de Firma / Sello superpuesta */}
+              {/* Imagen de Firma ancha de extremo a extremo, anclada sobre el nombre */}
               {data.firmaDataUri && (
-                <div className="absolute -top-16 inset-x-0 flex justify-center pointer-events-none z-10">
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-10 flex items-center justify-center"
+                  style={{
+                    bottom: "-45px",
+                    width: "770px",
+                    maxWidth: "none",
+                  }}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={data.firmaDataUri}
-                    alt="Firma y Sello"
-                    className="max-h-28 max-w-48 object-contain mix-blend-multiply"
+                    alt="Firma"
+                    style={{ width: "770px", maxWidth: "none", height: "auto", maxHeight: "350px" }}
+                    className="object-contain mix-blend-multiply"
+                  />
+                </div>
+              )}
+
+              {/* Imagen de Sello Oficial a la derecha de la firma */}
+              {data.selloDataUri && (
+                <div
+                  className="absolute pointer-events-none z-10 flex items-center justify-center"
+                  style={{
+                    bottom: "-10px",
+                    left: "calc(50% + 4.6rem)",
+                    width: "165px",
+                    height: "165px",
+                    maxWidth: "none",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={data.selloDataUri}
+                    alt="Sello Oficial"
+                    style={{ width: "165px", height: "165px", maxWidth: "none" }}
+                    className="object-contain mix-blend-multiply opacity-95"
                   />
                 </div>
               )}

@@ -17,7 +17,7 @@ export function RoleSimulator() {
           <option value="">{realRole}</option>
           <option value="super">SUPER ADMIN</option>
           <option value="admin">ADMINISTRADOR</option>
-          <option value="cocode">COMUDE</option>
+          <option value="comude">COMUDE</option>
           <option value="institucion">INSTITUCCIÓN</option>
         </select>
       </div>

@@ -8,6 +8,7 @@ import { useUser, useUserContext } from "@/components/(base)/providers/UserProvi
 import { BreadcrumbNav } from "@/components/ui/breadcrumb-nav";
 import { Menu as MenuIcon, X, RefreshCw, LogIn } from "lucide-react";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import { PushNotificationToggle } from "@/components/ui/PushNotificationToggle";
 import Menu from "./Menu";
 import { getPendingDevicesCount } from "@/components/(comude)/admin/lib/actions";
 import Image from "next/image";
@@ -125,6 +126,7 @@ export default function Header() {
           </div>
 
           <div className="flex items-center gap-5 md:gap-4 shrink-0">
+            {user && <PushNotificationToggle />}
             <AnimatedThemeToggler />
             <button
               id="refresh-btn"

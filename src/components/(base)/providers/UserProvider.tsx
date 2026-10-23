@@ -5,6 +5,8 @@ import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import { PushListener } from "@/components/push/PushListener";
 import BloqueoConfirmacionModal from "@/components/(comude)/actividades/modals/BloqueoConfirmacionModal";
+import BloqueoActividad from "@/components/(comude)/tareas/BloqueoActividad";
+import { verificarEsJefeUsuario } from "@/components/(comude)/tareas/lib/actions";
 
 /** Intervalo de refresco automático de sesión (ms) - 5 minutos */
 const REFRESH_INTERVAL_MS = 300_000;
@@ -15,6 +17,7 @@ interface UserContextValue {
   setSimulatedRole: (role: string | null) => void;
   effectiveRole: string;
   realRole: string;
+  esJefe: boolean;
 }
 
 const UserContext = createContext<UserContextValue>({
@@ -23,6 +26,7 @@ const UserContext = createContext<UserContextValue>({
   setSimulatedRole: () => {},
   effectiveRole: "user",
   realRole: "user",
+  esJefe: false,
 });
 
 export function UserProvider({
@@ -34,6 +38,7 @@ export function UserProvider({
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [simulatedRole, setSimulatedRole] = useState<string | null>(null);
+  const [esJefe, setEsJefe] = useState<boolean>(false);
   const supabase = createClient();
   const lastRoleRef = useRef<string | undefined>(undefined);
 
@@ -75,6 +80,25 @@ export function UserProvider({
     return () => clearInterval(interval);
   }, [user, refreshUser]);
 
+  // Verificar si el usuario tiene asignada alguna jefatura en el municipio
+  useEffect(() => {
+    if (!user) {
+      setEsJefe(false);
+      return;
+    }
+    let isMounted = true;
+    verificarEsJefeUsuario()
+      .then((resultado) => {
+        if (isMounted) setEsJefe(resultado);
+      })
+      .catch(() => {
+        if (isMounted) setEsJefe(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   const metadata = user?.user_metadata || {};
   const realRole = metadata.rol || user?.role || "user";
   const effectiveRole = simulatedRole || realRole;
@@ -90,11 +114,12 @@ export function UserProvider({
   }, [realRole]);
 
   return (
-    <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole }}>
+    <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole, esJefe }}>
       {user && (
         <>
           <PushListener />
           <BloqueoConfirmacionModal />
+          <BloqueoActividad />
         </>
       )}
       {children}

@@ -201,8 +201,12 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
     const { credentials, loading, refetch } = useUserCredentials(userId);
     const mutation = useCredentialsMutation();
 
-    const targetRole = profile?.rol || "user";
-    const roleOptions = getManageableRoles(effectiveRole);
+    const rawRole =
+      (profile?.rol === "cocode" ? "comude" : profile?.rol) ||
+      (credentials as any)?.rol ||
+      "";
+    const targetRole = rawRole || "comude";
+    const roleOptions = getManageableRoles(effectiveRole).filter((r) => r !== "cocode");
     const canManageTarget = isUserVisibleToActor(targetRole, effectiveRole);
     const canChangeRole =
       canManageTarget &&
@@ -211,7 +215,7 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
     const canManageStatus = canManageUsers(effectiveRole) && canManageTarget;
 
     const [step, setStep] = useState(1);
-    const [selectedRole, setSelectedRole] = useState("user");
+    const [selectedRole, setSelectedRole] = useState(rawRole || "comude");
     const [formData, setFormData] = useState({
       username: "",
       newPassword: "",
@@ -223,10 +227,10 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
     const [savedData, setSavedData] = useState({ user: "", pass: "" });
 
     useEffect(() => {
-      if (profile?.rol) {
-        setSelectedRole(profile.rol);
+      if (rawRole) {
+        setSelectedRole(rawRole);
       }
-    }, [profile?.rol]);
+    }, [rawRole]);
 
     useEffect(() => {
       if (
@@ -234,9 +238,15 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
         selectedRole &&
         !roleOptions.includes(selectedRole)
       ) {
-        setSelectedRole(profile?.rol || roleOptions[0]);
+        const fallback =
+          rawRole && roleOptions.includes(rawRole)
+            ? rawRole
+            : roleOptions.includes("comude")
+            ? "comude"
+            : roleOptions[0];
+        setSelectedRole(fallback);
       }
-    }, [roleOptions, profile?.rol, selectedRole]);
+    }, [roleOptions, rawRole, selectedRole]);
 
     useEffect(() => {
       if (credentials) {
@@ -250,7 +260,7 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
     }, [credentials]);
 
     const hasPendingAccessChanges =
-      hasChanges || selectedRole !== (profile?.rol || "user");
+      hasChanges || selectedRole !== (rawRole || "comude");
 
     useEffect(() => {
       if (embedded) onCredentialChanges?.(hasPendingAccessChanges);
@@ -281,7 +291,7 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
     };
 
     const handleSave = useCallback(async (): Promise<boolean> => {
-      const roleChanged = selectedRole !== (profile?.rol || "user");
+      const roleChanged = selectedRole !== (rawRole || "comude");
       const credentialsChanged =
         formData.username !== (credentials?.username || "") ||
         formData.newPassword.length > 0;
@@ -428,7 +438,7 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
                 Rol
               </label>
               <select
-                value={selectedRole}
+                value={selectedRole || rawRole || "comude"}
                 onChange={handleRoleChange}
                 disabled={!canChangeRole || !canEdit}
                 className="flex h-10 w-full rounded-lg border border-input bg-background/50 px-3 text-sm outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
@@ -440,8 +450,8 @@ export const InfoUser = forwardRef<InfoUserRef, InfoUserProps>(
                     </option>
                   ))
                 ) : (
-                  <option value={selectedRole}>
-                    {ROLE_LABELS[selectedRole] || selectedRole || "Usuario"}
+                  <option value={selectedRole || rawRole || "comude"}>
+                    {ROLE_LABELS[selectedRole || rawRole || "comude"] || selectedRole || "Comude"}
                   </option>
                 )}
               </select>

@@ -16,7 +16,8 @@ export default function BloqueoConfirmacionModal() {
     },
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
-    staleTime: 1000 * 10, // 10 segundos para mayor frescura
+    staleTime: 1000 * 10,
+    refetchInterval: 8000,
   });
 
   // Listener para el evento de refresco disparado por el Service Worker / PushListener
@@ -79,7 +80,7 @@ export default function BloqueoConfirmacionModal() {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9998] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
+      className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
     >
       <div className="bg-[#12131c] text-white border border-blue-500/30 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Barra superior de acento azul/índigo */}

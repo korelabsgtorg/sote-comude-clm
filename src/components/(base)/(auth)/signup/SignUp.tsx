@@ -102,7 +102,7 @@ export default function SignUp({
   const logic = useSignupLogic();
   const { effectiveRole } = useUserContext();
   const creatableRoles = useMemo(
-    () => getManageableRoles(effectiveRole),
+    () => getManageableRoles(effectiveRole).filter((r) => r !== "cocode"),
     [effectiveRole],
   );
   const [step, setStep] = useState(1);
@@ -200,7 +200,7 @@ export default function SignUp({
     logic.setName("");
     logic.setUsername("");
     logic.setPasswordValue(pass);
-    logic.setRol(creatableRoles[0] || "cocode");
+    logic.setRol(creatableRoles[0] || "comude");
     logic.setOrganizacionId("");
     logic.setShowPassword(false);
     setPhoneNumber("");

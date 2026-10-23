@@ -8,10 +8,28 @@ import {
   ActComudePunto,
   ActComudeCategoria,
   ActComudeArchivo,
+  ActividadPunto,
+  ActividadComudeConContexto,
+  UsuarioAsignablePunto,
   CrearActividadValues,
   RegistroAsistenciaValues,
   CrearPuntoValues,
 } from "./zod";
+import {
+  obtenerActividadesDePunto,
+  obtenerTodasActividadesComude,
+  obtenerUsuariosAsignablesMunicipio,
+  crearActividadPunto,
+  editarActividadPunto,
+  eliminarActividadPunto,
+  toggleChecklistActividadPunto,
+  toggleMiembroChecklistActividadPunto,
+  marcarActividadRevisadaPorComude,
+  desmarcarActividadRevisadaPorComude,
+  finalizarActividadPunto,
+  CrearActividadPuntoInput,
+  EditarActividadPuntoInput,
+} from "./actividadesPuntoActions";
 import {
   getActividades,
   getActividadById,
@@ -75,6 +93,14 @@ export function useActividades(year?: number, month?: number) {
   return useQuery<ActComudeConParticipantes[], Error>({
     queryKey: ["actividades-comude", year, month],
     queryFn: () => getActividades(year, month),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useTodasActividadesComude() {
+  return useQuery<ActividadComudeConContexto[], Error>({
+    queryKey: ["actividades-comude-todas"],
+    queryFn: () => obtenerTodasActividadesComude(),
     staleTime: 1000 * 60 * 5,
   });
 }
@@ -414,3 +440,135 @@ export function useContactos(isSuperViewer: boolean, options?: { enabled?: boole
     staleTime: 1000 * 60 * 5,
   });
 }
+
+// ============================================================
+// ----- ACTIVIDADES DERIVADAS DE PUNTOS COMUDE -----
+// ============================================================
+
+export function useActividadesDePunto(puntoId: string | null, enabled: boolean = true) {
+  return useQuery<ActividadPunto[], Error>({
+    queryKey: ["actividades-punto", puntoId],
+    queryFn: () => obtenerActividadesDePunto(puntoId!),
+    enabled: !!puntoId && enabled,
+    staleTime: 1000 * 30, // 30 segundos
+  });
+}
+
+export function useUsuariosAsignablesMunicipio(enabled: boolean = true) {
+  return useQuery<UsuarioAsignablePunto[], Error>({
+    queryKey: ["usuarios-asignables-municipio"],
+    queryFn: () => obtenerUsuariosAsignablesMunicipio(),
+    enabled,
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
+export function useCrearActividadPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; data?: { id: string }; error?: string }, Error, CrearActividadPuntoInput>({
+    mutationFn: (input) => crearActividadPunto(input),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+    },
+  });
+}
+
+export function useEditarActividadPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId: string; input: EditarActividadPuntoInput }>({
+    mutationFn: ({ actividadId, input }) => editarActividadPunto(actividadId, input),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+    },
+  });
+}
+
+export function useEliminarActividadPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId: string }>({
+    mutationFn: ({ actividadId, puntoId }) => eliminarActividadPunto(actividadId, puntoId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+    },
+  });
+}
+
+export function useToggleChecklistPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId: string; checklist: any[] }>({
+    mutationFn: ({ actividadId, checklist }) => toggleChecklistActividadPunto(actividadId, checklist),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+    },
+  });
+}
+
+export function useToggleMiembroChecklistPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { miembroId: string; puntoId: string; asignaciones: any[] }>({
+    mutationFn: ({ miembroId, asignaciones }) => toggleMiembroChecklistActividadPunto(miembroId, asignaciones),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+    },
+  });
+}
+
+export function useMarcarRevisadoPorComude() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId?: string }>({
+    mutationFn: ({ actividadId, puntoId }) => marcarActividadRevisadaPorComude(actividadId, puntoId),
+    onSuccess: (_, variables) => {
+      if (variables.puntoId) {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+    },
+  });
+}
+
+export function useDesmarcarRevisadoPorComude() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId?: string }>({
+    mutationFn: ({ actividadId, puntoId }) => desmarcarActividadRevisadaPorComude(actividadId, puntoId),
+    onSuccess: (_, variables) => {
+      if (variables.puntoId) {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+    },
+  });
+}
+
+export function useFinalizarActividadPunto() {
+  const queryClient = useQueryClient();
+  return useMutation<{ success: boolean; error?: string }, Error, { actividadId: string; puntoId?: string }>({
+    mutationFn: ({ actividadId, puntoId }) => finalizarActividadPunto(actividadId, puntoId),
+    onSuccess: (_, variables) => {
+      if (variables.puntoId) {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["actividades-punto"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+    },
+  });
+}
+
