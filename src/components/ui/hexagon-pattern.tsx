@@ -71,7 +71,7 @@ function hexPoints(
   direction: "horizontal" | "vertical"
 ): string {
   return hexVertexList(cx, cy, r, direction)
-    .map(([px, py]) => `${px},${py}`)
+    .map(([px, py]) => `${Number(px.toFixed(4))},${Number(py.toFixed(4))}`)
     .join(" ")
 }
 
@@ -214,12 +214,12 @@ function hexCenter(
     const { colStep, rowStep } = getHexSpacing(r, direction, gap)
     const x = col * colStep + colStep / 2
     const y = row * rowStep + rowStep / 2 + (col % 2 !== 0 ? rowStep / 2 : 0)
-    return [x, y]
+    return [Number(x.toFixed(4)), Number(y.toFixed(4))]
   } else {
     const { colStep, rowStep } = getHexSpacing(r, direction, gap)
     const x = col * colStep + colStep / 2 + (row % 2 !== 0 ? colStep / 2 : 0)
     const y = row * rowStep + rowStep / 2
-    return [x, y]
+    return [Number(x.toFixed(4)), Number(y.toFixed(4))]
   }
 }
 
@@ -245,6 +245,7 @@ export function HexagonPattern({
   return (
     <svg
       aria-hidden="true"
+      suppressHydrationWarning
       className={cn(
         "pointer-events-none absolute inset-0 h-full w-full fill-gray-400/30 stroke-gray-400/30",
         className
@@ -254,8 +255,9 @@ export function HexagonPattern({
       <defs>
         <pattern
           id={id}
-          width={tileW}
-          height={tileH}
+          width={Number(tileW.toFixed(4))}
+          height={Number(tileH.toFixed(4))}
+          suppressHydrationWarning
           patternUnits="userSpaceOnUse"
           x={x}
           y={y}

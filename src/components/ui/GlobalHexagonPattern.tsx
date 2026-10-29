@@ -1,12 +1,22 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { HexagonPattern } from "@/components/ui/hexagon-pattern";
 
 export function GlobalHexagonPattern() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
     <div
       aria-hidden="true"
+      suppressHydrationWarning
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none"
     >
       <HexagonPattern
