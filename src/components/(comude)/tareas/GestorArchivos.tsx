@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { useUserContext } from '@/components/(base)/providers/UserProvider';
 import { ArchivoAdjunto, BUCKET_ARCHIVOS_TAREAS } from './lib/zod';
 import { useTareaMutations } from './lib/hooks';
 import { FileText, Link as LinkIcon, Trash2, Loader2, Upload, ExternalLink } from 'lucide-react';
@@ -18,6 +19,7 @@ interface Props {
   esLectura?: boolean;
   onVerPdf?: (archivo: ArchivoAdjunto) => void;
   nombreUsuarioActual?: string;
+  municipioId?: number | null;
 }
 
 export default function GestorArchivos({
@@ -26,6 +28,7 @@ export default function GestorArchivos({
   esLectura,
   onVerPdf,
   nombreUsuarioActual,
+  municipioId,
 }: Props) {
   const [archivos, setArchivos] = useState<ArchivoAdjunto[]>(archivosIniciales || []);
   const [isUploading, setIsUploading] = useState(false);
@@ -34,6 +37,8 @@ export default function GestorArchivos({
   const [nuevoLinkNombre, setNuevoLinkNombre] = useState('');
   const [pdfViendo, setPdfViendo] = useState<ArchivoAdjunto | null>(null);
 
+  const { user } = useUserContext();
+  const userMunicipioId = (user?.user_metadata?.municipio_id ?? (user as unknown as { municipio_id?: number })?.municipio_id) as number | undefined;
   const { actualizarArchivos } = useTareaMutations();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +49,7 @@ export default function GestorArchivos({
 
     setIsUploading(true);
     const nuevos: ArchivoAdjunto[] = [...archivos];
+    const munId = municipioId ?? userMunicipioId ?? 'general';
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -59,7 +65,7 @@ export default function GestorArchivos({
       const fileExt = 'pdf';
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_${safeName}`;
-      const filePath = `${tareaId}/${fileName}`;
+      const filePath = `municipio_${munId}/actividad_${tareaId}/${fileName}`;
 
       const { error } = await supabase.storage
         .from(BUCKET_ARCHIVOS_TAREAS)
@@ -158,12 +164,12 @@ export default function GestorArchivos({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-semibold uppercase text-slate-500 dark:text-gray-400">
+      <div className="flex flex-col items-center justify-center text-center sm:text-left sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-3 mb-4.5 sm:mb-4">
+        <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400 whitespace-nowrap text-center sm:text-left">
           Archivos y Enlaces Adjuntos
         </h4>
         {!esLectura && (
-          <div className="flex gap-3">
+          <div className="flex items-center justify-center gap-3 w-full sm:w-auto mt-1 sm:mt-0">
             <input
               type="file"
               ref={fileInputRef}
@@ -175,25 +181,30 @@ export default function GestorArchivos({
             <button
               type="button"
               onClick={() => setMostrarLinkInput(!mostrarLinkInput)}
-              className="text-xs flex items-center gap-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium transition-colors cursor-pointer"
+              className={`h-8 px-3.5 sm:px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
+                mostrarLinkInput
+                  ? "border-blue-500 bg-blue-500/20 text-blue-600 dark:text-blue-300 ring-1 ring-blue-500/40"
+                  : "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 active:scale-95"
+              }`}
             >
-              <LinkIcon size={14} /> Añadir Enlace
+              <LinkIcon size={13} />
+              <span>Añadir Enlace</span>
             </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="text-xs flex items-center gap-1.5 text-purple-600 hover:text-purple-700 dark:text-purple-400 font-medium transition-colors disabled:opacity-50 cursor-pointer"
+              className="h-8 px-3.5 sm:px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 active:scale-95 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap shadow-2xs"
             >
-              {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              Subir PDF
+              {isUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+              <span>Subir PDF</span>
             </button>
           </div>
         )}
       </div>
 
       {mostrarLinkInput && !esLectura && (
-        <div className="bg-slate-50 dark:bg-neutral-800/50 p-3 rounded-lg border border-slate-200 dark:border-neutral-700 mb-3 flex flex-col gap-2">
+        <div className="bg-slate-50 dark:bg-neutral-800/50 p-3 rounded-lg border border-slate-200 dark:border-neutral-700 mb-3.5 flex flex-col gap-2">
           <input
             type="text"
             placeholder="URL del enlace (ej. https://drive.google.com/...)"
@@ -222,11 +233,11 @@ export default function GestorArchivos({
       )}
 
       {archivos.length === 0 ? (
-        <div className="text-[13px] text-slate-500 dark:text-gray-400 italic py-2 text-center bg-slate-50/50 dark:bg-neutral-900/30 rounded-lg border border-dashed border-slate-200 dark:border-neutral-800">
+        <div className="text-[13px] text-slate-500 dark:text-gray-400 italic py-3 sm:py-2.5 px-4 text-center bg-slate-50/50 dark:bg-neutral-900/30 rounded-lg border border-dashed border-slate-200 dark:border-neutral-800">
           No hay archivos ni enlaces adjuntos.
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {archivos.map((archivo) => (
             <div
               key={archivo.id}

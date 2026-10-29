@@ -19,10 +19,18 @@ interface NewTareaProps {
   usuarios: Usuario[];
   usuarioActual: string;
   esJefe: boolean;
+  comisionId?: string;
 }
 
-export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJefe }: NewTareaProps) {
+export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJefe, comisionId }: NewTareaProps) {
   const { crear } = useTareaMutations();
+  const { effectiveRole } = useUserContext();
+  const isSuper = effectiveRole === 'super';
+
+  const usuariosDisponibles = useMemo(() => {
+    if (isSuper) return usuarios;
+    return usuarios.filter((u) => u.rol !== 'super');
+  }, [usuarios, isSuper]);
 
   const obtenerFechaPorDefecto = () => {
     const d = new Date();
@@ -82,7 +90,9 @@ export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJ
     });
   };
 
-  const CACHE_KEY = `newTareaDraft_${usuarioActual}`;
+  const CACHE_KEY = comisionId
+    ? `newTareaDraft_${usuarioActual}_${comisionId}`
+    : `newTareaDraft_${usuarioActual}`;
   const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutos
 
   const [isRestored, setIsRestored] = useState(false);
@@ -109,18 +119,22 @@ export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJ
         }
       } else {
         // Reset if no cache
+        const soyElegible = !comisionId || usuarios.some((u) => u.user_id === usuarioActual);
+        const defaultUser = soyElegible
+          ? usuarios.find((u) => u.user_id === usuarioActual)
+          : usuarios[0];
         setTitle('');
         setDescription('');
         setDueDate(obtenerFechaPorDefecto());
-        setAssignedTo(usuarioActual);
-        setSearchTerm('');
+        setAssignedTo(defaultUser?.user_id || usuarioActual);
+        setSearchTerm(soyElegible ? '' : defaultUser?.nombre || '');
         setMiembros([]);
       }
       setIsRestored(true);
     } else {
       setIsRestored(false);
     }
-  }, [isOpen, usuarioActual]);
+  }, [isOpen, usuarioActual, comisionId]);
 
   // Save to cache on change
   useEffect(() => {
@@ -138,16 +152,7 @@ export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJ
     }
   }, [title, description, dueDate, assignedTo, searchTerm, miembros, isOpen, isRestored, usuarioActual]);
 
-  if (!isOpen) return null;
   const isSubmitting = crear.isPending;
-
-  const { effectiveRole } = useUserContext();
-  const isSuper = effectiveRole === 'super';
-
-  const usuariosDisponibles = useMemo(() => {
-    if (isSuper) return usuarios;
-    return usuarios.filter((u) => u.rol !== 'super');
-  }, [usuarios, isSuper]);
 
   // ── Helpers encargado ────────────────────────────────────────────────────
   const filteredUsuarios = usuariosDisponibles.filter(u =>
@@ -277,6 +282,7 @@ export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJ
         assigned_to: asignadoA,
         checklist: [],
         status: 'Asignado',
+        comision_id: comisionId || null,
         miembros: esGrupal
           ? miembros.map(m => ({ userId: m.userId, asignaciones: m.asignaciones }))
           : undefined,
@@ -308,6 +314,8 @@ export default function NewTarea({ isOpen, onClose, usuarios, usuarioActual, esJ
       toast.error(err.message || 'Error al guardar');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">

@@ -31,10 +31,12 @@ import { AuroraText } from "@/components/ui/aurora-text";
 import {
   ACTIVIDADES_MENU_OPTIONS,
   ADMIN_MENU_OPTIONS,
+  COMISIONES_MENU_OPTIONS,
   OBSERVATORIO_MENU_OPTIONS,
   getPerfilMenuOptions,
   getVisibleActividadesOptions,
   getVisibleAdminOptions,
+  getVisibleComisionesOptions,
   getVisibleDashboardModules,
   type DashboardModule,
 } from "@/components/(base)/dashboard/modules";
@@ -49,6 +51,8 @@ const MENU_OPTION_ICONS: Record<string, LucideIcon> = {
   "mis-actividades": ClipboardList,
   "jefatura-actividades": Users,
   "supervision-actividades": Building2,
+  "mis-comisiones": Users,
+  "supervision-comisiones": Building2,
   "movilidad-humana": Globe,
   "mi-perfil": User,
   "ingreso-seguro": KeyRound,
@@ -60,6 +64,7 @@ const MENU_OPTION_ICONS: Record<string, LucideIcon> = {
 const MODULE_ICONS: Record<string, LucideIcon> = {
   actividades: ClipboardList,
   tareas: ClipboardList,
+  comisiones: Users,
   observatorio: Globe,
   perfil: User,
   admin: Settings,
@@ -85,14 +90,16 @@ function MenuAccordionIcon({
   const iconColor =
     variant === "actividades"
       ? "text-blue-600 dark:text-blue-400"
-      : variant === "account"
-        ? "text-violet-600 dark:text-violet-400"
-        : "text-celeste-trifinio";
+      : variant === "comisiones"
+        ? "text-emerald-600 dark:text-emerald-400"
+        : variant === "account"
+          ? "text-violet-600 dark:text-violet-400"
+          : "text-celeste-trifinio";
 
   return <Icon className={cn("size-4 shrink-0", iconColor)} strokeWidth={2} aria-hidden />;
 }
 
-type MenuSectionVariant = "modules" | "account" | "admin" | "actividades";
+type MenuSectionVariant = "modules" | "account" | "admin" | "actividades" | "comisiones";
 
 const MENU_SECTION_STYLES: Record<
   MenuSectionVariant,
@@ -130,6 +137,14 @@ const MENU_SECTION_STYLES: Record<
     itemHover: "hover:bg-blue-100/70 dark:hover:bg-blue-900/35",
     itemActive: "bg-blue-100/80 dark:bg-blue-900/50 ring-1 ring-inset ring-blue-300/60 dark:ring-blue-600/50",
   },
+  comisiones: {
+    label: "text-emerald-600 dark:text-emerald-400",
+    dot: "bg-emerald-500",
+    panel: "bg-emerald-50/80 dark:bg-emerald-950/35 ring-1 ring-emerald-200/60 dark:ring-emerald-800/40",
+    item: "bg-white/85 dark:bg-emerald-950/45",
+    itemHover: "hover:bg-emerald-100/70 dark:hover:bg-emerald-900/35",
+    itemActive: "bg-emerald-100/80 dark:bg-emerald-900/50 ring-1 ring-inset ring-emerald-300/60 dark:ring-emerald-600/50",
+  },
 };
 
 function MenuActiveIndicator({
@@ -142,9 +157,11 @@ function MenuActiveIndicator({
   const accent =
     variant === "actividades"
       ? "bg-blue-500"
-      : variant === "account"
-        ? "bg-violet-500"
-        : "bg-celeste-trifinio";
+      : variant === "comisiones"
+        ? "bg-emerald-500"
+        : variant === "account"
+          ? "bg-violet-500"
+          : "bg-celeste-trifinio";
 
   return (
     <span
@@ -248,13 +265,17 @@ function MenuAccordion({
       ? isExpanded
         ? "text-blue-600 dark:text-blue-400"
         : "text-foreground"
-      : variant === "account"
+      : variant === "comisiones"
         ? isExpanded
-          ? "text-violet-700 dark:text-violet-300"
+          ? "text-emerald-600 dark:text-emerald-400"
           : "text-foreground"
-        : isExpanded
-          ? "text-celeste-trifinio"
-          : "text-foreground";
+        : variant === "account"
+          ? isExpanded
+            ? "text-violet-700 dark:text-violet-300"
+            : "text-foreground"
+          : isExpanded
+            ? "text-celeste-trifinio"
+            : "text-foreground";
 
   return (
     <MenuItemShell variant={variant} active={isExpanded} id={id}>
@@ -271,9 +292,11 @@ function MenuAccordion({
             isExpanded
               ? variant === "actividades"
                 ? "bg-blue-500/15 dark:bg-blue-500/25"
-                : variant === "account"
-                  ? "bg-violet-500/15 dark:bg-violet-500/25"
-                  : "bg-celeste-trifinio/15 dark:bg-celeste-trifinio/25"
+                : variant === "comisiones"
+                  ? "bg-emerald-500/15 dark:bg-emerald-500/25"
+                  : variant === "account"
+                    ? "bg-violet-500/15 dark:bg-violet-500/25"
+                    : "bg-celeste-trifinio/15 dark:bg-celeste-trifinio/25"
               : "bg-zinc-100 dark:bg-zinc-800",
           )}
         >
@@ -315,8 +338,13 @@ function MenuAccordion({
         <div className="overflow-hidden">
           <div className={cn("mx-2 mb-2 space-y-1.5 rounded-xl p-1.5", styles.panel)}>
             {options.map((opt, index) => {
+              const isExactRoot =
+                opt.href === "/comude/actividades" ||
+                opt.href === "/comude/comisiones";
               const isActive = opt.href
-                ? pathname === opt.href || pathname.startsWith(`${opt.href}/`)
+                ? isExactRoot
+                  ? pathname === opt.href
+                  : pathname === opt.href || pathname.startsWith(`${opt.href}/`)
                 : false;
 
               const itemClassName = cn(
@@ -334,9 +362,11 @@ function MenuAccordion({
                       "flex size-8 shrink-0 items-center justify-center rounded-lg",
                       variant === "actividades"
                         ? "bg-blue-500/10 dark:bg-blue-500/20"
-                        : variant === "account"
-                          ? "bg-violet-500/10 dark:bg-violet-500/20"
-                          : "bg-celeste-trifinio/10 dark:bg-celeste-trifinio/15",
+                        : variant === "comisiones"
+                          ? "bg-emerald-500/10 dark:bg-emerald-500/20"
+                          : variant === "account"
+                            ? "bg-violet-500/10 dark:bg-violet-500/20"
+                            : "bg-celeste-trifinio/10 dark:bg-celeste-trifinio/15",
                     )}
                   >
                     <MenuAccordionIcon optionId={opt.id} variant={variant} />
@@ -490,11 +520,11 @@ function MenuModuleLink({
   );
 }
 
-type MenuAccordionId = "observatorio" | "perfil" | "admin" | "actividades";
+type MenuAccordionId = "observatorio" | "perfil" | "admin" | "actividades" | "comisiones";
 
 export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   const pathname = usePathname();
-  const { realRole, effectiveRole, simulatedRole, setSimulatedRole, esJefe } = useUserContext();
+  const { realRole, effectiveRole, simulatedRole, setSimulatedRole, esJefe, esMiembroComision } = useUserContext();
   const { data: appSettings } = useAppSettings();
   const [openAccordionId, setOpenAccordionId] = useState<MenuAccordionId | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -515,14 +545,17 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   const usuario = metadata.username || user?.email?.split("@")[0] || "—";
   const nombre = metadata.nombre || "—";
 
-  const visibleModules = user ? getVisibleDashboardModules(effectiveRole) : [];
+  const visibleModules = user
+    ? getVisibleDashboardModules(effectiveRole, esMiembroComision)
+    : [];
   const mainModules = visibleModules.filter(
     (mod) =>
       mod.id !== "admin" &&
       mod.id !== "observatorio" &&
       mod.id !== "perfil" &&
       mod.id !== "actividades" &&
-      mod.id !== "tareas",
+      mod.id !== "tareas" &&
+      mod.id !== "comisiones",
   );
   const adminModule = visibleModules.find((mod) => mod.id === "admin");
   const observatorioModule = visibleModules.find((mod) => mod.id === "observatorio");
@@ -531,9 +564,13 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   const isObservatorioRoute = pathname.startsWith("/comude/observatorio");
   const isActividadesRoute =
     pathname.startsWith("/comude/actividades") || pathname.startsWith("/comude/tareas");
+  const isComisionesRoute = pathname.startsWith("/comude/comisiones");
   const effectiveEsJefe = simulatedRole ? false : esJefe;
   const visibleActividadesOptions = user
     ? getVisibleActividadesOptions(ACTIVIDADES_MENU_OPTIONS, effectiveRole, effectiveEsJefe)
+    : [];
+  const visibleComisionesOptions = user
+    ? getVisibleComisionesOptions(COMISIONES_MENU_OPTIONS, effectiveRole, esMiembroComision)
     : [];
   const passkeysEnabled = appSettings?.enable_passkeys ?? false;
   const perfilMenuOptions = getPerfilMenuOptions(passkeysEnabled);
@@ -547,6 +584,10 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
   useEffect(() => {
     if (isActividadesRoute) setOpenAccordionId("actividades");
   }, [isActividadesRoute]);
+
+  useEffect(() => {
+    if (isComisionesRoute) setOpenAccordionId("comisiones");
+  }, [isComisionesRoute]);
 
   useEffect(() => {
     if (isAdminRoute) setOpenAccordionId("admin");
@@ -700,6 +741,25 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
                       onNavigate={() => setIsOpen(false)}
                       variant="actividades"
                       icon={ClipboardList}
+                    />
+                  </MenuSection>
+                )}
+
+                {visibleComisionesOptions.length > 0 && (
+                  <MenuSection label="Comisiones" variant="comisiones">
+                    <MenuAccordion
+                      id="menu-comisiones"
+                      title="Comisiones"
+                      subtitle="de Trabajo"
+                      desc="Espacio colaborativo y planes de trabajo de las comisiones municipales."
+                      options={visibleComisionesOptions}
+                      pathname={pathname}
+                      open={openAccordionId === "comisiones"}
+                      onToggle={() => toggleAccordion("comisiones")}
+                      isRouteActive={isComisionesRoute}
+                      onNavigate={() => setIsOpen(false)}
+                      variant="comisiones"
+                      icon={Users}
                     />
                   </MenuSection>
                 )}

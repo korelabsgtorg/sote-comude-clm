@@ -7,6 +7,7 @@ import { PushListener } from "@/components/push/PushListener";
 import BloqueoConfirmacionModal from "@/components/(comude)/actividades/modals/BloqueoConfirmacionModal";
 import BloqueoActividad from "@/components/(comude)/tareas/BloqueoActividad";
 import { verificarEsJefeUsuario } from "@/components/(comude)/tareas/lib/actions";
+import { verificarEsMiembroComision } from "@/components/(comude)/comisiones/lib/actions";
 
 /** Intervalo de refresco automático de sesión (ms) - 5 minutos */
 const REFRESH_INTERVAL_MS = 300_000;
@@ -18,6 +19,7 @@ interface UserContextValue {
   effectiveRole: string;
   realRole: string;
   esJefe: boolean;
+  esMiembroComision: boolean;
 }
 
 const UserContext = createContext<UserContextValue>({
@@ -27,6 +29,7 @@ const UserContext = createContext<UserContextValue>({
   effectiveRole: "user",
   realRole: "user",
   esJefe: false,
+  esMiembroComision: false,
 });
 
 export function UserProvider({
@@ -39,6 +42,7 @@ export function UserProvider({
   const [user, setUser] = useState<User | null>(initialUser);
   const [simulatedRole, setSimulatedRole] = useState<string | null>(null);
   const [esJefe, setEsJefe] = useState<boolean>(false);
+  const [esMiembroComision, setEsMiembroComision] = useState<boolean>(false);
   const supabase = createClient();
   const lastRoleRef = useRef<string | undefined>(undefined);
 
@@ -80,10 +84,11 @@ export function UserProvider({
     return () => clearInterval(interval);
   }, [user, refreshUser]);
 
-  // Verificar si el usuario tiene asignada alguna jefatura en el municipio
+  // Verificar si el usuario tiene asignada alguna jefatura o comisión en el municipio
   useEffect(() => {
     if (!user) {
       setEsJefe(false);
+      setEsMiembroComision(false);
       return;
     }
     let isMounted = true;
@@ -94,10 +99,17 @@ export function UserProvider({
       .catch(() => {
         if (isMounted) setEsJefe(false);
       });
+    verificarEsMiembroComision()
+      .then((resultado) => {
+        if (isMounted) setEsMiembroComision(resultado);
+      })
+      .catch(() => {
+        if (isMounted) setEsMiembroComision(false);
+      });
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   const metadata = user?.user_metadata || {};
   const realRole = metadata.rol || user?.role || "user";
@@ -114,7 +126,7 @@ export function UserProvider({
   }, [realRole]);
 
   return (
-    <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole, esJefe }}>
+    <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole, esJefe, esMiembroComision }}>
       {user && (
         <>
           <PushListener />

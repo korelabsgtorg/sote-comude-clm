@@ -17,6 +17,13 @@ interface Props {
 
 export default function EditarTarea({ isOpen, onClose, tarea, esJefe, usuarios }: Props) {
   const { actualizar, addMiembro, removeMiembro } = useTareaMutations(); 
+  const { effectiveRole } = useUserContext();
+  const isSuper = effectiveRole === 'super';
+
+  const usuariosDisponibles = useMemo(() => {
+    if (isSuper) return usuarios;
+    return usuarios.filter((u) => u.rol !== 'super');
+  }, [usuarios, isSuper]);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -61,17 +68,7 @@ export default function EditarTarea({ isOpen, onClose, tarea, esJefe, usuarios }
     }
   }, [isOpen, tarea, usuarios]);
 
-  if (!isOpen) return null;
-
   const isSubmitting = actualizar.isPending;
-
-  const { effectiveRole } = useUserContext();
-  const isSuper = effectiveRole === 'super';
-
-  const usuariosDisponibles = useMemo(() => {
-    if (isSuper) return usuarios;
-    return usuarios.filter((u) => u.rol !== 'super');
-  }, [usuarios, isSuper]);
 
   // ── Helpers mentions ─────────────────────────────────────────────────────
   const usuariosParaMencion = usuariosDisponibles.filter(u => 
@@ -202,6 +199,8 @@ export default function EditarTarea({ isOpen, onClose, tarea, esJefe, usuarios }
       toast.error('Error al actualizar la actividad');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">

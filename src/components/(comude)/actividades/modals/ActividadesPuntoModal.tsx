@@ -19,7 +19,10 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  Building2,
+  Users,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
@@ -43,6 +46,7 @@ import {
   useDesmarcarRevisadoPorComude,
   useFinalizarActividadPunto,
 } from '../lib/hooks';
+import { useTodasComisiones } from '@/components/(comude)/comisiones/lib/hooks';
 import { useUserContext } from '@/components/(base)/providers/UserProvider';
 
 interface ActividadesPuntoModalProps {
@@ -211,6 +215,7 @@ function DetalleActividadPanel({
 }) {
   const { user } = useUserContext();
   const [tabActivo, setTabActivo] = useState<string>('encargado');
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
   const { mutate: toggleChecklist } = useToggleChecklistPunto();
   const { mutate: toggleMiembroChecklist } = useToggleMiembroChecklistPunto();
 
@@ -226,7 +231,7 @@ function DetalleActividadPanel({
 
   const totalMiembros = miembros.reduce((s, m) => s + (m.asignaciones?.length || 0), 0);
   const completadosMiembros = miembros.reduce(
-    (s, m) => s + (m.asignaciones?.filter((a) => a.is_complete).length || 0),
+    (s, m) => s + (m.asignaciones?.filter((a) => Boolean(a.is_complete ?? (a as any).completado)).length || 0),
     0
   );
   const totalGlobal = totalEncargado + (esGrupal ? totalMiembros : 0);
@@ -258,16 +263,26 @@ function DetalleActividadPanel({
   const activeMember = miembros.find((m) => m.id === tabActivo);
 
   const handleToggleGlobalCheck = (index: number) => {
-    const nuevo = [...checklist];
-    nuevo[index] = { ...nuevo[index], is_completed: !nuevo[index].is_completed };
+    const nuevo = checklist.map((item, i) => {
+      const currentTitle = item.title || (item as any).titulo || '';
+      const currentCompleted = Boolean(item.is_completed ?? (item as any).completado);
+      return i === index
+        ? { title: currentTitle, is_completed: !currentCompleted }
+        : { title: currentTitle, is_completed: currentCompleted };
+    });
     toggleChecklist({ actividadId: actividad.id, puntoId, checklist: nuevo });
   };
 
   const handleToggleMiembroCheck = (miembroId: string, itemIdx: number) => {
     const miembro = miembros.find((m) => m.id === miembroId);
     if (!miembro) return;
-    const nuevas = [...(miembro.asignaciones || [])];
-    nuevas[itemIdx] = { ...nuevas[itemIdx], is_complete: !nuevas[itemIdx].is_complete };
+    const nuevas = (miembro.asignaciones || []).map((a, i) => {
+      const currentTitle = a.title || (a as any).titulo || '';
+      const currentComplete = Boolean(a.is_complete ?? (a as any).completado);
+      return i === itemIdx
+        ? { title: currentTitle, is_complete: !currentComplete }
+        : { title: currentTitle, is_complete: currentComplete };
+    });
     toggleMiembroChecklist({ miembroId, puntoId, asignaciones: nuevas });
   };
 
@@ -279,14 +294,14 @@ function DetalleActividadPanel({
       : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400';
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-        <div className="min-w-0 flex-1">
+    <article className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-sm text-zinc-100 sm:rounded-2xl">
+      <div className="flex items-start justify-between gap-2 border-b border-zinc-800 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-400">
               {indice}
             </span>
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{actividad.titulo}</h3>
+            <h3 className="text-base font-bold text-zinc-100">{actividad.titulo}</h3>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadgeClass}`}>
               {actividad.fecha_confirmacion || actividad.estado === 'Completado' ? (
                 <CheckCircle2 size={11} />
@@ -310,7 +325,14 @@ function DetalleActividadPanel({
             )}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+          {actividad.comision_nombre && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-400">
+              <Building2 size={13} className="shrink-0 text-purple-400" />
+              <span className="leading-snug">{actividad.comision_nombre}</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 pt-0.5">
             <span className="flex items-center gap-1">
               <Crown size={13} className="text-amber-500" /> <span className="font-semibold text-zinc-800 dark:text-zinc-200">{actividad.encargado_nombre}</span> (Encargado)
             </span>
@@ -345,26 +367,26 @@ function DetalleActividadPanel({
         )}
       </div>
 
-      <div className="space-y-4 p-4">
+      <div className="space-y-3 p-2.5 sm:space-y-4 sm:p-4">
         {actividad.descripcion && (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-2.5 sm:rounded-xl sm:p-3">
             <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Descripción</p>
-            <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{actividad.descripcion}</p>
+            <p className="whitespace-pre-wrap text-sm text-zinc-300">{actividad.descripcion}</p>
           </div>
         )}
 
         {/* Barra de progreso global */}
         {(totalGlobal > 0 || esGrupal) && (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3.5 dark:border-zinc-700 dark:bg-zinc-800/50 space-y-2.5">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-2.5 space-y-2 sm:rounded-xl sm:p-3.5 sm:space-y-2.5">
             <div className="flex justify-between items-end">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">
                 {esGrupal ? 'Progreso Global' : 'Progreso de la actividad'}
               </p>
-              <span className={`text-xs font-bold ${porcentajeGlobal === 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-700 dark:text-zinc-300'}`}>
+              <span className={`text-xs font-bold ${porcentajeGlobal === 100 ? 'text-emerald-400' : 'text-zinc-300'}`}>
                 {completosGlobal}/{totalGlobal} · {porcentajeGlobal}%
               </span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-700">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${getColorBarra(porcentajeGlobal)}`}
                 style={{ width: `${porcentajeGlobal}%` }}
@@ -373,24 +395,26 @@ function DetalleActividadPanel({
 
             {/* Sub-barras para actividades grupales */}
             {esGrupal && (
-              <div className="pt-2 mt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
+              <div className="pt-2 mt-2 border-t border-zinc-700 space-y-2">
                 <div>
-                  <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1 font-medium text-zinc-700 dark:text-zinc-300 min-w-0 flex-1">
+                  <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-1.5 sm:gap-2">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-300 min-w-0 flex-1">
                       <div className="flex items-center gap-1 min-w-0">
                         <Crown size={12} className="text-amber-500 shrink-0" />
-                        <span className="truncate">{actividad.encargado_nombre}</span>
-                        <span className="text-blue-500 text-[10px] shrink-0">(Encargado)</span>
+                        <span className="truncate">
+                          {actividad.encargado_nombre} {esAsignadoAMi ? '(Yo)' : ''}
+                        </span>
+                        <span className="text-blue-400 text-[10px] shrink-0">(Encargado)</span>
                       </div>
-                      <div className="sm:ml-1 shrink-0">
+                      <div className="shrink-0">
                         {renderConfirmacion(actividad.fecha_confirmacion)}
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold text-zinc-500 shrink-0 mt-0.5 sm:mt-0">
+                    <span className="text-[10px] font-semibold text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
                       {completadosEncargado}/{totalEncargado}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-zinc-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${getColorBarra(porcentajeEncargado)}`}
                       style={{ width: `${porcentajeEncargado}%` }}
@@ -399,26 +423,29 @@ function DetalleActividadPanel({
                 </div>
 
                 {miembros.map((m) => {
+                  const esYo = m.usuario_id === user?.id;
                   const mTotal = m.asignaciones?.length || 0;
-                  const mComp = m.asignaciones?.filter((a) => a.is_complete).length || 0;
-                  const mPct = mTotal === 0 ? 0 : Math.round((mComp / mTotal) * 100);
+                  const mComp = m.asignaciones?.filter((a) => Boolean(a.is_complete ?? (a as any).completado)).length || 0;
+                  const mPct = mTotal === 0 ? (m.fecha_finalizacion ? 100 : 0) : Math.round((mComp / mTotal) * 100);
                   return (
                     <div key={m.id}>
-                      <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1 font-medium text-zinc-700 dark:text-zinc-300 min-w-0 flex-1">
+                      <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-1.5 sm:gap-2">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-300 min-w-0 flex-1">
                           <div className="flex items-center gap-1 min-w-0">
-                            <User size={12} className="text-purple-500 shrink-0" />
-                            <span className="truncate">{m.nombre_usuario}</span>
+                            <User size={12} className="text-purple-400 shrink-0" />
+                            <span className="truncate">
+                              {m.nombre_usuario} {esYo ? '(Yo)' : ''}
+                            </span>
                           </div>
-                          <div className="sm:ml-1 shrink-0">
+                          <div className="shrink-0">
                             {renderConfirmacion(m.fecha_confirmacion)}
                           </div>
                         </div>
-                        <span className="text-[10px] font-semibold text-zinc-500 shrink-0 mt-0.5 sm:mt-0">
-                          {mComp}/{mTotal}
+                        <span className="text-[10px] font-semibold text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
+                          {mTotal === 0 ? (m.fecha_finalizacion ? 'Completado' : '—') : `${mComp}/${mTotal}`}
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-zinc-700 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${getColorBarra(mPct)}`}
                           style={{ width: `${mPct}%` }}
@@ -434,21 +461,31 @@ function DetalleActividadPanel({
 
         {/* Pestañas para Grupal vs Checklist Simple */}
         {esGrupal ? (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-700 dark:bg-zinc-800/30">
-            <div className="flex justify-start sm:justify-center gap-6 mb-4 overflow-x-auto border-b border-zinc-200 dark:border-zinc-700 px-2 pb-2 scrollbar-none w-full">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-800/30 p-2.5 sm:rounded-xl sm:p-4">
+            <div
+              ref={tabsScrollRef}
+              className="flex justify-start sm:justify-center gap-2 sm:gap-4 mb-3 sm:mb-4 overflow-x-auto border-b border-zinc-700 px-3 pb-1.5 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full"
+            >
               {tabs.map((t) => {
                 const isActive = tabActivo === t.id;
                 const isEncargadoTab = t.id === 'encargado';
                 const activeColorClass = isEncargadoTab
-                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                  : 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400';
+                  ? 'text-blue-400 border-b-2 border-blue-400'
+                  : 'text-purple-400 border-b-2 border-purple-400';
 
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setTabActivo(t.id)}
-                    className={`pb-2 text-xs font-semibold whitespace-nowrap flex flex-col items-center shrink-0 transition-colors ${
-                      isActive ? activeColorClass : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                    onClick={(e) => {
+                      setTabActivo(t.id);
+                      if (isEncargadoTab && tabsScrollRef.current) {
+                        tabsScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+                      } else {
+                        e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                      }
+                    }}
+                    className={`px-3 pb-2 pt-0.5 text-xs font-semibold whitespace-nowrap flex flex-col items-center shrink-0 transition-colors ${
+                      isActive ? activeColorClass : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <span className={`text-[9px] uppercase font-bold tracking-wider mb-0.5 ${isActive ? 'opacity-90' : 'opacity-60'}`}>
@@ -456,12 +493,12 @@ function DetalleActividadPanel({
                     </span>
                     <div className="flex items-center gap-1.5">
                       {isEncargadoTab ? (
-                        <Crown size={14} className={isActive ? 'text-amber-500' : 'opacity-40'} />
+                        <Crown size={14} className={`shrink-0 ${isActive ? 'text-amber-500' : 'opacity-40'}`} />
                       ) : (
-                        <User size={14} className={isActive ? 'text-purple-500' : 'opacity-40'} />
+                        <User size={14} className={`shrink-0 ${isActive ? 'text-purple-500' : 'opacity-40'}`} />
                       )}
                       <span>{t.label}</span>
-                      {t.confirmedAt && <CheckCircle2 size={12} className="text-emerald-500" />}
+                      {t.confirmedAt && <CheckCircle2 size={12} className="shrink-0 text-emerald-500" />}
                     </div>
                   </button>
                 );
@@ -479,16 +516,16 @@ function DetalleActividadPanel({
                       <li
                         key={i}
                         onClick={() => handleToggleGlobalCheck(i)}
-                        className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800/70 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700/50 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                        className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/70 p-2 rounded-lg border border-zinc-700/50 cursor-pointer hover:bg-zinc-800 transition-colors"
                       >
                         <input
                           type="checkbox"
-                          checked={item.is_completed}
+                          checked={Boolean(item.is_completed)}
                           readOnly
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
-                        <span className={cn(item.is_completed && 'line-through text-zinc-400 dark:text-zinc-500')}>
-                          {item.title}
+                        <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-500')}>
+                          {item.title || (item as any).titulo || ''}
                         </span>
                       </li>
                     ))}
@@ -500,28 +537,32 @@ function DetalleActividadPanel({
             ) : (
               activeMember && (
                 <div className="space-y-3">
-                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400">
                     <CheckSquare size={14} /> Actividades de {activeMember.nombre_usuario} ({(activeMember.asignaciones || []).length})
                   </p>
                   {(activeMember.asignaciones || []).length > 0 ? (
                     <ul className="space-y-1.5">
-                      {activeMember.asignaciones.map((asig, i) => (
-                        <li
-                          key={i}
-                          onClick={() => handleToggleMiembroCheck(activeMember.id, i)}
-                          className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800/70 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700/50 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={asig.is_complete}
-                            readOnly
-                            className="rounded text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className={cn(asig.is_complete && 'line-through text-zinc-400 dark:text-zinc-500')}>
-                            {asig.title}
-                          </span>
-                        </li>
-                      ))}
+                      {activeMember.asignaciones.map((asig, i) => {
+                        const completada = Boolean(asig.is_complete ?? (asig as any).completado);
+                        const titulo = asig.title || (asig as any).titulo || (asig as any).nombre || '';
+                        return (
+                          <li
+                            key={i}
+                            onClick={() => handleToggleMiembroCheck(activeMember.id, i)}
+                            className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/70 p-2 rounded-lg border border-zinc-700/50 cursor-pointer hover:bg-zinc-800 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={completada}
+                              readOnly
+                              className="rounded text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className={cn(completada && 'line-through text-zinc-500')}>
+                              {titulo}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">No hay tareas individuales asignadas.</p>
@@ -533,7 +574,7 @@ function DetalleActividadPanel({
         ) : (
           checklist.length > 0 && (
             <div className="space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400">
                 <CheckSquare size={14} /> Entregables ({completadosEncargado}/{totalEncargado})
               </p>
               <ul className="space-y-1.5">
@@ -541,16 +582,16 @@ function DetalleActividadPanel({
                   <li
                     key={i}
                     onClick={() => handleToggleGlobalCheck(i)}
-                    className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/50 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/50 p-2 rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors"
                   >
                     <input
                       type="checkbox"
-                      checked={item.is_completed}
+                      checked={Boolean(item.is_completed)}
                       readOnly
                       className="rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className={cn(item.is_completed && 'line-through text-zinc-400 dark:text-zinc-500')}>
-                      {item.title}
+                    <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-500')}>
+                      {item.title || (item as any).titulo || ''}
                     </span>
                   </li>
                 ))}
@@ -560,7 +601,7 @@ function DetalleActividadPanel({
         )}
 
         {/* Sección de finalización y revisión */}
-        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2.5">
+        <div className="pt-3 border-t border-zinc-800 space-y-2.5">
           {actividad.estado === 'Completado' && actividad.actualizado_en && (
             <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               <CheckCircle2 size={13} />
@@ -663,6 +704,14 @@ export default function ActividadesPuntoModal({
   const [checklistInput, setChecklistInput] = useState('');
   const [miembros, setMiembros] = useState<{ userId: string; nombre: string; asignaciones: { title: string; is_complete: boolean }[] }[]>([]);
 
+  // Tipo de asignación: 'persona' o 'comision'
+  const [tipoAsignacion, setTipoAsignacion] = useState<'persona' | 'comision'>('persona');
+  const [comisionSeleccionadaId, setComisionSeleccionadaId] = useState<string>('');
+  const [comisionSearchTerm, setComisionSearchTerm] = useState('');
+  const [showComisionDropdown, setShowComisionDropdown] = useState(false);
+  const [showMiembroDropdown, setShowMiembroDropdown] = useState(false);
+  const [miembroSearchTerm, setMiembroSearchTerm] = useState('');
+
   // Mention State
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearchTerm, setMentionSearchTerm] = useState('');
@@ -670,6 +719,9 @@ export default function ActividadesPuntoModal({
   const backdropRef = useRef<HTMLDivElement>(null);
 
   // Queries & Mutations
+  const queryClient = useQueryClient();
+  const anioActual = new Date().getFullYear();
+  const { data: comisiones = [], isLoading: cargandoComisiones } = useTodasComisiones(anioActual, isOpen);
   const { data: actividades = [], isLoading } = useActividadesDePunto(punto?.id ?? null, isOpen);
   const { data: usuarios = [] } = useUsuariosAsignablesMunicipio(isOpen);
   const { mutateAsync: crearActividad, isPending: creando } = useCrearActividadPunto();
@@ -682,6 +734,74 @@ export default function ActividadesPuntoModal({
 
   const { effectiveRole } = useUserContext();
   const isSuper = effectiveRole === 'super';
+
+  const comisionActual = useMemo(() => {
+    return comisiones.find((c) => c.id === comisionSeleccionadaId) || null;
+  }, [comisiones, comisionSeleccionadaId]);
+
+  const integrantesComision = useMemo(() => {
+    return comisionActual?.integrantes || [];
+  }, [comisionActual]);
+
+  const comisionesFiltradas = useMemo(() => {
+    if (!comisionSearchTerm.trim()) return comisiones;
+    return comisiones.filter((c) =>
+      c.nombre.toLowerCase().includes(comisionSearchTerm.toLowerCase())
+    );
+  }, [comisiones, comisionSearchTerm]);
+
+  const integrantesFiltrados = useMemo(() => {
+    if (!miembroSearchTerm.trim()) return integrantesComision;
+    return integrantesComision.filter((i) =>
+      i.nombre.toLowerCase().includes(miembroSearchTerm.toLowerCase())
+    );
+  }, [integrantesComision, miembroSearchTerm]);
+
+  const handleSeleccionarComision = (comision: (typeof comisiones)[0]) => {
+    setComisionSeleccionadaId(comision.id);
+    setComisionSearchTerm(comision.nombre);
+    setShowComisionDropdown(false);
+
+    const integrantes = comision.integrantes || [];
+    // Priorizar al coordinador designado de la comisión; si solo hay 1 integrante, usarlo
+    const coordinador = integrantes.find((i) => i.es_coordinador) || (integrantes.length === 1 ? integrantes[0] : null);
+
+    if (coordinador) {
+      setAssignedTo(coordinador.id_integrante);
+      setSearchTerm(coordinador.nombre);
+      setMiembroSearchTerm(coordinador.nombre);
+      const otrosMiembros = integrantes
+        .filter((m) => m.id_integrante !== coordinador.id_integrante)
+        .map((m) => ({
+          userId: m.id_integrante,
+          nombre: m.nombre,
+          asignaciones: [],
+        }));
+      setMiembros(otrosMiembros);
+    } else {
+      setAssignedTo('');
+      setSearchTerm('');
+      setMiembroSearchTerm('');
+      setMiembros([]);
+    }
+  };
+
+  const handleSeleccionarEncargadoComision = (integrante: { id_integrante: string; nombre: string; es_coordinador?: boolean }) => {
+    setAssignedTo(integrante.id_integrante);
+    setSearchTerm(integrante.nombre);
+    setMiembroSearchTerm(integrante.nombre);
+    setShowMiembroDropdown(false);
+
+    // Los demás integrantes de la comisión se agregan como miembros colaboradores grupales
+    const otrosMiembros = integrantesComision
+      .filter((m) => m.id_integrante !== integrante.id_integrante)
+      .map((m) => ({
+        userId: m.id_integrante,
+        nombre: m.nombre,
+        asignaciones: [],
+      }));
+    setMiembros(otrosMiembros);
+  };
 
   const usuariosDisponibles = useMemo(() => {
     if (isSuper) return usuarios;
@@ -716,6 +836,12 @@ export default function ActividadesPuntoModal({
     setChecklistInput('');
     setMiembros([]);
     setEditandoId(null);
+    setTipoAsignacion('persona');
+    setComisionSeleccionadaId('');
+    setComisionSearchTerm('');
+    setShowComisionDropdown(false);
+    setShowMiembroDropdown(false);
+    setMiembroSearchTerm('');
   };
 
   const [mounted, setMounted] = useState(false);
@@ -767,6 +893,17 @@ export default function ActividadesPuntoModal({
         asignaciones: m.asignaciones || [],
       }))
     );
+    if (act.comision_id) {
+      setTipoAsignacion('comision');
+      setComisionSeleccionadaId(act.comision_id);
+      setComisionSearchTerm(act.comision_nombre || 'Comisión');
+      setMiembroSearchTerm(act.encargado_nombre);
+    } else {
+      setTipoAsignacion('persona');
+      setComisionSeleccionadaId('');
+      setComisionSearchTerm('');
+      setMiembroSearchTerm('');
+    }
     setVista('formulario');
   };
 
@@ -890,8 +1027,16 @@ export default function ActividadesPuntoModal({
       toast.warn('Completa el título y la fecha límite de la actividad.');
       return;
     }
+    if (tipoAsignacion === 'comision' && !comisionSeleccionadaId) {
+      toast.warn('Por favor selecciona una comisión.');
+      return;
+    }
     if (!assignedTo) {
-      toast.warn('Selecciona a quién se le asigna la actividad.');
+      toast.warn(
+        tipoAsignacion === 'comision'
+          ? 'Por favor selecciona un encargado entre los integrantes de la comisión.'
+          : 'Selecciona a quién se le asigna la actividad.'
+      );
       return;
     }
 
@@ -941,9 +1086,15 @@ export default function ActividadesPuntoModal({
           encargadoId: assignedTo,
           checklist,
           miembros: esGrupal ? miembros.map((m) => ({ userId: m.userId, asignaciones: m.asignaciones })) : undefined,
+          comisionId: tipoAsignacion === 'comision' && comisionSeleccionadaId ? comisionSeleccionadaId : undefined,
         });
+        queryClient.invalidateQueries({ queryKey: ['actividades_comision'] });
         notifyActividadPendienteRefresh();
-        toast.success('Actividad asignada.');
+        toast.success(
+          tipoAsignacion === 'comision'
+            ? 'Actividad asignada a la comisión.'
+            : 'Actividad asignada.'
+        );
       }
       limpiarFormulario();
       setVista('lista');
@@ -1031,7 +1182,7 @@ export default function ActividadesPuntoModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[500] flex flex-col sm:items-center sm:justify-center sm:p-4">
+        <div className="dark fixed inset-0 z-[500] flex flex-col sm:items-center sm:justify-center sm:p-4">
           {/* Backdrop con blur que cubre toda la pantalla incluyendo el header */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -1048,11 +1199,11 @@ export default function ActividadesPuntoModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="relative z-10 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-800 sm:h-auto sm:max-h-[min(90vh,52rem)] sm:w-full sm:max-w-2xl sm:rounded-3xl sm:border sm:border-zinc-200 sm:shadow-2xl dark:sm:border-zinc-700 dark:sm:shadow-black/70"
+            className="relative z-10 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-zinc-900 text-zinc-100 sm:h-auto sm:max-h-[min(90vh,52rem)] sm:w-full sm:max-w-2xl sm:rounded-3xl sm:border sm:border-zinc-800 sm:shadow-2xl dark:sm:border-zinc-700 dark:sm:shadow-black/70"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-200 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] dark:border-zinc-700 sm:rounded-t-3xl sm:px-5 sm:pb-2.5 sm:pt-4">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:rounded-t-3xl sm:px-5 sm:pb-2.5 sm:pt-4">
               <div className="min-w-0 pr-1">
                 <h2 className="text-base font-semibold leading-snug text-[#0066cc] line-clamp-1 dark:text-blue-400 sm:text-lg">
                   Actividades asignadas
@@ -1060,7 +1211,7 @@ export default function ActividadesPuntoModal({
               </div>
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-white"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
                 aria-label="Cerrar"
               >
                 <X size={20} />
@@ -1068,17 +1219,17 @@ export default function ActividadesPuntoModal({
             </div>
 
         {/* Contenido */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] custom-scrollbar sm:px-5 sm:pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5 pb-[max(1rem,env(safe-area-inset-bottom))] custom-scrollbar sm:px-5 sm:pb-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
             </div>
           ) : vista === 'lista' ? (
-            <div className="flex w-full flex-col gap-4">
+            <div className="flex w-full flex-col gap-3 sm:gap-4">
               {canManage && (
                 <button
                   onClick={abrirNueva}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-200 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600"
+                  className="flex h-11 sm:h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-700 text-sm font-semibold text-white transition-colors hover:bg-zinc-600"
                 >
                   <Plus size={18} /> Nueva actividad
                 </button>
@@ -1089,7 +1240,7 @@ export default function ActividadesPuntoModal({
                   No hay actividades asignadas para este punto.
                 </p>
               ) : (
-                <ul className="flex flex-col gap-4">
+                <ul className="flex flex-col gap-3 sm:gap-4">
                   {actividades.map((actividad, index) => (
                     <li key={actividad.id}>
                       <DetalleActividadPanel
@@ -1159,18 +1310,72 @@ export default function ActividadesPuntoModal({
               </div>
 
               <div className="space-y-2 relative">
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  <User size={14} /> {editandoId ? 'Asignado a' : 'Asignar a'}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {tipoAsignacion === 'comision' ? <Building2 size={14} /> : <User size={14} />}{' '}
+                    {editandoId ? 'Asignado a' : 'Asignar a'}
+                  </label>
+                  {!editandoId && (
+                    <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5 dark:bg-neutral-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (tipoAsignacion !== 'persona') {
+                            setTipoAsignacion('persona');
+                            setComisionSeleccionadaId('');
+                            setComisionSearchTerm('');
+                            setAssignedTo('');
+                            setSearchTerm('');
+                            setMiembroSearchTerm('');
+                            setMiembros([]);
+                          }
+                        }}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                          tipoAsignacion === 'persona'
+                            ? 'bg-white text-blue-600 shadow-sm dark:bg-neutral-700 dark:text-blue-400'
+                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        Persona
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (tipoAsignacion !== 'comision') {
+                            setTipoAsignacion('comision');
+                            setComisionSeleccionadaId('');
+                            setComisionSearchTerm('');
+                            setAssignedTo('');
+                            setSearchTerm('');
+                            setMiembroSearchTerm('');
+                            setMiembros([]);
+                          }
+                        }}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                          tipoAsignacion === 'comision'
+                            ? 'bg-white text-purple-600 shadow-sm dark:bg-neutral-700 dark:text-purple-400'
+                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        Comisión
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {editandoId ? (
                   <input
                     type="text"
-                    value={searchTerm}
+                    value={
+                      comisionSearchTerm
+                        ? `Comisión: ${comisionSearchTerm} (${searchTerm})`
+                        : searchTerm
+                    }
                     readOnly
                     disabled
                     className="w-full cursor-not-allowed p-3 bg-gray-50 dark:bg-neutral-800 border border-gray-100 dark:border-neutral-700 rounded-xl text-base text-gray-500 dark:text-gray-400 opacity-70"
                   />
-                ) : (
+                ) : tipoAsignacion === 'persona' ? (
                   <>
                     <input
                       type="text"
@@ -1192,7 +1397,10 @@ export default function ActividadesPuntoModal({
                             <button
                               key={u.id}
                               type="button"
-                              onClick={() => seleccionarUsuario(u.id, u.nombre)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                seleccionarUsuario(u.id, u.nombre);
+                              }}
                               className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-neutral-700 text-gray-700 dark:text-gray-200 text-sm transition-colors border-b border-gray-50 dark:border-neutral-700/50 last:border-0"
                             >
                               {u.nombre}
@@ -1206,6 +1414,141 @@ export default function ActividadesPuntoModal({
                       </div>
                     )}
                   </>
+                ) : (
+                  /* Modo Comisión */
+                  <div className="space-y-3 pt-1">
+                    {/* 1. Selector de Comisión */}
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                          1. Seleccionar Comisión
+                        </span>
+                        {comisionSeleccionadaId && (
+                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                            ✓ Comisión seleccionada
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={comisionSearchTerm}
+                        onChange={(e) => {
+                          setComisionSearchTerm(e.target.value);
+                          setShowComisionDropdown(true);
+                          if (!e.target.value.trim()) {
+                            setComisionSeleccionadaId('');
+                            setAssignedTo('');
+                            setSearchTerm('');
+                            setMiembroSearchTerm('');
+                            setMiembros([]);
+                          }
+                        }}
+                        onFocus={() => setShowComisionDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowComisionDropdown(false), 200)}
+                        placeholder="Buscar y seleccionar una comisión..."
+                        className="w-full p-3 bg-white dark:bg-neutral-800 border border-purple-200 dark:border-purple-900/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none text-base text-gray-700 dark:text-gray-100"
+                      />
+                      {showComisionDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-800 border border-gray-100 dark:border-neutral-700 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                          {cargandoComisiones ? (
+                            <div className="p-3 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
+                              <Loader2 size={14} className="animate-spin" /> Cargando comisiones...
+                            </div>
+                          ) : comisionesFiltradas.length > 0 ? (
+                            comisionesFiltradas.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSeleccionarComision(c);
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-gray-700 dark:text-gray-200 text-sm transition-colors border-b border-gray-50 dark:border-neutral-700/50 last:border-0 flex items-center justify-between"
+                              >
+                                <span className="font-medium">{c.nombre}</span>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
+                                  {c.integrantes?.length || 0} integrantes
+                                </span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-3 text-center text-gray-400 text-xs italic">
+                              No se encontraron comisiones
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Selector de Encargado dentro de los miembros de esa comisión */}
+                    {comisionActual && (
+                      <div className="space-y-2 animate-in fade-in duration-200">
+                        {integrantesComision.length === 0 ? (
+                          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-xs rounded-xl border border-amber-200 dark:border-amber-800">
+                            ⚠️ Esta comisión no tiene integrantes asignados en {anioActual}.
+                          </div>
+                        ) : (
+                          <>
+                            <div className="relative">
+                              <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mb-1">
+                                2. Encargado / Responsable Principal de la Comisión
+                              </span>
+                              <input
+                                type="text"
+                                value={miembroSearchTerm}
+                                onChange={(e) => {
+                                  setMiembroSearchTerm(e.target.value);
+                                  setShowMiembroDropdown(true);
+                                  if (!e.target.value.trim()) {
+                                    setAssignedTo('');
+                                    setSearchTerm('');
+                                    setMiembros([]);
+                                  }
+                                }}
+                                onFocus={() => setShowMiembroDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowMiembroDropdown(false), 200)}
+                                placeholder="Buscar entre los miembros de esta comisión..."
+                                className="w-full p-3 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none text-base text-gray-700 dark:text-gray-100"
+                              />
+                              {showMiembroDropdown && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-neutral-800 border border-gray-100 dark:border-neutral-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                  {integrantesFiltrados.length > 0 ? (
+                                    integrantesFiltrados.map((m) => (
+                                      <button
+                                        key={m.id_integrante}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          handleSeleccionarEncargadoComision(m);
+                                        }}
+                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-neutral-700 text-gray-700 dark:text-gray-200 text-sm transition-colors border-b border-gray-50 dark:border-neutral-700/50 last:border-0 flex items-center justify-between"
+                                      >
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-medium">{m.nombre}</span>
+                                          {m.es_coordinador && (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-500 shrink-0">
+                                              <Crown className="size-2.5 text-amber-500" /> Coordinador
+                                            </span>
+                                          )}
+                                        </div>
+                                        {m.rol && (
+                                          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">{m.rol}</span>
+                                        )}
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="p-3 text-center text-gray-400 text-xs italic">
+                                      No hay miembros que coincidan
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

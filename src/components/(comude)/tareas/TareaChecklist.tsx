@@ -225,7 +225,7 @@ export default function TareaChecklist({ tareaId, checklist, isReadOnly, onCompl
                     onClick={toggleAll}
                     disabled={isTogglingAll}
                     className={`
-                        flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all
+                        flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md transition-all
                         ${allCompleted 
                             ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40' 
                             : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40'}
@@ -233,13 +233,13 @@ export default function TareaChecklist({ tareaId, checklist, isReadOnly, onCompl
                     `}
                 >
                     {isTogglingAll ? (
-                        <Loader2 size={14} className="animate-spin" />
+                        <Loader2 size={11} className="animate-spin" />
                     ) : allCompleted ? (
-                        <Square size={14} strokeWidth={3} />
+                        <Square size={11} strokeWidth={2} />
                     ) : (
-                        <CheckSquare size={14} strokeWidth={3} />
+                        <CheckSquare size={11} strokeWidth={2} />
                     )}
-                    {allCompleted ? 'Desmarcar todos' : 'Marcar todos como completados'}
+                    {allCompleted ? 'Desmarcar todos' : 'Marcar todos'}
                 </button>
             </div>
         )}

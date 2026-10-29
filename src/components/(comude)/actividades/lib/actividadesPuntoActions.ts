@@ -14,6 +14,7 @@ import {
 const T_ACTIVIDADES = 'tra_actividades';
 const T_MIEMBROS = 'tra_actividad_miembros';
 const T_ENLACES = 'tra_actividad_comude_enlaces';
+const T_ENLACES_COMISION = 'tra_actividad_comision_enlaces';
 
 interface ChecklistItemInput {
   title: string;
@@ -25,6 +26,36 @@ interface MiembroInput {
   asignaciones?: { title: string; is_complete: boolean }[];
 }
 
+function normalizarAsignaciones(items: unknown): { title: string; is_complete: boolean }[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((i: any) => {
+      if (typeof i === 'string') {
+        return { title: i.trim(), is_complete: false };
+      }
+      return {
+        title: String(i?.title ?? i?.titulo ?? i?.nombre ?? '').trim(),
+        is_complete: Boolean(i?.is_complete ?? i?.completado),
+      };
+    })
+    .filter((i) => i.title.length > 0);
+}
+
+function normalizarChecklist(items: unknown): { title: string; is_completed: boolean }[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((i: any) => {
+      if (typeof i === 'string') {
+        return { title: i.trim(), is_completed: false };
+      }
+      return {
+        title: String(i?.title ?? i?.titulo ?? i?.nombre ?? '').trim(),
+        is_completed: Boolean(i?.is_completed ?? i?.is_complete ?? i?.completado),
+      };
+    })
+    .filter((i) => i.title.length > 0);
+}
+
 export interface CrearActividadPuntoInput {
   puntoId: string;
   titulo: string;
@@ -33,6 +64,7 @@ export interface CrearActividadPuntoInput {
   encargadoId: string;
   checklist?: ChecklistItemInput[];
   miembros?: MiembroInput[];
+  comisionId?: string | null;
 }
 
 export interface EditarActividadPuntoInput {
@@ -157,20 +189,24 @@ export async function obtenerActividadesDePunto(puntoId: string): Promise<Activi
   }
 
   // 3. Cargar miembros de esas actividades
-  const { data: rawMiembros } = await supabase
+  const { data: rawMiembros, error: errMiembros } = await supabase
     .from(T_MIEMBROS)
     .select('*')
     .in('actividad_id', actividadIds)
-    .order('created_at', { ascending: true });
+    .order('creado_en', { ascending: true });
+
+  if (errMiembros) {
+    console.error('[actividadesPunto] Error cargando miembros:', errMiembros);
+  }
 
   // 4. Cargar perfiles de encargados y miembros
   const userIds = new Set<string>();
   actividades.forEach((a) => {
-    if (a.encargado_id) userIds.add(a.encargado_id);
-    if (a.creador_id) userIds.add(a.creador_id);
+    if (a.encargado_id) userIds.add(String(a.encargado_id));
+    if (a.creador_id) userIds.add(String(a.creador_id));
   });
   (rawMiembros || []).forEach((m) => {
-    if (m.usuario_id) userIds.add(m.usuario_id);
+    if (m.usuario_id) userIds.add(String(m.usuario_id));
   });
 
   const userIdsArr = Array.from(userIds);
@@ -183,7 +219,7 @@ export async function obtenerActividadesDePunto(puntoId: string): Promise<Activi
       .select('id, nombre, puesto_id')
       .in('id', userIdsArr);
 
-    (perfiles || []).forEach((p) => perfilesMap.set(p.id, p));
+    (perfiles || []).forEach((p) => perfilesMap.set(String(p.id), p));
 
     const puestoIds = Array.from(new Set((perfiles || []).map((p) => p.puesto_id).filter(Boolean)));
     if (puestoIds.length > 0) {
@@ -191,38 +227,67 @@ export async function obtenerActividadesDePunto(puntoId: string): Promise<Activi
         .from('puestos')
         .select('id, nombre')
         .in('id', puestoIds);
-      (puestos || []).forEach((p) => puestosMap.set(p.id, p.nombre));
+      (puestos || []).forEach((p) => puestosMap.set(String(p.id), p.nombre));
     }
   }
 
   // Mapear miembros por actividad
   const miembrosPorActividad = new Map<string, ActividadPuntoMiembro[]>();
   (rawMiembros || []).forEach((m: any) => {
-    const list = miembrosPorActividad.get(m.actividad_id) || [];
-    const perfil = perfilesMap.get(m.usuario_id);
-    const puestoNombre = perfil?.puesto_id ? puestosMap.get(perfil.puesto_id) || null : null;
+    const actIdStr = String(m.actividad_id);
+    const list = miembrosPorActividad.get(actIdStr) || [];
+    const perfil = perfilesMap.get(String(m.usuario_id));
+    const puestoNombre = perfil?.puesto_id ? puestosMap.get(String(perfil.puesto_id)) || null : null;
 
     list.push({
-      id: m.id,
-      actividad_id: m.actividad_id,
-      usuario_id: m.usuario_id,
-      asignaciones: Array.isArray(m.asignaciones) ? m.asignaciones : [],
+      id: String(m.id),
+      actividad_id: actIdStr,
+      usuario_id: String(m.usuario_id),
+      asignaciones: normalizarAsignaciones(m.asignaciones),
       fecha_confirmacion: m.fecha_confirmacion ?? null,
       fecha_finalizacion: m.fecha_finalizacion ?? null,
       nombre_usuario: perfil?.nombre || 'Usuario',
       puesto: puestoNombre,
     });
-    miembrosPorActividad.set(m.actividad_id, list);
+    miembrosPorActividad.set(actIdStr, list);
+  });
+
+  // 4b. Enlaces a comisiones
+  const { data: rawEnlacesComision } = await supabase
+    .from(T_ENLACES_COMISION)
+    .select('actividad_id, comision_id')
+    .in('actividad_id', actividadIds);
+
+  const comisionIds = Array.from(new Set((rawEnlacesComision || []).map((r: any) => r.comision_id).filter(Boolean)));
+  const comisionesMap = new Map<string, string>();
+  if (comisionIds.length > 0) {
+    const { data: comisionesData } = await supabase
+      .from('comisiones')
+      .select('id, nombre')
+      .in('id', comisionIds);
+    (comisionesData || []).forEach((c: any) => comisionesMap.set(c.id, c.nombre));
+  }
+
+  const comisionPorActividad = new Map<string, { id: string; nombre: string }>();
+  (rawEnlacesComision || []).forEach((r: any) => {
+    if (r.actividad_id && r.comision_id) {
+      comisionPorActividad.set(String(r.actividad_id), {
+        id: String(r.comision_id),
+        nombre: comisionesMap.get(String(r.comision_id)) || 'Comisión',
+      });
+    }
   });
 
   // 5. Estructurar resultado
   return actividades.map((a: any) => {
-    const encargadoPerfil = perfilesMap.get(a.encargado_id);
-    const creadorPerfil = perfilesMap.get(a.creador_id);
-    const encargadoPuesto = encargadoPerfil?.puesto_id ? puestosMap.get(encargadoPerfil.puesto_id) || null : null;
+    const actIdStr = String(a.id);
+    const encargadoPerfil = perfilesMap.get(String(a.encargado_id));
+    const creadorPerfil = perfilesMap.get(String(a.creador_id));
+    const encargadoPuesto = encargadoPerfil?.puesto_id ? puestosMap.get(String(encargadoPerfil.puesto_id)) || null : null;
+    const comisionInfo = comisionPorActividad.get(actIdStr);
 
     return {
-      id: a.id,
+      id: actIdStr,
       titulo: a.titulo,
       descripcion: a.descripcion,
       fecha_limite: a.fecha_limite,
@@ -233,12 +298,14 @@ export async function obtenerActividadesDePunto(puntoId: string): Promise<Activi
       creador_id: a.creador_id,
       creador_nombre: creadorPerfil?.nombre || 'Desconocido',
       fecha_confirmacion: a.fecha_confirmacion ?? null,
-      checklist: Array.isArray(a.checklist) ? a.checklist : [],
-      miembros: miembrosPorActividad.get(a.id) || [],
+      checklist: normalizarChecklist(a.checklist),
+      miembros: miembrosPorActividad.get(actIdStr) || [],
       archivos: Array.isArray(a.archivos) ? a.archivos : [],
       revisado_por: a.revisado_por ?? null,
-      created_at: a.created_at,
+      created_at: a.created_at || a.creado_en,
       actualizado_en: a.actualizado_en ?? null,
+      comision_id: comisionInfo?.id || null,
+      comision_nombre: comisionInfo?.nombre || null,
     };
   });
 }
@@ -323,6 +390,20 @@ export async function crearActividadPunto(input: CrearActividadPuntoInput): Prom
     }
   }
 
+  // 3b. Insertar enlace a comisión si aplica
+  if (input.comisionId) {
+    const { error: errorEnlaceComision } = await supabase
+      .from(T_ENLACES_COMISION)
+      .insert({
+        actividad_id: actividadId,
+        comision_id: input.comisionId,
+      });
+
+    if (errorEnlaceComision) {
+      console.error('[actividadesPunto] Error vinculando con comisión:', errorEnlaceComision);
+    }
+  }
+
   // 4. Enviar notificación push
   try {
     const receptoresPush = [input.encargadoId];
@@ -346,6 +427,10 @@ export async function crearActividadPunto(input: CrearActividadPuntoInput): Prom
   // 5. Revalidar rutas
   revalidatePath('/comude/actividades', 'layout');
   revalidatePath('/comude/actividades/mis-actividades', 'layout');
+  if (input.comisionId) {
+    revalidatePath('/comude/comisiones', 'layout');
+    revalidatePath('/comude/comisiones/supervision', 'layout');
+  }
 
   return { success: true, data: { id: actividadId } };
 }
@@ -692,7 +777,7 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
       id: m.id,
       actividad_id: m.actividad_id,
       usuario_id: m.usuario_id,
-      asignaciones: Array.isArray(m.asignaciones) ? m.asignaciones : [],
+      asignaciones: normalizarAsignaciones(m.asignaciones),
       fecha_confirmacion: m.fecha_confirmacion ?? null,
       fecha_finalizacion: m.fecha_finalizacion ?? null,
       nombre_usuario: perfil?.nombre || 'Usuario',
@@ -730,7 +815,7 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
       creador_id: a.creador_id,
       creador_nombre: creadorPerfil?.nombre || 'Desconocido',
       fecha_confirmacion: a.fecha_confirmacion ?? null,
-      checklist: Array.isArray(a.checklist) ? a.checklist : [],
+      checklist: normalizarChecklist(a.checklist),
       miembros: miembrosPorActividad.get(a.id) || [],
       archivos: Array.isArray(a.archivos) ? a.archivos : [],
       revisado_por: a.revisado_por ?? null,

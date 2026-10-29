@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useComisiones, useIntegrantesComisiones } from "./lib/hooks";
+import {
+  useComisiones,
+  useIntegrantesComisiones,
+  usePlanesTrabajoComisiones,
+} from "./lib/hooks";
 import { ComisionesHeader } from "./ui/ComisionesHeader";
 import { ComisionesList } from "./ui/ComisionesList";
 import { CrearEditarComisionModal } from "./modals/CrearEditarComisionModal";
@@ -15,6 +19,7 @@ export function ComisionesManager() {
   const { data: comisiones = [], isLoading: loadingComisiones } = useComisiones();
   const { data: integrantesMap = {}, isLoading: loadingIntegrantes } =
     useIntegrantesComisiones(año);
+  const { data: planesMap = {} } = usePlanesTrabajoComisiones(año);
 
   const [crearEditarModalOpen, setCrearEditarModalOpen] = useState(false);
   const [comisionEditar, setComisionEditar] = useState<ComisionRecord | null>(null);
@@ -58,6 +63,7 @@ export function ComisionesManager() {
         <ComisionesList
           comisiones={comisiones}
           integrantesMap={integrantesMap}
+          planesMap={planesMap}
           año={año}
           onEditar={handleEditarComision}
           onAsignar={handleAsignarIntegrante}

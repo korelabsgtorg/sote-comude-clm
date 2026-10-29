@@ -7,6 +7,7 @@ import { FileText, Loader2, Trash2, Eye, Upload } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ModalShell } from "@/components/ui/general-modal";
 import { Button } from "@/components/ui/button";
+import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import dynamic from "next/dynamic";
 import {
   useAgregarAcreditacionPuesto,
@@ -33,6 +34,8 @@ export function GestorAcreditacionesModal({
   puestoNombre: string;
 }) {
   const { data: puestos = [] } = usePuestos();
+  const { user } = useUserContext();
+  const munId = (user?.user_metadata?.municipio_id ?? (user as unknown as { municipio_id?: number })?.municipio_id) || 1;
   const agregarMutation = useAgregarAcreditacionPuesto();
   const eliminarMutation = useEliminarAcreditacionPuesto();
 
@@ -64,7 +67,7 @@ export function GestorAcreditacionesModal({
     try {
       const supabase = createClient();
       const fileNameSeguro = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-      const filePath = `puestos/${puestoId}/${Date.now()}_${fileNameSeguro}`;
+      const filePath = `municipio_${munId}/puestos/puesto_${puestoId}/${Date.now()}_${fileNameSeguro}`;
 
       const { error: uploadError } = await supabase.storage
         .from("acreditaciones")

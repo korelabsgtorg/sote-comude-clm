@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Calendar, ClipboardList, MapPin, Loader2 } from "lucide-react";
 import { getActividadPendienteConfirmacion, confirmarParticipacionComude } from "../lib/actions";
+import { createClient } from "@/utils/supabase/client";
 
 export default function BloqueoConfirmacionModal() {
   const queryClient = useQueryClient();
@@ -14,11 +15,34 @@ export default function BloqueoConfirmacionModal() {
     queryFn: async () => {
       return await getActividadPendienteConfirmacion();
     },
-    refetchOnWindowFocus: true,
-    refetchOnMount: "always",
-    staleTime: 1000 * 10,
-    refetchInterval: 8000,
+    staleTime: 1000 * 60 * 5,
   });
+
+  // Supabase Realtime para recibir cambios en tiempo real sin saturar con polling
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("bloqueo-comude-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "act_comude" },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["actividad-pendiente-confirmacion"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "act_comude_participantes" },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["actividad-pendiente-confirmacion"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Listener para el evento de refresco disparado por el Service Worker / PushListener
   useEffect(() => {

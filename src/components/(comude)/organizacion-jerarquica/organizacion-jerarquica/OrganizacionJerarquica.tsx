@@ -38,8 +38,8 @@ import { VerEditarEstructura } from "./forms/VerEditar";
 import { AsignarPersonaPuesto } from "./forms/AsignarPersona";
 import { ReubicarPuestoModal } from "./forms/ReubicarPuesto";
 import { GestorAcreditacionesModal } from "./forms/GestorAcreditacionesModal";
-import { ComisionesManager } from "../comisiones/ComisionesManager";
-import { AsignarPersonaDesdePuestoModal } from "../comisiones/modals/AsignarPersonaDesdePuestoModal";
+import { ComisionesManager } from "../estructura-comisiones/ComisionesManager";
+import { AsignarPersonaDesdePuestoModal } from "../estructura-comisiones/modals/AsignarPersonaDesdePuestoModal";
 import { Building2, Users as UsersIcon } from "lucide-react";
 
 export function OrganizacionJerarquica() {

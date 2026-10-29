@@ -35,9 +35,7 @@ export default function BloqueoActividad() {
   const actividad = (data as ActividadPendiente | null) ?? null;
   const [confirming, setConfirming] = useState(false);
 
-  useEffect(() => {
-    void refetch();
-  }, [pathname, refetch]);
+
 
   useEffect(() => {
     const onRefresh = () => {

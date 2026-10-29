@@ -103,6 +103,8 @@ export interface ActividadPunto {
   revisado_por?: { nombre: string; fecha: string } | null;
   created_at: string;
   actualizado_en?: string | null;
+  comision_id?: string | null;
+  comision_nombre?: string | null;
 }
 
 export interface UsuarioAsignablePunto {

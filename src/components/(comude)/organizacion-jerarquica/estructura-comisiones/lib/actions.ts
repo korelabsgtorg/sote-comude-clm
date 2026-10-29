@@ -11,6 +11,7 @@ import {
   type ComisionIntegranteRecord,
   type PersonaElegible,
   type AsignarIntegranteValues,
+  type PlanTrabajoRecord,
 } from "./zod";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -198,12 +199,22 @@ export async function listarIntegrantesPorAnio(
       nombre: prof?.nombre ?? "Usuario no encontrado",
       dpi: prof?.dpi,
       rol: prof?.rol,
+      es_coordinador: Boolean(asig.es_coordinador),
     };
 
     if (!agrupados[asig.id_comision]) {
       agrupados[asig.id_comision] = [];
     }
     agrupados[asig.id_comision].push(item);
+  }
+
+  // Ordenar integrantes: el coordinador siempre primero, luego alfabéticamente
+  for (const comId in agrupados) {
+    agrupados[comId].sort((a, b) => {
+      if (a.es_coordinador && !b.es_coordinador) return -1;
+      if (!a.es_coordinador && b.es_coordinador) return 1;
+      return (a.nombre || "").localeCompare(b.nombre || "");
+    });
   }
 
   return { data: agrupados, error: null };
@@ -233,13 +244,65 @@ export async function asignarIntegrante(
     return { success: false, error: "La persona ya pertenece a esta comisión en el año seleccionado" };
   }
 
+  // Chequear si ya hay integrantes en esta comisión para este año
+  const { count } = await auth.supabase
+    .from("comision_integrantes")
+    .select("id", { count: "exact", head: true })
+    .eq("id_comision", comisionId)
+    .eq("año", parseRes.data.año);
+
+  const esPrimerIntegrante = (count ?? 0) === 0;
+  const esCoordinador = parseRes.data.es_coordinador ?? esPrimerIntegrante;
+
+  if (esCoordinador) {
+    // Si este integrante se designa como coordinador, desmarcar a cualquier otro
+    await auth.supabase
+      .from("comision_integrantes")
+      .update({ es_coordinador: false })
+      .eq("id_comision", comisionId)
+      .eq("año", parseRes.data.año);
+  }
+
   const { error } = await auth.supabase.from("comision_integrantes").insert({
     id_comision: comisionId,
     id_integrante: parseRes.data.id_integrante,
     año: parseRes.data.año,
+    es_coordinador: esCoordinador,
   });
 
   if (error) return { success: false, error: error.message };
+
+  return { success: true, error: null };
+}
+
+export async function cambiarCoordinadorComision(params: {
+  comisionId: string;
+  año: number;
+  nuevoCoordinadorIntegranteId: string;
+}): Promise<{ success: boolean; error: string | null }> {
+  const auth = await requireAdminConMunicipio();
+  if (auth.error || !auth.supabase) return { success: false, error: auth.error };
+
+  const { comisionId, año, nuevoCoordinadorIntegranteId } = params;
+
+  // 1. Desmarcar cualquier coordinador actual en esta comisión y año
+  const { error: errReset } = await auth.supabase
+    .from("comision_integrantes")
+    .update({ es_coordinador: false })
+    .eq("id_comision", comisionId)
+    .eq("año", año);
+
+  if (errReset) return { success: false, error: errReset.message };
+
+  // 2. Marcar al nuevo integrante como coordinador
+  const { error: errSet } = await auth.supabase
+    .from("comision_integrantes")
+    .update({ es_coordinador: true })
+    .eq("id_comision", comisionId)
+    .eq("id_integrante", nuevoCoordinadorIntegranteId)
+    .eq("año", año);
+
+  if (errSet) return { success: false, error: errSet.message };
 
   return { success: true, error: null };
 }
@@ -277,4 +340,75 @@ export async function listarPersonasElegibles(): Promise<{
   if (error) return { data: null, error: error.message };
 
   return { data: (data as PersonaElegible[]) ?? [], error: null };
+}
+
+export async function listarPlanesTrabajoPorAnio(
+  año: number,
+): Promise<{
+  data: Record<string, PlanTrabajoRecord> | null;
+  error: string | null;
+}> {
+  const auth = await requireAdminConMunicipio();
+  if (auth.error || !auth.supabase) return { data: null, error: auth.error };
+
+  const { data: comisionesMun, error: errCom } = await auth.supabase
+    .from("comisiones")
+    .select("id")
+    .eq("municipio_id", auth.municipioId);
+
+  if (errCom) return { data: null, error: errCom.message };
+
+  const comisionIds = (comisionesMun ?? []).map((c) => c.id as string);
+  if (comisionIds.length === 0) return { data: {}, error: null };
+
+  const { data: planes, error: errPlanes } = await auth.supabase
+    .from("comision_planes_trabajo")
+    .select("*")
+    .in("id_comision", comisionIds)
+    .eq("año", año)
+    .order("created_at", { ascending: false });
+
+  if (errPlanes) return { data: null, error: errPlanes.message };
+  if (!planes || planes.length === 0) return { data: {}, error: null };
+
+  const uploaderIds = Array.from(
+    new Set(
+      planes
+        .map((p) => p.subido_por as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  const profileMap = new Map<string, string>();
+  if (uploaderIds.length > 0) {
+    const { data: profiles } = await auth.supabase
+      .from("profiles")
+      .select("id, nombre")
+      .in("id", uploaderIds);
+
+    for (const p of profiles ?? []) {
+      profileMap.set(p.id as string, (p.nombre as string) ?? "Usuario");
+    }
+  }
+
+  const mapa: Record<string, PlanTrabajoRecord> = {};
+  for (const plan of planes) {
+    const cId = plan.id_comision as string;
+    if (!mapa[cId]) {
+      mapa[cId] = {
+        id: plan.id as string,
+        id_comision: cId,
+        año: plan.año as number,
+        archivo_url: plan.archivo_url,
+        subido_por: (plan.subido_por as string | null) ?? null,
+        subido_por_nombre: plan.subido_por
+          ? (profileMap.get(plan.subido_por as string) ?? null)
+          : null,
+        created_at: plan.created_at as string,
+      };
+    }
+  }
+
+  return { data: mapa, error: null };
+
 }

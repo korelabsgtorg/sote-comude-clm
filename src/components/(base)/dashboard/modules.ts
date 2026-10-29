@@ -8,6 +8,7 @@ export type DashboardModule = {
   animatedIcon: string;
   href: string;
   requiresAdmin?: boolean;
+  requiresComision?: boolean;
   allowedRoles?: string[];
 };
 
@@ -41,6 +42,15 @@ export const DASHBOARD_MODULES: DashboardModule[] = [
     desc: "Gestión de actividades individuales, colaborativas y acuerdos del COMUDE.",
     animatedIcon: "kthelypq",
     href: "/comude/actividades",
+  },
+  {
+    id: "comisiones",
+    title: "Comisiones",
+    subtitle: "de Trabajo",
+    desc: "Espacio colaborativo y carga del plan de trabajo anual de tu comisión.",
+    animatedIcon: "giblkgwf",
+    href: "/comude/comisiones",
+    requiresComision: true,
   },
   {
     id: "estructuras",
@@ -126,6 +136,39 @@ export function getVisibleActividadesOptions<T extends { id: string }>(
   });
 }
 
+export const COMISIONES_MENU_OPTIONS = [
+  {
+    id: "mis-comisiones",
+    title: "Mis Comisiones",
+    desc: "Tus comisiones asignadas y carga del plan de trabajo anual.",
+    href: "/comude/comisiones",
+  },
+  {
+    id: "supervision-comisiones",
+    title: "Todas las Comisiones",
+    desc: "Supervisión de comisiones y planes de trabajo del municipio.",
+    href: "/comude/comisiones/supervision",
+  },
+] as const;
+
+export function getVisibleComisionesOptions<T extends { id: string }>(
+  options: readonly T[],
+  role: string,
+  esMiembroComision: boolean = false,
+): T[] {
+  const isSuperOrAdmin = isSuperOrAdminRole(role);
+
+  return options.filter((opt) => {
+    if (opt.id === "mis-comisiones") {
+      return esMiembroComision;
+    }
+    if (opt.id === "supervision-comisiones") {
+      return isSuperOrAdmin;
+    }
+    return true;
+  });
+}
+
 export const PERFIL_MENU_OPTIONS = [
   {
     id: "mi-perfil",
@@ -185,11 +228,17 @@ export function getVisibleAdminOptions<T extends { id: string }>(
   return options.filter((opt) => opt.id === "usuarios");
 }
 
-export function getVisibleDashboardModules(effectiveRole: string) {
+export function getVisibleDashboardModules(
+  effectiveRole: string,
+  esMiembroComision: boolean = false,
+) {
   const isSuperOrAdmin = isSuperOrAdminRole(effectiveRole);
   return DASHBOARD_MODULES.filter((mod) => {
     if (mod.id === "admin") {
       return canManageUsers(effectiveRole);
+    }
+    if (mod.requiresComision) {
+      return esMiembroComision;
     }
     if (mod.requiresAdmin && !isSuperOrAdmin) return false;
     if (mod.allowedRoles) {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { ComisionRecord, ComisionIntegranteRecord } from "../lib/zod";
 import { useEliminarIntegrante, useAlternarEstadoComision } from "../lib/hooks";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 
 interface Props {
   comision: ComisionRecord;
@@ -25,9 +26,18 @@ export function ComisionCard({
   const alternarEstadoMutation = useAlternarEstadoComision();
 
   const handleEliminarIntegrante = async (idAsignacion: string, nombre: string) => {
-    if (!confirm(`¿Desea remover a ${nombre} de esta comisión en el año ${año}?`)) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: "¿Remover integrante?",
+      html: `¿Deseas remover a <b class="text-blue-500">${nombre}</b> de esta comisión en el año <b>${año}</b>?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, remover",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const res = await eliminarMutation.mutateAsync(idAsignacion);

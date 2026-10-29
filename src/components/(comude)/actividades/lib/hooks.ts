@@ -342,9 +342,10 @@ export function useCrearArchivoPunto() {
   const queryClient = useQueryClient();
   return useMutation<ActComudeArchivo, Error, { puntoId: string; nombre: string; filePath: string; actComudeId: string }>({
     mutationFn: ({ puntoId, nombre, filePath }) => crearArchivoPunto(puntoId, nombre, filePath),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
     },
   });
 }
@@ -353,9 +354,10 @@ export function useEliminarArchivoPunto() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { archivoId: string; actComudeId: string }>({
     mutationFn: ({ archivoId }) => eliminarArchivoPunto(archivoId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["puntos-comude", variables.actComudeId] });
-      queryClient.invalidateQueries({ queryKey: ["actividad-comude", variables.actComudeId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
     },
   });
 }

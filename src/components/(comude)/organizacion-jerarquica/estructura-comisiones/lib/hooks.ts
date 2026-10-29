@@ -8,12 +8,28 @@ import {
   asignarIntegrante,
   eliminarIntegrante,
   listarPersonasElegibles,
+  listarPlanesTrabajoPorAnio,
+  cambiarCoordinadorComision,
 } from "./actions";
 import type { ComisionFormValues, AsignarIntegranteValues } from "./zod";
 
 export const COMISIONES_QUERY_KEY = ["comisiones"];
 export const COMISION_INTEGRANTES_QUERY_KEY = ["comision_integrantes"];
 export const PERSONAS_ELEGIBLES_QUERY_KEY = ["personas_elegibles_comision"];
+export const COMISION_PLANES_QUERY_KEY = ["comision_planes_trabajo"];
+
+export function usePlanesTrabajoComisiones(año: number) {
+  return useQuery({
+    queryKey: [...COMISION_PLANES_QUERY_KEY, año],
+    queryFn: async () => {
+      const res = await listarPlanesTrabajoPorAnio(año);
+      if (res.error) throw new Error(res.error);
+      return res.data ?? {};
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+  });
+}
 
 export function useComisiones() {
   return useQuery({
@@ -111,6 +127,28 @@ export function useEliminarIntegrante(año: number) {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: [...COMISION_INTEGRANTES_QUERY_KEY, año],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: COMISIONES_QUERY_KEY,
+      });
+    },
+  });
+}
+
+export function useCambiarCoordinadorComision(año: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      comisionId: string;
+      año: number;
+      nuevoCoordinadorIntegranteId: string;
+    }) => cambiarCoordinadorComision(params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...COMISION_INTEGRANTES_QUERY_KEY, año],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: COMISIONES_QUERY_KEY,
       });
     },
   });

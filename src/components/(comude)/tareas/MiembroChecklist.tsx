@@ -27,7 +27,7 @@ export default function MiembroChecklist({
   const [pendingIndices, setPendingIndices] = useState<number[]>([]);
   const [localAsignaciones, setLocalAsignaciones] = useState<AsignacionMiembro[]>(asignaciones);
   const latestAsignaciones = useRef<AsignacionMiembro[]>(asignaciones);
-  
+
   const [comentarioLocal, setComentarioLocal] = useState(comentario || '');
   const [guardandoComentario, setGuardandoComentario] = useState(false);
   const [marcandoCompletado, setMarcandoCompletado] = useState(false);
@@ -41,9 +41,9 @@ export default function MiembroChecklist({
   const [isSyncPaused, setIsSyncPaused] = useState(false);
 
   const pauseSync = () => {
-      setIsSyncPaused(true);
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = setTimeout(() => setIsSyncPaused(false), 2000);
+    setIsSyncPaused(true);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => setIsSyncPaused(false), 2000);
   };
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function MiembroChecklist({
 
     const actuales = [...latestAsignaciones.current];
     actuales[idx] = { ...actuales[idx], is_complete: !actuales[idx].is_complete };
-    
+
     latestAsignaciones.current = actuales;
     setLocalAsignaciones(actuales);
 
@@ -91,36 +91,36 @@ export default function MiembroChecklist({
     pauseSync();
     setIsAdding(true);
     const newItem: AsignacionMiembro = { title: newItemText, is_complete: false };
-    
+
     const actuales = [...latestAsignaciones.current, newItem];
     latestAsignaciones.current = actuales;
     setLocalAsignaciones(actuales);
-    
+
     const previousText = newItemText;
     setNewItemText('');
-    
+
     try {
-        await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
-        toast.success('actividad agregada');
-    } catch (error) { 
-        setNewItemText(previousText);
-        latestAsignaciones.current = asignaciones;
-        setLocalAsignaciones(asignaciones);
-        toast.error('Error'); 
+      await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
+      toast.success('actividad agregada');
+    } catch (error) {
+      setNewItemText(previousText);
+      latestAsignaciones.current = asignaciones;
+      setLocalAsignaciones(asignaciones);
+      toast.error('Error');
     } finally { setIsAdding(false); }
   };
 
   const handleDeleteItem = async (idx: number) => {
     if (isReadOnly) return;
     const result = await Swal.fire({
-        title: '¿Eliminar actividad?',
-        text: "No podrás revertir esta acción",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
+      title: '¿Eliminar actividad?',
+      text: "No podrás revertir esta acción",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
     });
 
     if (!result.isConfirmed) return;
@@ -131,12 +131,12 @@ export default function MiembroChecklist({
     setLocalAsignaciones(actuales);
 
     try {
-        await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
-        toast.success('Eliminada correctamente');
+      await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
+      toast.success('Eliminada correctamente');
     } catch (error) {
-        latestAsignaciones.current = asignaciones;
-        setLocalAsignaciones(asignaciones);
-        toast.error('Error al eliminar');
+      latestAsignaciones.current = asignaciones;
+      setLocalAsignaciones(asignaciones);
+      toast.error('Error al eliminar');
     }
   };
 
@@ -148,14 +148,14 @@ export default function MiembroChecklist({
 
   const saveStepEdit = async (idx: number) => {
     if (!editingStepText.trim()) {
-        setEditingStepIndex(null);
-        return;
+      setEditingStepIndex(null);
+      return;
     }
-    
+
     pauseSync();
     const actuales = [...latestAsignaciones.current];
     actuales[idx] = { ...actuales[idx], title: editingStepText };
-    
+
     latestAsignaciones.current = actuales;
     setLocalAsignaciones(actuales);
 
@@ -165,14 +165,14 @@ export default function MiembroChecklist({
     setEditingStepText('');
 
     try {
-        await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
-        toast.success('Modificada correctamente');
-    } catch (error) { 
-        setEditingStepIndex(prevIndex);
-        setEditingStepText(prevText);
-        latestAsignaciones.current = asignaciones;
-        setLocalAsignaciones(asignaciones);
-        toast.error('Error al guardar'); 
+      await actualizarAsignaciones.mutateAsync({ miembroId, asignaciones: actuales });
+      toast.success('Modificada correctamente');
+    } catch (error) {
+      setEditingStepIndex(prevIndex);
+      setEditingStepText(prevText);
+      latestAsignaciones.current = asignaciones;
+      setLocalAsignaciones(asignaciones);
+      toast.error('Error al guardar');
     }
   };
 
@@ -191,7 +191,7 @@ export default function MiembroChecklist({
 
   const handleCompletarParte = async () => {
     if (marcandoCompletado || !puedeCompletar) return;
-    
+
     // Auto save the comment if there is one changed
     if (comentarioLocal !== (comentario || '')) {
       await handleGuardarComentario();
@@ -269,19 +269,19 @@ export default function MiembroChecklist({
 
                   {/* Title / Editor */}
                   {editingStepIndex === idx ? (
-                      <div className="flex-1 flex gap-2 animate-in fade-in duration-200 min-w-0">
-                          <input 
-                              type="text" 
-                              value={editingStepText}
-                              onChange={(e) => setEditingStepText(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && saveStepEdit(idx)}
-                              autoFocus
-                              className="w-full text-base bg-white dark:bg-neutral-900 border border-blue-400 dark:border-blue-500 rounded px-2 py-1 focus:outline-none shadow-sm dark:text-gray-100"
-                          />
-                          <button onClick={() => saveStepEdit(idx)} className="text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 p-2 rounded shrink-0">
-                              <Check size={18} />
-                          </button>
-                      </div>
+                    <div className="flex-1 flex gap-2 animate-in fade-in duration-200 min-w-0">
+                      <input
+                        type="text"
+                        value={editingStepText}
+                        onChange={(e) => setEditingStepText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveStepEdit(idx)}
+                        autoFocus
+                        className="w-full text-base bg-white dark:bg-neutral-900 border border-blue-400 dark:border-blue-500 rounded px-2 py-1 focus:outline-none shadow-sm dark:text-gray-100"
+                      />
+                      <button onClick={() => saveStepEdit(idx)} className="text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 p-2 rounded shrink-0">
+                        <Check size={18} />
+                      </button>
+                    </div>
                   ) : (
                     <span
                       onClick={() => toggleCheck(idx)}
@@ -298,26 +298,26 @@ export default function MiembroChecklist({
 
                 {/* Actions */}
                 {editingStepIndex !== idx && !isReadOnly && !isPending && (
-                    <div className="flex items-center gap-1 ml-2 shrink-0">
-                        <button 
-                            onClick={() => startEditingStep(idx, item.title)} 
-                            className="p-2 text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                        >
-                            <Edit2 size={16} />
-                        </button>
-                        <button 
-                            onClick={() => handleDeleteItem(idx)} 
-                            className="p-2 text-slate-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                        >
-                            <Trash2 size={16} />
-                        </button>
-                    </div>
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <button
+                      onClick={() => startEditingStep(idx, item.title)}
+                      className="p-2 text-slate-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteItem(idx)}
+                      className="p-2 text-slate-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </li>
             );
           })
         )}
-        
+
         {/* Fake checklist item para completar todo */}
         {!isReadOnly && !completedAt && (
           <li
@@ -343,7 +343,7 @@ export default function MiembroChecklist({
                   ${!puedeCompletar ? 'text-slate-400 dark:text-gray-500 cursor-not-allowed' : 'text-blue-700 dark:text-blue-400 font-medium cursor-pointer'}
                 `}
               >
-                Completar todas mis actividades asignadas
+                Completar mis Actividades
               </span>
             </div>
           </li>
@@ -352,27 +352,27 @@ export default function MiembroChecklist({
 
       {/* Add Subtask Input */}
       {!isReadOnly && (
-          <div className="flex gap-2">
-              <div className="relative flex-1">
-                  <input 
-                      type="text" 
-                      value={newItemText} 
-                      onChange={(e) => setNewItemText(e.target.value)} 
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} 
-                      placeholder="Escribe una nueva actividad..."
-                      disabled={isAdding} 
-                      className="w-full text-base pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 dark:placeholder-gray-500 text-slate-700 dark:text-gray-100" 
-                  />
-                  <Plus size={16} className="absolute left-3 top-3.5 text-slate-400 dark:text-gray-500" />
-              </div>
-              <button 
-                  onClick={handleAddItem} 
-                  disabled={!newItemText.trim() || isAdding} 
-                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed shadow-sm shadow-blue-200 dark:shadow-none active:scale-95"
-              >
-                  {isAdding ? <Loader2 size={18} className="animate-spin"/> : "Añadir"}
-              </button>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={newItemText}
+              onChange={(e) => setNewItemText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+              placeholder="Escribe una nueva actividad..."
+              disabled={isAdding}
+              className="w-full text-base pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 dark:placeholder-gray-500 text-slate-700 dark:text-gray-100"
+            />
+            <Plus size={16} className="absolute left-3 top-3.5 text-slate-400 dark:text-gray-500" />
           </div>
+          <button
+            onClick={handleAddItem}
+            disabled={!newItemText.trim() || isAdding}
+            className="bg-blue-600 text-white hover:bg-blue-700 px-4 rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed shadow-sm shadow-blue-200 dark:shadow-none active:scale-95"
+          >
+            {isAdding ? <Loader2 size={18} className="animate-spin" /> : "Añadir"}
+          </button>
+        </div>
       )}
 
       {/* Campo de comentario (solo editable si no es lectura y no completado) */}

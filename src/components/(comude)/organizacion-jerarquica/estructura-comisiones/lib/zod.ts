@@ -26,6 +26,7 @@ export interface ComisionIntegranteRecord {
   nombre?: string;
   dpi?: string;
   rol?: string;
+  es_coordinador?: boolean;
 }
 
 export interface PersonaElegible {
@@ -38,6 +39,13 @@ export interface PersonaElegible {
 export const asignarIntegranteSchema = z.object({
   id_integrante: z.string().uuid("Debe seleccionar un integrante válido"),
   año: z.number().int().min(2000).max(2100),
+  es_coordinador: z.boolean().optional(),
 });
 
 export type AsignarIntegranteValues = z.infer<typeof asignarIntegranteSchema>;
+
+export {
+  BUCKET_PLANES_TRABAJO,
+  extraerDatosArchivoPlan,
+  type PlanTrabajoRecord,
+} from "@/components/(comude)/comisiones/lib/zod";

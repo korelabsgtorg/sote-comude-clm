@@ -85,6 +85,7 @@ export const newTaskSchema = z.object({
     )
     .optional(),
   punto_comude_id: z.string().uuid().nullable().optional(),
+  comision_id: z.string().uuid().nullable().optional(),
 });
 export type NewTaskState = z.infer<typeof newTaskSchema>;
 
@@ -169,6 +170,8 @@ export interface Tarea {
   agenda_id?: string;
   agenda_titulo?: string;
   agenda_fecha?: string;
+  comision_id?: string;
+  comision_nombre?: string;
 }
 
 export interface ActividadPendiente {

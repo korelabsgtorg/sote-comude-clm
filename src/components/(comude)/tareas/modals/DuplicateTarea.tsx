@@ -24,6 +24,13 @@ interface NewTareaProps {
 
 export default function DuplicateTarea({ isOpen, onClose, usuarios, usuarioActual, esJefe, tareaOriginal }: NewTareaProps) {
   const { duplicar } = useTareaMutations();
+  const { effectiveRole } = useUserContext();
+  const isSuper = effectiveRole === 'super';
+
+  const usuariosDisponibles = useMemo(() => {
+    if (isSuper) return usuarios;
+    return usuarios.filter((u) => u.rol !== 'super');
+  }, [usuarios, isSuper]);
 
   const obtenerFechaPorDefecto = () => {
     const d = new Date();
@@ -83,16 +90,7 @@ export default function DuplicateTarea({ isOpen, onClose, usuarios, usuarioActua
     });
   };
 
-  if (!isOpen) return null;
   const isSubmitting = duplicar.isPending;
-
-  const { effectiveRole } = useUserContext();
-  const isSuper = effectiveRole === 'super';
-
-  const usuariosDisponibles = useMemo(() => {
-    if (isSuper) return usuarios;
-    return usuarios.filter((u) => u.rol !== 'super');
-  }, [usuarios, isSuper]);
 
   // ── Helpers encargado ────────────────────────────────────────────────────
   const filteredUsuarios = usuariosDisponibles.filter(u =>
@@ -247,8 +245,9 @@ export default function DuplicateTarea({ isOpen, onClose, usuarios, usuarioActua
         description,
         due_date: new Date(dueDate).toISOString(),
         assigned_to: asignadoA,
-        checklist: [],
+        checklist: tareaOriginal?.checklist || [],
         status: 'Asignado',
+        comision_id: tareaOriginal?.comision_id || null,
         miembros: esGrupal
           ? miembros.map(m => ({ userId: m.userId, asignaciones: m.asignaciones }))
           : undefined,
@@ -280,6 +279,8 @@ export default function DuplicateTarea({ isOpen, onClose, usuarios, usuarioActua
       toast.error(err.message || 'Error al guardar');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">

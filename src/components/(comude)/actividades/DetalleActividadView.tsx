@@ -264,7 +264,14 @@ export default function DetalleActividadView({
     try {
       const supabase = createClient();
       const fileExt = file.name.split(".").pop() || "pdf";
-      const filePath = `${actividad.id}/acta_${Date.now()}.${fileExt}`;
+      const munId = actividad.municipio_id ?? "general";
+      const filePath = `municipio_${munId}/sesion_${actividad.id}/acta/acta_${Date.now()}.${fileExt}`;
+
+      // Si ya existía un acta previa, eliminar el archivo anterior del bucket
+      const primerActa = actividad?.acta?.[0];
+      if (primerActa && !primerActa.startsWith("http")) {
+        await supabase.storage.from("actas").remove([primerActa]);
+      }
 
       const { error: uploadError } = await supabase.storage.from("actas").upload(filePath, file);
       if (uploadError) throw uploadError;
@@ -567,6 +574,7 @@ export default function DetalleActividadView({
               <TablaPuntosAgenda
                 puntos={actividad.act_comude_puntos ?? []}
                 actComudeId={actividad.id}
+                municipioId={actividad.municipio_id}
                 canManage={puedeGestionarAgenda}
                 isAddModalOpen={isNuevoPuntoModalOpen}
                 onCloseAddModal={() => setIsNuevoPuntoModalOpen(false)}

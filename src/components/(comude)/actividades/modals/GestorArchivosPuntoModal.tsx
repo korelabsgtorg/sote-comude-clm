@@ -20,6 +20,7 @@ interface GestorArchivosPuntoModalProps {
   punto: ActComudePunto;
   actComudeId: string;
   canManage: boolean;
+  municipioId?: number | null;
 }
 
 export default function GestorArchivosPuntoModal({
@@ -28,6 +29,7 @@ export default function GestorArchivosPuntoModal({
   punto,
   actComudeId,
   canManage,
+  municipioId,
 }: GestorArchivosPuntoModalProps) {
   const [mounted, setMounted] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -36,6 +38,11 @@ export default function GestorArchivosPuntoModal({
   const [isGenerandoUrl, setIsGenerandoUrl] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [archivosLocales, setArchivosLocales] = useState(punto.act_comude_archivos || []);
+
+  useEffect(() => {
+    setArchivosLocales(punto.act_comude_archivos || []);
+  }, [punto.act_comude_archivos]);
 
   const { mutateAsync: crearArchivo } = useCrearArchivoPunto();
   const { mutateAsync: eliminarArchivo, isPending: eliminando } = useEliminarArchivoPunto();
@@ -57,18 +64,23 @@ export default function GestorArchivosPuntoModal({
     setIsUploading(true);
     try {
       const supabase = createClient();
+      const munId = municipioId ?? "general";
       const fileNameSeguro = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      const filePath = `${actComudeId}/puntos/${punto.id}/${Date.now()}_${fileNameSeguro}`;
+      const filePath = `municipio_${munId}/sesion_${actComudeId}/puntos/punto_${punto.id}/${Date.now()}_${fileNameSeguro}`;
 
       const { error: uploadError } = await supabase.storage.from("actas").upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      await crearArchivo({
+      const nuevo = await crearArchivo({
         puntoId: punto.id,
         nombre: file.name,
         filePath: filePath,
         actComudeId,
       });
+
+      if (nuevo) {
+        setArchivosLocales((prev) => [...prev, nuevo]);
+      }
 
       toast.success("Archivo subido exitosamente");
     } catch (err) {
@@ -89,7 +101,17 @@ export default function GestorArchivosPuntoModal({
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        container: 'z-[99999]',
+      },
+      didOpen: () => {
+        const container = Swal.getContainer();
+        if (container) {
+          container.style.zIndex = '99999';
+          container.style.pointerEvents = 'auto';
+        }
+      },
     });
 
     if (result.isConfirmed) {
@@ -97,6 +119,7 @@ export default function GestorArchivosPuntoModal({
         const supabase = createClient();
         await supabase.storage.from("actas").remove([filePath]);
         await eliminarArchivo({ archivoId, actComudeId });
+        setArchivosLocales((prev) => prev.filter((a) => a.id !== archivoId));
         toast.success("Archivo eliminado");
       } catch (err) {
         toast.error("Error al eliminar el archivo");
@@ -104,7 +127,7 @@ export default function GestorArchivosPuntoModal({
     }
   };
 
-  const archivos = punto.act_comude_archivos || [];
+  const archivos = archivosLocales;
 
   return (
     <>

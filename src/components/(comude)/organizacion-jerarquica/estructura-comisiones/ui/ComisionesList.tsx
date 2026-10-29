@@ -1,11 +1,16 @@
 "use client";
 
-import type { ComisionRecord, ComisionIntegranteRecord } from "../lib/zod";
+import type {
+  ComisionRecord,
+  ComisionIntegranteRecord,
+  PlanTrabajoRecord,
+} from "../lib/zod";
 import { ComisionAccordionItem } from "./ComisionAccordionItem";
 
 interface Props {
   comisiones: ComisionRecord[];
   integrantesMap: Record<string, ComisionIntegranteRecord[]>;
+  planesMap?: Record<string, PlanTrabajoRecord>;
   año: number;
   onEditar: (comision: ComisionRecord) => void;
   onAsignar: (comision: ComisionRecord) => void;
@@ -14,6 +19,7 @@ interface Props {
 export function ComisionesList({
   comisiones,
   integrantesMap,
+  planesMap = {},
   año,
   onEditar,
   onAsignar,
@@ -30,11 +36,13 @@ export function ComisionesList({
     <div className="space-y-3">
       {comisiones.map((comision, idx) => {
         const integrantes = integrantesMap[comision.id] ?? [];
+        const planTrabajo = planesMap[comision.id] ?? null;
         return (
           <ComisionAccordionItem
             key={comision.id}
             comision={comision}
             integrantes={integrantes}
+            planTrabajo={planTrabajo}
             año={año}
             onEditar={onEditar}
             onAsignar={onAsignar}

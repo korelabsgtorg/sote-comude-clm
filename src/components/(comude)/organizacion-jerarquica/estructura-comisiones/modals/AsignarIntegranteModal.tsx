@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, Crown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,13 @@ export function AsignarIntegranteModal({
   const asignarMutation = useAsignarIntegrante();
   const [busqueda, setBusqueda] = useState("");
   const [personaSeleccionadaId, setPersonaSeleccionadaId] = useState<string | null>(null);
+  const [designarCoordinador, setDesignarCoordinador] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDesignarCoordinador(integrantesActualesIds.length === 0);
+    }
+  }, [open, integrantesActualesIds.length]);
 
   const personasFiltradas = personas.filter((p) => {
     const yaAsignado = integrantesActualesIds.includes(p.id);
@@ -57,6 +65,7 @@ export function AsignarIntegranteModal({
         values: {
           id_integrante: personaSeleccionadaId,
           año,
+          es_coordinador: designarCoordinador,
         },
       });
 
@@ -143,6 +152,41 @@ export function AsignarIntegranteModal({
                 })
               )}
             </div>
+          </div>
+
+          {/* Opción para designar coordinador */}
+          <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+            <div className="space-y-0.5 pr-2">
+              <div className="flex items-center gap-1.5">
+                <Crown className="size-4 text-amber-500 shrink-0" />
+                <span className="text-xs font-semibold text-foreground">
+                  Designar como Coordinador
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {integrantesActualesIds.length === 0
+                  ? "Primer integrante de la comisión. Será asignado como coordinador."
+                  : "Si se activa, pasará a ser el nuevo coordinador de esta comisión."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDesignarCoordinador(!designarCoordinador)}
+              className={cn(
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500",
+                designarCoordinador
+                  ? "bg-amber-500"
+                  : "bg-zinc-300 dark:bg-zinc-700"
+              )}
+              aria-label="Designar como coordinador"
+            >
+              <span
+                className={cn(
+                  "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                  designarCoordinador ? "translate-x-4" : "translate-x-0"
+                )}
+              />
+            </button>
           </div>
         </div>
 

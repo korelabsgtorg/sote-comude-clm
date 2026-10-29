@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, FileText, ExternalLink, Loader2, ChevronLeft, ChevronRight, ZoomOut, ZoomIn, Trash2 } from "lucide-react";
+import { X, FileText, Loader2, ChevronLeft, ChevronRight, ZoomOut, ZoomIn, Trash2 } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -15,7 +15,9 @@ interface ActaVisorModalProps {
   onClose: () => void;
   actaUrl: string;
   actividadNombre: string;
+  subtitulo?: string;
   puedeGestionar?: boolean;
+  textoEliminar?: string;
   onEliminar?: () => void;
 }
 
@@ -24,7 +26,9 @@ export default function ActaVisorModal({
   onClose,
   actaUrl,
   actividadNombre,
+  subtitulo,
   puedeGestionar,
+  textoEliminar = "Eliminar acta",
   onEliminar,
 }: ActaVisorModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -34,6 +38,15 @@ export default function ActaVisorModal({
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
   const [loadingPdf, setLoadingPdf] = useState(true);
+
+  // Separar título principal y subtítulo si vienen concatenados con " — "
+  let tituloPrincipal = actividadNombre;
+  let subtituloTexto = subtitulo;
+  if (!subtituloTexto && actividadNombre.includes(" — ")) {
+    const partes = actividadNombre.split(" — ");
+    tituloPrincipal = partes[0].trim();
+    subtituloTexto = partes.slice(1).join(" — ").trim();
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -60,16 +73,24 @@ export default function ActaVisorModal({
     <div className="fixed inset-0 z-[1050] flex flex-col bg-[#1a1a1a] sm:bg-[#111] animate-in fade-in duration-200">
       
       {/* HEADER PRINCIPAL */}
-      <div className="flex flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-4 bg-[#222] border-b border-neutral-800 gap-2">
-        <div className="flex items-center gap-2 overflow-hidden">
+      <div className="flex flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-3.5 bg-[#222] border-b border-neutral-800 gap-2">
+        <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
           <div className="p-1.5 sm:p-2 bg-blue-500/20 text-blue-400 rounded-lg shrink-0">
             <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div className="min-w-0">
-            <h2 className="text-white font-bold text-sm sm:text-lg leading-tight truncate">
-              {actividadNombre}
+          <div className="min-w-0 flex flex-col">
+            <h2 className="text-white font-bold text-xs sm:text-base leading-tight truncate">
+              {tituloPrincipal}
             </h2>
-            <p className="text-gray-400 text-[10px] sm:text-xs hidden sm:block">Visor de documento PDF</p>
+            {subtituloTexto ? (
+              <p className="text-gray-400 text-[10px] sm:text-xs leading-tight truncate mt-0.5 font-medium">
+                {subtituloTexto}
+              </p>
+            ) : (
+              <p className="text-gray-400 text-[10px] sm:text-xs hidden sm:block">
+                Visor de documento PDF
+              </p>
+            )}
           </div>
         </div>
         
@@ -78,15 +99,15 @@ export default function ActaVisorModal({
             <button
               onClick={onEliminar}
               className="flex items-center justify-center p-1.5 sm:px-3 sm:py-2 bg-red-900/20 hover:bg-red-500/20 border border-red-900/50 hover:border-red-500/50 text-red-400 font-medium rounded-lg transition-colors"
-              title="Eliminar acta permanentemente"
+              title="Eliminar documento permanentemente"
             >
               <Trash2 className="w-4 h-4 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline sm:ml-2 text-sm">Eliminar acta</span>
+              <span className="hidden sm:inline sm:ml-2 text-sm">{textoEliminar}</span>
             </button>
           )}
           <button 
             onClick={onClose} 
-            className="p-1.5 sm:p-2 bg-neutral-800 hover:bg-red-500/20 text-gray-300 hover:text-red-400 rounded-lg transition-colors"
+            className="p-1.5 sm:p-2 bg-neutral-800 hover:bg-red-500/20 text-gray-300 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5 sm:w-5 sm:h-5" />
           </button>
@@ -155,7 +176,7 @@ export default function ActaVisorModal({
             setNumPages(numPages);
             setLoadingPdf(false);
           }}
-          loading={null} // Ocultar el loading interno ya que usamos nuestro Loader2 arriba
+          loading={null}
           error={<div className="mt-10 p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-400 text-center font-medium max-w-sm">No se pudo renderizar el PDF. Verifique que el archivo no esté corrupto.</div>}
           className="shadow-2xl shadow-black/50"
         >

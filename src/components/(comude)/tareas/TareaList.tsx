@@ -82,7 +82,7 @@ function TareaCard(props: TareaCardProps) {
   return <TareaItem {...props} />;
 }
 
-type FiltroOrigen = 'Internas' | 'Concejo' | 'Vencidas';
+type FiltroOrigen = 'Internas' | 'Concejo' | 'Comisiones' | 'Vencidas';
 
 const ORIGEN_STYLES: Record<FiltroOrigen, { active: string; inactive: string; badge: string }> = {
   Internas: {
@@ -95,6 +95,11 @@ const ORIGEN_STYLES: Record<FiltroOrigen, { active: string; inactive: string; ba
     inactive: 'text-blue-600 bg-blue-50 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50',
     badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300',
   },
+  Comisiones: {
+    active: 'bg-teal-600 text-white shadow-sm',
+    inactive: 'text-teal-600 bg-teal-50 hover:bg-teal-100/70 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/50',
+    badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300',
+  },
   Vencidas: {
     active: 'bg-rose-600 text-white shadow-sm',
     inactive: 'text-rose-600 bg-rose-50 hover:bg-rose-100/70 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50',
@@ -105,10 +110,11 @@ const ORIGEN_STYLES: Record<FiltroOrigen, { active: string; inactive: string; ba
 const ORIGEN_LABELS: Record<FiltroOrigen, string> = {
   Internas: 'Internas',
   Concejo: 'COMUDE',
+  Comisiones: 'Comisiones',
   Vencidas: 'Vencidas',
 };
 
-const ORIGEN_ORDEN: FiltroOrigen[] = ['Internas', 'Concejo', 'Vencidas'];
+const ORIGEN_ORDEN: FiltroOrigen[] = ['Internas', 'Concejo', 'Comisiones', 'Vencidas'];
 
 const ALCANCE_JEFE_STYLES: Record<string, { active: string, inactive: string, badge: string }> = {
   'equipo': { active: 'bg-blue-600 text-white', inactive: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400', badge: 'bg-blue-100 text-blue-700' },
@@ -283,7 +289,8 @@ export default function TareaList({ initialData, tipoVista }: Props) {
   }, [tareasPorAlcance]);
 
   const conteos = useMemo(() => ({
-    Internas: tareasFiltradas.filter((t: Tarea) => !t.es_concejo && t.estadoFiltro !== 'Vencido').length,
+    Internas: tareasFiltradas.filter((t: Tarea) => !t.es_concejo && !t.comision_id && t.estadoFiltro !== 'Vencido').length,
+    Comisiones: tareasFiltradas.filter((t: Tarea) => !!t.comision_id && t.estadoFiltro !== 'Vencido').length,
     Concejo: tareasFiltradas.filter((t: Tarea) => !!t.es_concejo && t.estadoFiltro !== 'Vencido').length,
     Vencidas: tareasFiltradas.filter((t: Tarea) => t.estadoFiltro === 'Vencido').length,
   }), [tareasFiltradas]);
@@ -305,7 +312,8 @@ export default function TareaList({ initialData, tipoVista }: Props) {
 
   const listaVisual = useMemo(() => {
       const filtradas = tareasFiltradas.filter((t: Tarea) => {
-        if (filtroEstado === 'Internas') return !t.es_concejo && t.estadoFiltro !== 'Vencido';
+        if (filtroEstado === 'Internas') return !t.es_concejo && !t.comision_id && t.estadoFiltro !== 'Vencido';
+        if (filtroEstado === 'Comisiones') return !!t.comision_id && t.estadoFiltro !== 'Vencido';
         if (filtroEstado === 'Concejo') return !!t.es_concejo && t.estadoFiltro !== 'Vencido';
         return t.estadoFiltro === 'Vencido';
       });

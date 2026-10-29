@@ -32,6 +32,7 @@ import {
 const T_ACTIVIDADES = 'tra_actividades';
 const T_MIEMBROS = 'tra_actividad_miembros';
 const T_ENLACES = 'tra_actividad_comude_enlaces';
+const T_ENLACES_COMISION = 'tra_actividad_comision_enlaces';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -47,6 +48,7 @@ const CHUNK = 100;
 
 const revalidarModulo = () => {
   revalidatePath(RUTAS_TAREAS.mis_actividades);
+  revalidatePath('/comude/comisiones');
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -355,6 +357,8 @@ interface TareaAutorizada {
   esCreador: boolean;
   esMiembro: boolean;
   esJefeDelEncargado: boolean;
+  esTareaComision: boolean;
+  esMiembroComision: boolean;
 }
 
 async function cargarTareaAutorizada(ctx: Contexto, taskId: string): Promise<TareaAutorizada | null> {
@@ -379,21 +383,64 @@ async function cargarTareaAutorizada(ctx: Contexto, taskId: string): Promise<Tar
     .maybeSingle();
   const esMiembro = !!miembro;
 
+  // Verificar si la actividad pertenece a una comisión
+  let esTareaComision = false;
+  let esMiembroComision = false;
+  const { data: enlaceComision } = await ctx.supabase
+    .from(T_ENLACES_COMISION)
+    .select('comision_id')
+    .eq('actividad_id', taskId)
+    .maybeSingle();
+
+  if (enlaceComision?.comision_id) {
+    esTareaComision = true;
+    const esSuper = (ctx.rol || '').toLowerCase().trim() === 'super';
+    if (esSuper) {
+      esMiembroComision = true;
+    } else {
+      const { data: integrante } = await ctx.supabase
+        .from('comision_integrantes')
+        .select('id')
+        .eq('id_comision', enlaceComision.comision_id)
+        .eq('id_integrante', ctx.userId)
+        .maybeSingle();
+      esMiembroComision = !!integrante;
+    }
+  }
+
   let esJefeDelEncargado = false;
-  if (!esEncargado && !esCreador && !ctx.esSupervisor && row.encargado_id) {
+  if (!esEncargado && !esCreador && !ctx.esSupervisor && !esMiembroComision && row.encargado_id) {
     const subordinados = await obtenerSubordinados(ctx);
     esJefeDelEncargado = subordinados.has(row.encargado_id);
   }
 
-  const puedeVer = esEncargado || esCreador || esMiembro || esJefeDelEncargado || ctx.esSupervisor;
+  const puedeVer =
+    esEncargado ||
+    esCreador ||
+    esMiembro ||
+    esJefeDelEncargado ||
+    ctx.esSupervisor ||
+    esMiembroComision;
   if (!puedeVer) return null;
 
-  return { row, esEncargado, esCreador, esMiembro, esJefeDelEncargado };
+  return {
+    row,
+    esEncargado,
+    esCreador,
+    esMiembro,
+    esJefeDelEncargado,
+    esTareaComision,
+    esMiembroComision,
+  };
 }
 
 /** Puede gestionar la actividad completa (editar, cerrar, administrar miembros) */
-const puedeGestionar = (ctx: Contexto, t: TareaAutorizada) =>
-  t.esEncargado || t.esCreador || t.esJefeDelEncargado || ctx.esSupervisor;
+const puedeGestionar = (ctx: Contexto, t: TareaAutorizada) => {
+  if (t.esTareaComision) {
+    return t.esEncargado || t.esCreador || t.esMiembroComision;
+  }
+  return t.esEncargado || t.esCreador || t.esJefeDelEncargado || ctx.esSupervisor;
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Query principal
@@ -444,7 +491,7 @@ export async function obtenerDatosGestor(tipoVista: TipoVistaTareas): Promise<{
   if (tipoVista === 'mis_actividades') {
     const [{ data: propias, error: errorPropias }, { data: comoMiembro }] = await Promise.all([
       base()
-        .or(`encargado_id.eq.${ctx.userId},creador_id.eq.${ctx.userId}`)
+        .eq('encargado_id', ctx.userId)
         .order('fecha_limite', { ascending: true }),
       supabase.from(T_MIEMBROS).select('actividad_id').eq('usuario_id', ctx.userId),
     ]);
@@ -537,12 +584,36 @@ export async function obtenerDatosGestor(tipoVista: TipoVistaTareas): Promise<{
   // 4. CONTEXTO COMUDE (punto de agenda + sesión)
   const contextoComude = await obtenerContextoComude(supabase, taskIds);
 
+  // 4.5 CONTEXTO COMISIÓN (enlaces de comisiones)
+  const enlacesComision = taskIds.length > 0
+    ? await selectEnChunks<{ actividad_id: string; comision_id: string }>(
+        (chunk) => supabase.from(T_ENLACES_COMISION).select('actividad_id, comision_id').in('actividad_id', chunk),
+        taskIds,
+      )
+    : [];
+
+  const comisionIds = Array.from(new Set(enlacesComision.map((e) => String(e.comision_id)).filter(Boolean)));
+  const comisiones = comisionIds.length > 0
+    ? await selectEnChunks<{ id: string; nombre: string }>(
+        (chunk) => supabase.from('comisiones').select('id, nombre').in('id', chunk),
+        comisionIds,
+      )
+    : [];
+  const comisionMap = new Map(comisiones.map((c) => [String(c.id), String(c.nombre)]));
+  const comisionPorTarea = new Map(
+    enlacesComision.map((e) => [
+      String(e.actividad_id),
+      { id: String(e.comision_id), nombre: comisionMap.get(String(e.comision_id)) || 'Comisión' },
+    ]),
+  );
+
   // 5. MAPEAR TAREAS
   const tareas: Tarea[] = rawTareas.map((row) => {
     const t = mapTarea(row);
     const creador = usuarioPorId.get(t.created_by);
     const asignado = t.assigned_to ? usuarioPorId.get(t.assigned_to) : undefined;
     const contexto = contextoComude.get(t.id);
+    const comisionInfo = comisionPorTarea.get(t.id);
 
     return {
       ...t,
@@ -552,11 +623,13 @@ export async function obtenerDatosGestor(tipoVista: TipoVistaTareas): Promise<{
       agenda_id: contexto?.agenda_id,
       agenda_titulo: contexto?.agenda_titulo,
       agenda_fecha: contexto?.agenda_fecha,
+      comision_id: comisionInfo?.id,
+      comision_nombre: comisionInfo?.nombre,
       alcance: alcancePorTarea.get(t.id),
       creator: { nombre: contexto ? REMITENTE_COMUDE : creador?.nombre || 'Desconocido' },
       assignee: {
         nombre: asignado?.nombre || 'Sin asignar',
-        oficina_nombre: asignado?.oficina_nombre || 'Sin Dependencia Asignada',
+        oficina_nombre: asignado?.oficina_nombre || comisionInfo?.nombre || 'Sin Dependencia Asignada',
       },
       miembros: miembrosPorTarea.get(t.id) || [],
     };
@@ -628,25 +701,58 @@ async function insertarTarea(
   const fecha = new Date(datos.due_date);
   if (!datos.due_date || Number.isNaN(fecha.getTime())) return fail('La fecha límite no es válida.');
 
-  // Solo jefaturas / supervisores pueden asignar a otra persona
+  // Solo jefaturas / supervisores (o integrantes en actividades de comisión) pueden asignar a otra persona
   const estructura = await cargarEstructura(ctx);
   const perfil = construirPerfil(ctx, estructura);
+  const esSuperUser = (ctx.rol || '').toLowerCase().trim() === 'super';
+
+  if (datos.comision_id) {
+    const { data: comision } = await ctx.supabase
+      .from('comisiones')
+      .select('id, municipio_id')
+      .eq('id', datos.comision_id)
+      .maybeSingle();
+    if (!comision || Number(comision.municipio_id) !== Number(ctx.municipioId)) {
+      return fail('La comisión no existe o pertenece a otro municipio.');
+    }
+    if (!esSuperUser) {
+      const { data: integrante } = await ctx.supabase
+        .from('comision_integrantes')
+        .select('id')
+        .eq('id_comision', datos.comision_id)
+        .eq('id_integrante', ctx.userId)
+        .maybeSingle();
+      if (!integrante) {
+        return fail('Solo los integrantes de la comisión o un Super Administrador pueden crear actividades en esta comisión.');
+      }
+    }
+  }
+
   let encargadoId = datos.assigned_to || ctx.userId;
-  if (!perfil.esJefe && encargadoId !== ctx.userId) encargadoId = ctx.userId;
+  if (!perfil.esJefe && !datos.comision_id && encargadoId !== ctx.userId) encargadoId = ctx.userId;
 
   // Miembros: sin duplicados y sin incluir al encargado
   const miembrosEntrada = (datos.miembros || []).filter(
     (m, idx, arr) => m.userId && m.userId !== encargadoId && arr.findIndex((x) => x.userId === m.userId) === idx,
   );
 
-  // Aislamiento: encargado y miembros deben pertenecer al municipio activo
+  // Aislamiento: encargado y miembros deben pertenecer al municipio activo (o ser integrantes de la comisión)
   const validos = await usuariosDelMunicipio(ctx, [encargadoId, ...miembrosEntrada.map((m) => m.userId)]);
+  if (datos.comision_id) {
+    validos.add(ctx.userId);
+    const { data: intRows } = await ctx.supabase
+      .from('comision_integrantes')
+      .select('id_integrante')
+      .eq('id_comision', datos.comision_id);
+    (intRows || []).forEach((r: any) => {
+      if (r.id_integrante) validos.add(String(r.id_integrante));
+    });
+  }
   if (!validos.has(encargadoId)) return fail('El encargado seleccionado no pertenece al municipio.');
   const miembrosInvalidos = miembrosEntrada.filter((m) => !validos.has(m.userId));
   if (miembrosInvalidos.length) return fail('Uno o más participantes no pertenecen al municipio.');
 
   // Si quien crea no es super, no puede asignar ni incluir a un super
-  const esSuperUser = (ctx.rol || '').toLowerCase().trim() === 'super';
   if (!esSuperUser) {
     const idsVerificar = [encargadoId, ...miembrosEntrada.map((m) => m.userId)].filter((id) => id !== ctx.userId);
     if (idsVerificar.length > 0) {
@@ -741,6 +847,17 @@ async function insertarTarea(
     }
   }
 
+  if (datos.comision_id) {
+    const { error: errorEnlaceComision } = await ctx.supabase
+      .from(T_ENLACES_COMISION)
+      .insert({ comision_id: datos.comision_id, actividad_id: nueva.id });
+    if (errorEnlaceComision) {
+      console.error('[tareas] Error vinculando con comisión:', errorEnlaceComision);
+      await rollback();
+      return fail('No se pudo vincular la actividad con la comisión.');
+    }
+  }
+
   return ok({ id: String(nueva.id) });
 }
 
@@ -794,8 +911,19 @@ export async function actualizarTarea(id: string, updates: ActualizarTareaInput)
   let cambioAsignado = false;
   if (updates.assigned_to && updates.assigned_to !== actual.encargado_id) {
     const perfil = construirPerfil(ctx, await cargarEstructura(ctx));
-    if (!perfil.esJefe) return fail('Solo una jefatura puede reasignar la actividad.');
+    if (!perfil.esJefe && !t.esMiembroComision) {
+      return fail('Solo una jefatura o integrante de la comisión puede reasignar la actividad.');
+    }
     const validos = await usuariosDelMunicipio(ctx, [updates.assigned_to]);
+    if (t.esTareaComision) {
+      const { data: intRow } = await ctx.supabase
+        .from('comision_integrantes')
+        .select('id_integrante')
+        .eq('id_integrante', updates.assigned_to)
+        .limit(1)
+        .maybeSingle();
+      if (intRow?.id_integrante) validos.add(String(intRow.id_integrante));
+    }
     if (!validos.has(updates.assigned_to)) return fail('El encargado seleccionado no pertenece al municipio.');
 
     const esSuperEditor = (ctx.rol || '').toLowerCase().trim() === 'super';
@@ -960,7 +1088,11 @@ export async function eliminarTarea(taskId: string): Promise<ActionResult> {
 
   const t = await cargarTareaAutorizada(ctx, taskId);
   if (!t) return fail('Actividad no encontrada.');
-  if (!(t.esCreador || t.esJefeDelEncargado || ctx.esSupervisor)) {
+  if (t.esTareaComision) {
+    if (!(t.esCreador || t.esMiembroComision)) {
+      return fail('Solo los integrantes de la comisión o un Super Administrador pueden eliminar esta actividad.');
+    }
+  } else if (!(t.esCreador || t.esJefeDelEncargado || ctx.esSupervisor)) {
     return fail('Solo quien creó la actividad o una jefatura puede eliminarla.');
   }
 
@@ -1192,6 +1324,15 @@ export async function agregarMiembro(
   if (userId === t.row.encargado_id) return fail('El encargado no puede ser agregado como participante.');
 
   const validos = await usuariosDelMunicipio(ctx, [userId]);
+  if (t.esTareaComision) {
+    const { data: intRow } = await ctx.supabase
+      .from('comision_integrantes')
+      .select('id_integrante')
+      .eq('id_integrante', userId)
+      .limit(1)
+      .maybeSingle();
+    if (intRow?.id_integrante) validos.add(String(intRow.id_integrante));
+  }
   if (!validos.has(userId)) return fail('El participante no pertenece al municipio.');
 
   const { error } = await ctx.supabase.from(T_MIEMBROS).insert({
@@ -1348,6 +1489,136 @@ export async function marcarRevisadoPorComude(taskId: string): Promise<ActionRes
   revalidarModulo();
   revalidatePath('/comude/comude', 'layout');
   return ok();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Actividades de Comisión (tra_actividad_comision_enlaces)
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function obtenerActividadesDeComision(
+  comisionId: string,
+  año: number,
+): Promise<{ tareas: Tarea[]; usuarios: Usuario[] }> {
+  const ctx = await obtenerContexto();
+  if (!ctx || !ctx.municipioId || !comisionId) return { tareas: [], usuarios: [] };
+
+  const supabase = ctx.supabase;
+  const municipioId = ctx.municipioId;
+
+  const { data: comision } = await supabase
+    .from('comisiones')
+    .select('id, nombre, municipio_id')
+    .eq('id', comisionId)
+    .maybeSingle();
+
+  if (!comision || Number(comision.municipio_id) !== Number(municipioId)) {
+    return { tareas: [], usuarios: [] };
+  }
+
+  const estructura = await cargarEstructura(ctx);
+
+  // 1. Integrantes de la comisión para el año seleccionado (usuarios asignables)
+  const { data: intRows } = await supabase
+    .from('comision_integrantes')
+    .select('id_integrante')
+    .eq('id_comision', comisionId)
+    .eq('año', año);
+
+  const integranteIds = Array.from(
+    new Set((intRows || []).map((r: any) => String(r.id_integrante)).filter(Boolean)),
+  );
+
+  // 2. Enlaces de actividades de esta comisión
+  const { data: enlaces } = await supabase
+    .from(T_ENLACES_COMISION)
+    .select('actividad_id')
+    .eq('comision_id', comisionId);
+
+  const actividadIds = Array.from(
+    new Set((enlaces || []).map((e: any) => String(e.actividad_id)).filter(Boolean)),
+  );
+
+  let rawTareas: any[] = [];
+  if (actividadIds.length > 0) {
+    const todas = await selectEnChunks(
+      (chunk) => supabase.from(T_ACTIVIDADES).select('*').eq('municipio_id', municipioId).in('id', chunk),
+      actividadIds,
+    );
+    rawTareas = todas.filter((row: any) => {
+      const añoLimite = row.fecha_limite ? new Date(row.fecha_limite).getFullYear() : null;
+      const añoCreado = row.creado_en ? new Date(row.creado_en).getFullYear() : null;
+      return añoLimite === año || añoCreado === año;
+    });
+  }
+
+  const taskIds = rawTareas.map((t) => String(t.id));
+
+  // 3. Miembros grupales
+  let rawMiembros: any[] = [];
+  if (taskIds.length > 0) {
+    rawMiembros = await selectEnChunks(
+      (chunk) => supabase.from(T_MIEMBROS).select('*').in('actividad_id', chunk).order('creado_en', { ascending: true }),
+      taskIds,
+    );
+  }
+
+  // 4. Cargar perfiles necesarios (integrantes + creadores + encargados + miembros)
+  const profileIdsToFetch = new Set<string>(integranteIds);
+  rawTareas.forEach((t: any) => {
+    if (t.creador_id) profileIdsToFetch.add(String(t.creador_id));
+    if (t.encargado_id) profileIdsToFetch.add(String(t.encargado_id));
+  });
+  rawMiembros.forEach((m: any) => {
+    if (m.usuario_id) profileIdsToFetch.add(String(m.usuario_id));
+  });
+
+  const esSuper = (ctx.rol || '').toLowerCase().trim() === 'super';
+  const usuarioPorId = new Map<string, Usuario>();
+
+  if (profileIdsToFetch.size > 0) {
+    const perfiles = await selectEnChunks<ProfileRow>(
+      (chunk) => supabase.from('profiles').select('id, nombre, activo, puesto_id, rol').in('id', chunk),
+      Array.from(profileIdsToFetch),
+    );
+    perfiles.forEach((u) => {
+      usuarioPorId.set(String(u.id), mapUsuario(u, estructura));
+    });
+  }
+
+  const usuariosComision: Usuario[] = integranteIds
+    .map((id) => usuarioPorId.get(id))
+    .filter((u): u is Usuario => !!u && (esSuper || (u.rol || '').toLowerCase().trim() !== 'super'))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const miembrosPorTarea = new Map<string, ActMiembro[]>();
+  rawMiembros.forEach((m: any) => {
+    const nombre = usuarioPorId.get(String(m.usuario_id))?.nombre || 'Usuario';
+    const lista = miembrosPorTarea.get(String(m.actividad_id)) || [];
+    lista.push(mapMiembro(m, nombre));
+    miembrosPorTarea.set(String(m.actividad_id), lista);
+  });
+
+  const tareas: Tarea[] = rawTareas.map((row) => {
+    const t = mapTarea(row);
+    const creador = usuarioPorId.get(t.created_by);
+    const asignado = t.assigned_to ? usuarioPorId.get(t.assigned_to) : undefined;
+
+    return {
+      ...t,
+      comision_id: comisionId,
+      comision_nombre: String(comision.nombre || 'Comisión'),
+      creator: { nombre: creador?.nombre || 'Desconocido' },
+      assignee: {
+        nombre: asignado?.nombre || 'Sin asignar',
+        oficina_nombre: asignado?.oficina_nombre || 'Integrante de Comisión',
+      },
+      miembros: miembrosPorTarea.get(t.id) || [],
+    };
+  });
+
+  tareas.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
+  return { tareas, usuarios: usuariosComision };
 }
 
 // Aliases para terminología unificada de Actividad

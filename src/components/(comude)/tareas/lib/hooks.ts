@@ -17,6 +17,7 @@ import {
   marcarParteMiembroCompletada,
   marcarComoRevisado,
   obtenerActividadPendienteConfirmacion,
+  obtenerActividadesDeComision,
 } from "./actions";
 import {
   TipoVistaTareas,
@@ -29,6 +30,7 @@ import {
 
 export const TAREAS_KEYS = {
   gestor: (vista: string) => ["gestor-tareas", vista],
+  comision: (comisionId: string, año: number) => ["gestor-tareas", "comision", comisionId, año],
   all: ["gestor-tareas"],
   pendiente: ["bloqueo-actividad-pendiente"],
 };
@@ -42,6 +44,15 @@ export const useGestorData = (tipoVista: TipoVistaTareas, initialData: any) => {
     queryKey: KEYS.gestor(tipoVista),
     queryFn: () => obtenerDatosGestor(tipoVista),
     initialData,
+    staleTime: FIVE_MINUTES,
+  });
+};
+
+export const useActividadesDeComision = (comisionId: string, año: number, enabled = true) => {
+  return useQuery({
+    queryKey: KEYS.comision(comisionId, año),
+    queryFn: () => obtenerActividadesDeComision(comisionId, año),
+    enabled: Boolean(comisionId && año && enabled),
     staleTime: FIVE_MINUTES,
   });
 };
@@ -294,9 +305,7 @@ export function useActividadPendiente() {
       const res = await obtenerActividadPendienteConfirmacion();
       return res.success ? res.data : null;
     },
-    staleTime: 1000 * 10,
-    refetchInterval: 8000,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5,
   });
 
   return {

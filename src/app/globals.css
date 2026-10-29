@@ -240,3 +240,13 @@
 .obs-toast-progress {
   background: rgb(5 150 105) !important;
 }
+
+/* SweetAlert2 container z-index & pointer-events fix when inside Radix Dialog modals */
+.swal2-container {
+  z-index: 99999 !important;
+  pointer-events: auto !important;
+}
+
+.swal2-container .swal2-popup {
+  pointer-events: auto !important;
+}

@@ -56,6 +56,30 @@ const getNombreCorto = (nombreCompleto: string | undefined | null) => {
   return `${primerNombre} ${partesApellido.join(' ')}`;
 };
 
+const renderNombreTab = (label: string) => {
+  if (!label) return null;
+  const palabras = label.trim().split(/\s+/);
+  const esMultilinea = palabras.length >= 4;
+
+  if (esMultilinea) {
+    const mid = Math.ceil(palabras.length / 2);
+    const linea1 = palabras.slice(0, mid).join(" ");
+    const linea2 = palabras.slice(mid).join(" ");
+    return (
+      <span className="flex flex-col items-center leading-[1.1] text-[9.5px] sm:text-[10.5px] md:text-xs text-center max-w-[125px] sm:max-w-[160px]">
+        <span className="truncate max-w-full">{linea1}</span>
+        <span className="truncate max-w-full">{linea2}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-[11px] sm:text-xs md:text-sm leading-tight text-center">
+      {label}
+    </span>
+  );
+};
+
 const renderConfirmacion = (isoString?: string | null) => {
   if (!isoString) {
     return <span className="text-[10px] text-orange-500 font-medium ml-1">Pendiente</span>;
@@ -651,7 +675,7 @@ export default function TareaItem({ tarea, isExpanded = false, onToggle, isJefe,
                     {esGrupal && (esEncargado || soySoloMiembro || isJefe) && (
                       <div className="flex flex-col h-full">
                         {/* Tabs */}
-                        <div className="flex justify-center gap-6 mb-6 overflow-x-auto overflow-y-hidden border-b border-slate-200 dark:border-neutral-700 px-2">
+                        <div className="flex justify-start sm:justify-center gap-2.5 sm:gap-4 md:gap-6 mb-4 sm:mb-6 overflow-x-auto overflow-y-hidden border-b border-slate-200 dark:border-neutral-700 px-2 scrollbar-none">
                           {(() => {
                             const tabs = [
                               {
@@ -690,25 +714,25 @@ export default function TareaItem({ tarea, isExpanded = false, onToggle, isJefe,
                                 <button
                                   key={t.id}
                                   onClick={() => setTabActivo(t.id)}
-                                  className={`relative pb-3 text-sm font-semibold whitespace-nowrap flex flex-col items-center transition-colors ${
+                                  className={`relative pb-2.5 sm:pb-3 px-1.5 sm:px-2.5 flex flex-col items-center transition-colors shrink-0 ${
                                     isActive
                                       ? `${activeColorClass} after:absolute after:bottom-[-1px] after:left-0 after:w-full after:h-[2px]`
                                       : 'text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-300'
                                   }`}
                                 >
-                                  <span className={`text-[9px] uppercase font-bold tracking-wider mb-0.5 ${isActive ? 'opacity-80' : 'opacity-60'}`}>
+                                  <span className={`text-[8px] sm:text-[9px] uppercase font-bold tracking-wider mb-0.5 ${isActive ? 'opacity-90' : 'opacity-60'}`}>
                                     {t.rol}
                                   </span>
-                                  <div className="flex items-center gap-1.5 leading-tight">
+                                  <div className="flex items-center gap-1 sm:gap-1.5 leading-tight">
                                     {isEncargadoTab ? (
-                                      <Crown size={15} className={isActive ? 'text-blue-500 dark:text-blue-400' : 'opacity-40'} strokeWidth={2.5} />
+                                      <Crown size={13} className={`shrink-0 ${isActive ? 'text-blue-500 dark:text-blue-400' : 'opacity-40'}`} strokeWidth={2.5} />
                                     ) : (
-                                      <User size={15} className={isActive ? 'text-purple-500 dark:text-purple-400' : 'opacity-40'} strokeWidth={2.5} />
+                                      <User size={13} className={`shrink-0 ${isActive ? 'text-purple-500 dark:text-purple-400' : 'opacity-40'}`} strokeWidth={2.5} />
                                     )}
-                                    <span className="flex items-center gap-1.5">
-                                      {t.label}
-                                      {t.completedAt && <CheckCircle2 size={13} className="text-green-500" strokeWidth={3} />}
-                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      {renderNombreTab(t.label)}
+                                      {t.completedAt && <CheckCircle2 size={12} className="text-green-500 shrink-0" strokeWidth={3} />}
+                                    </div>
                                   </div>
                                 </button>
                               );
@@ -752,17 +776,18 @@ export default function TareaItem({ tarea, isExpanded = false, onToggle, isJefe,
             </div>
             
             {/* Archivos adjuntos */}
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-neutral-800">
+            <div className="mt-6 sm:mt-7 pt-4 sm:pt-5 border-t border-slate-100 dark:border-neutral-800">
                 <GestorArchivos 
                     tareaId={tarea.id} 
                     archivosIniciales={tarea.archivos} 
                     esLectura={isReadOnly}
                     nombreUsuarioActual={nombreUsuarioActual}
+                    municipioId={tarea.municipio_id}
                 />
             </div>
 
             {/* Detalles del registro */}
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-neutral-800">
+            <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-slate-100 dark:border-neutral-800">
                 <div className="bg-slate-50 dark:bg-neutral-800 rounded-xl p-3 text-xs text-slate-500 dark:text-gray-400 flex flex-col gap-2">
                       <div className="flex justify-between items-center border-b pb-2 border-slate-200 dark:border-neutral-700">
                         <span className="font-bold text-slate-400 dark:text-gray-500 uppercase text-[10px]">Detalles del Registro</span>

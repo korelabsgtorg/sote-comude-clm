@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModalShell } from "@/components/ui/general-modal";
+import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { Button } from "@/components/ui/button";
 import { FormLabel } from "./TerritorioFormShell";
 import {
@@ -107,6 +108,8 @@ export function GestionarResolucionModal({
   comunidadNombre: string;
 }) {
   const [activeTab, setActiveTab] = useState<"actual" | "renovar" | "historial">("actual");
+  const { user } = useUserContext();
+  const munId = (user?.user_metadata?.municipio_id ?? (user as unknown as { municipio_id?: number })?.municipio_id) || 1;
 
   // Form State para renovar
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,7 +211,7 @@ export function GestionarResolucionModal({
       for (let i = 0; i < editNuevosArchivos.length; i++) {
         const f = editNuevosArchivos[i];
         const fileNameSeguro = f.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-        const filePath = `cocode/resoluciones/${comunidadId}/${Date.now()}_edit_${i}_${fileNameSeguro}`;
+        const filePath = `municipio_${munId}/resoluciones/comunidad_${comunidadId}/${Date.now()}_edit_${i}_${fileNameSeguro}`;
 
         const { error: uploadErr } = await supabase.storage
           .from("acreditaciones")
@@ -286,8 +289,7 @@ export function GestionarResolucionModal({
         const f = files[i];
         const fileExt = f.name.split(".").pop();
         const fileNameSeguro = f.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-        // Estructura ofuscada: cocode/resoluciones/{comunidadId}/{timestamp}_{filename}
-        const filePath = `cocode/resoluciones/${comunidadId}/${Date.now()}_${i}_${fileNameSeguro}`;
+        const filePath = `municipio_${munId}/resoluciones/comunidad_${comunidadId}/${Date.now()}_${i}_${fileNameSeguro}`;
 
         const { error: uploadErr } = await supabase.storage
           .from("acreditaciones")

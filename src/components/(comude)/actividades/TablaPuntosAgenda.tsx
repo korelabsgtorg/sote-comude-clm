@@ -150,6 +150,7 @@ function FilaPunto({
   punto,
   orden,
   actComudeId,
+  municipioId,
   canManage,
   categorias,
   sesionEstado,
@@ -160,6 +161,7 @@ function FilaPunto({
   punto: ActComudePunto;
   orden: number;
   actComudeId: string;
+  municipioId?: number | null;
   canManage: boolean;
   categorias: ActComudeCategoria[];
   sesionEstado?: string | null;
@@ -398,6 +400,7 @@ function FilaPunto({
         onClose={() => setIsArchivosModalOpen(false)}
         punto={punto}
         actComudeId={actComudeId}
+        municipioId={municipioId}
         canManage={canManage}
       />
       <ActividadesPuntoModal
@@ -598,6 +601,7 @@ function FilaPunto({
       onClose={() => setIsArchivosModalOpen(false)}
       punto={punto}
       actComudeId={actComudeId}
+      municipioId={municipioId}
       canManage={canManage}
     />
     <ActividadesPuntoModal
@@ -615,6 +619,7 @@ function FilaPunto({
 interface TablaPuntosAgendaProps {
   puntos: ActComudePunto[];
   actComudeId: string;
+  municipioId?: number | null;
   canManage: boolean;
   isAddModalOpen?: boolean;
   onCloseAddModal?: () => void;
@@ -622,7 +627,16 @@ interface TablaPuntosAgendaProps {
   filtroEstado?: string | null;
 }
 
-export default function TablaPuntosAgenda({ puntos, actComudeId, canManage, isAddModalOpen, onCloseAddModal, sesionEstado, filtroEstado }: TablaPuntosAgendaProps) {
+export default function TablaPuntosAgenda({
+  puntos,
+  actComudeId,
+  municipioId,
+  canManage,
+  isAddModalOpen,
+  onCloseAddModal,
+  sesionEstado,
+  filtroEstado,
+}: TablaPuntosAgendaProps) {
   const { data: puntosServidor } = usePuntosDeActividad(actComudeId);
   const puntosEfectivos = puntosServidor ?? puntos;
   const puntosFiltrados = filtroEstado ? puntosEfectivos.filter(p => (p.estado ?? "No iniciado") === filtroEstado) : puntosEfectivos;
@@ -722,6 +736,7 @@ export default function TablaPuntosAgenda({ puntos, actComudeId, canManage, isAd
                   punto={punto}
                   orden={idx + 1}
                   actComudeId={actComudeId}
+                  municipioId={municipioId}
                   canManage={canManage}
                   categorias={categorias}
                   sesionEstado={sesionEstado}
@@ -748,6 +763,7 @@ export default function TablaPuntosAgenda({ puntos, actComudeId, canManage, isAd
               punto={punto}
               orden={idx + 1}
               actComudeId={actComudeId}
+              municipioId={municipioId}
               canManage={canManage}
               categorias={categorias}
               sesionEstado={sesionEstado}
