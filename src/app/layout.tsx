@@ -9,6 +9,7 @@ import Providers from "@/components/(base)/providers/QueryProviders";
 import { UserProvider } from "@/components/(base)/providers/UserProvider";
 import ConditionalFooter from "@/components/(base)/layout/ConditionalFooter";
 import OfflineBanner from "@/components/OfflineBanner";
+import GlobalHexagonPattern from "@/components/ui/GlobalHexagonPattern";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,9 +72,10 @@ export default async function RootLayout({
             disableTransitionOnChange
           >
             <UserProvider user={user}>
+              <GlobalHexagonPattern />
               <OfflineBanner />
               <Header />
-              <main className="flex-1 w-full flex flex-col">
+              <main className="flex-1 w-full flex flex-col relative z-[1]">
                 {children}
               </main>
               <ConditionalFooter />

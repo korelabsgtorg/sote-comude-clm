@@ -44,7 +44,7 @@ export function ModalShell({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         className={cn(
-          "max-w-md w-full rounded-2xl border border-border/60 bg-background p-0 shadow-xl",
+          "w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-border/60 bg-background p-0 shadow-xl overflow-hidden",
           className,
         )}
       >
@@ -61,7 +61,7 @@ export function ModalShell({
           </div>
           {headerExtra && <div className="shrink-0 ml-2">{headerExtra}</div>}
         </DialogHeader>
-        <div className={cn("px-4 pt-1.5 pb-2.5", contentClassName)}>{children}</div>
+        <div className={cn("px-4 pt-1.5 pb-2.5 w-full min-w-0 overflow-hidden", contentClassName)}>{children}</div>
       </DialogContent>
     </Dialog>
   );

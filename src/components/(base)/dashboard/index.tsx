@@ -28,6 +28,7 @@ import {
   getVisibleDashboardModules,
 } from "@/components/(base)/dashboard/modules";
 import { cn } from "@/lib/utils";
+import { HexagonPattern } from "@/components/ui/hexagon-pattern";
 
 const MODULES = DASHBOARD_MODULES;
 
@@ -89,7 +90,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative flex flex-col items-center justify-center px-[1%] pt-0 pb-2 sm:px-10 lg:px-14 sm:pt-0 sm:pb-4 lg:pt-0 lg:pb-6 text-center w-full max-w-none mx-auto transition-all group"
+      className="relative flex flex-col items-center justify-center px-0 pt-0 pb-2 text-center w-full max-w-none mx-auto transition-all group"
     >
 
 
@@ -115,7 +116,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         user={user}
       />
 
-      <div className="flex flex-col md:hidden w-full bg-muted dark:bg-muted relative">
+      <div className="flex flex-col md:hidden w-full relative">
         {/* Encabezado con Logo arriba de la portada */}
         <div className="w-full pt-3 pb-2 bg-card border-b border-border/40 relative z-[2]">
           <LogoTrifinioMobile backgroundEffect="blur" />
@@ -134,16 +135,36 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         </div>
 
         {/* Sección de Contenido que se desliza sobre la portada fija */}
-        <div className="relative z-10 w-full px-[1%] pt-4 pb-20 bg-muted dark:bg-muted">
+        <div className="relative z-10 w-full px-[1%] pt-4 pb-20 bg-background overflow-hidden">
+          <HexagonPattern
+            hexagons={[
+              [1, 1],
+              [4, 4],
+              [2, 2],
+              [3, 4],
+              [5, 4],
+              [8, 2],
+              [6, 3],
+              [8, 5],
+              [10, 10],
+            ]}
+            className={cn(
+              "inset-0 skew-y-6",
+              "stroke-neutral-300/50 fill-neutral-200/35 dark:stroke-white/[0.05] dark:fill-white/[0.04]",
+              "mask-[radial-gradient(420px_circle_at_center,white,transparent)]",
+              "[mask-image:radial-gradient(420px_circle_at_center,white,transparent)]",
+              "[-webkit-mask-image:radial-gradient(420px_circle_at_center,white,transparent)]"
+            )}
+          />
           <div className="relative z-10">
             <CardsGrid />
           </div>
         </div>
       </div>
 
-      <div className="hidden md:flex md:flex-col w-full bg-[#0a1628]">
+      <div className="hidden md:flex md:flex-col w-full">
         {/* Banner de Portada en PC (70vh relativo a la altura de pantalla) */}
-        <div className="relative w-full h-[70vh] min-h-[440px] overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-[70vh] min-h-[440px] bg-[#0a1628] overflow-hidden flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={displayImage}
@@ -158,8 +179,28 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         </div>
 
         {/* Sección de Contenido (Actividades COMUDE) */}
-        <div className="relative z-10 w-full bg-muted dark:bg-muted px-8 lg:px-12 pt-6 pb-20">
-          <div className="relative z-20 w-full max-w-[min(100%,1600px)] mx-auto pt-0 pb-2">
+        <div className="relative z-10 w-full bg-background overflow-hidden px-3 sm:px-6 lg:px-8 xl:px-10 pt-6 pb-20">
+          <HexagonPattern
+            hexagons={[
+              [1, 1],
+              [4, 4],
+              [2, 2],
+              [3, 4],
+              [5, 4],
+              [8, 2],
+              [6, 3],
+              [8, 5],
+              [10, 10],
+            ]}
+            className={cn(
+              "inset-0 skew-y-6",
+              "stroke-neutral-300/50 fill-neutral-200/35 dark:stroke-white/[0.05] dark:fill-white/[0.04]",
+              "mask-[radial-gradient(420px_circle_at_center,white,transparent)]",
+              "[mask-image:radial-gradient(420px_circle_at_center,white,transparent)]",
+              "[-webkit-mask-image:radial-gradient(420px_circle_at_center,white,transparent)]"
+            )}
+          />
+          <div className="relative z-20 w-full max-w-[1850px] mx-auto pt-0 pb-2">
             <CardsGrid />
           </div>
         </div>

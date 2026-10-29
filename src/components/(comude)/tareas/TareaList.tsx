@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Tarea, Usuario, PerfilUsuario, TipoVistaTareas } from './lib/zod'; 
 import TareaItem from './TareaItem';
+import { useSearchParams } from 'next/navigation';
 import NewTarea from './modals/NewTarea'; 
 import { Plus, SearchX, ArrowLeft, Search, Building2, ChevronDown, ChevronLeft, ChevronRight, User, ArrowDownWideNarrow, ArrowUpWideNarrow, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -145,6 +146,8 @@ export default function TareaList({ initialData, tipoVista }: Props) {
   
   const [oficinasAbiertas, setOficinasAbiertas] = useState<Record<string, boolean>>({});
   const scrollPositionRef = useRef(0);
+  const searchParams = useSearchParams();
+  const searchParamsProcessedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const hoy = new Date();
@@ -155,6 +158,55 @@ export default function TareaList({ initialData, tipoVista }: Props) {
     setSemanaVista(hoy);
     setIsMounted(true);
   }, []);
+
+  // Sincronizar filtro y selección desde Query Params (ej. ?origen=comude&id=...)
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const currentQuery = searchParams.toString();
+    if (searchParamsProcessedRef.current === currentQuery) return;
+
+    const origenParam = searchParams.get('origen')?.toLowerCase() || searchParams.get('tab')?.toLowerCase();
+    if (origenParam) {
+      if (origenParam === 'comude' || origenParam === 'concejo') {
+        setFiltroEstado('Concejo');
+      } else if (origenParam === 'comisiones' || origenParam === 'comision') {
+        setFiltroEstado('Comisiones');
+      } else if (origenParam === 'internas' || origenParam === 'interna') {
+        setFiltroEstado('Internas');
+      } else if (origenParam === 'vencidas' || origenParam === 'vencida') {
+        setFiltroEstado('Vencidas');
+      }
+    }
+
+    const idParam = searchParams.get('id') || searchParams.get('actividadId');
+    if (idParam) {
+      setExpandedId(idParam);
+      const tareaTarget = tareas.find((t) => t.id === idParam);
+      if (tareaTarget && !origenParam) {
+        if (tareaTarget.es_concejo) {
+          setFiltroEstado('Concejo');
+        } else if (tareaTarget.comision_id) {
+          setFiltroEstado('Comisiones');
+        } else {
+          setFiltroEstado('Internas');
+        }
+      }
+      if (tareaTarget?.due_date) {
+        try {
+          const f = new Date(tareaTarget.due_date);
+          setMesSeleccionado(f.getMonth());
+          setAnioSeleccionado(f.getFullYear());
+          setSemanaVista(f);
+          searchParamsProcessedRef.current = currentQuery;
+        } catch {}
+      } else if (tareas.length > 0) {
+        searchParamsProcessedRef.current = currentQuery;
+      }
+    } else {
+      searchParamsProcessedRef.current = currentQuery;
+    }
+  }, [isMounted, searchParams, tareas]);
 
   const fechaReferencia = useMemo(
     () => new Date(anioSeleccionado, mesSeleccionado, 1),
@@ -289,9 +341,9 @@ export default function TareaList({ initialData, tipoVista }: Props) {
   }, [tareasPorAlcance]);
 
   const conteos = useMemo(() => ({
-    Internas: tareasFiltradas.filter((t: Tarea) => !t.es_concejo && !t.comision_id && t.estadoFiltro !== 'Vencido').length,
-    Comisiones: tareasFiltradas.filter((t: Tarea) => !!t.comision_id && t.estadoFiltro !== 'Vencido').length,
-    Concejo: tareasFiltradas.filter((t: Tarea) => !!t.es_concejo && t.estadoFiltro !== 'Vencido').length,
+    Internas: tareasFiltradas.filter((t: Tarea) => !t.es_concejo && !t.comision_id).length,
+    Comisiones: tareasFiltradas.filter((t: Tarea) => !t.es_concejo && !!t.comision_id).length,
+    Concejo: tareasFiltradas.filter((t: Tarea) => !!t.es_concejo).length,
     Vencidas: tareasFiltradas.filter((t: Tarea) => t.estadoFiltro === 'Vencido').length,
   }), [tareasFiltradas]);
 
@@ -312,17 +364,27 @@ export default function TareaList({ initialData, tipoVista }: Props) {
 
   const listaVisual = useMemo(() => {
       const filtradas = tareasFiltradas.filter((t: Tarea) => {
-        if (filtroEstado === 'Internas') return !t.es_concejo && !t.comision_id && t.estadoFiltro !== 'Vencido';
-        if (filtroEstado === 'Comisiones') return !!t.comision_id && t.estadoFiltro !== 'Vencido';
-        if (filtroEstado === 'Concejo') return !!t.es_concejo && t.estadoFiltro !== 'Vencido';
+        if (filtroEstado === 'Internas') return !t.es_concejo && !t.comision_id;
+        if (filtroEstado === 'Comisiones') return !t.es_concejo && !!t.comision_id;
+        if (filtroEstado === 'Concejo') return !!t.es_concejo;
         return t.estadoFiltro === 'Vencido';
       });
       return ordenarPorFecha(filtradas);
   }, [tareasFiltradas, filtroEstado, ordenDescendente]);
   
   const tareasRenderizadas = useMemo(() => {
-      return expandedId ? listaVisual.filter((t: Tarea) => t.id === expandedId) : listaVisual;
-  }, [expandedId, listaVisual]);
+    if (expandedId) {
+      const encontradaEnVisual = listaVisual.find((t: Tarea) => t.id === expandedId);
+      if (encontradaEnVisual) return [encontradaEnVisual];
+      const encontradaGlobal = tareasPorAlcance.find((t: Tarea) => t.id === expandedId);
+      if (encontradaGlobal) {
+        const esVencida = new Date() > new Date(encontradaGlobal.due_date) && encontradaGlobal.status !== 'Completado';
+        return [{ ...encontradaGlobal, estadoFiltro: esVencida ? 'Vencido' : encontradaGlobal.status }];
+      }
+      return [];
+    }
+    return listaVisual;
+  }, [expandedId, listaVisual, tareasPorAlcance]);
 
   const tareasAgrupadas = useMemo(() => {
       if (!isMounted) return [];

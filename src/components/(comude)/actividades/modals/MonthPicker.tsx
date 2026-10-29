@@ -62,7 +62,7 @@ export default function MonthPicker({ year, month, onChange }: MonthPickerProps)
       {/* Botón Selector */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-10 min-w-[140px] flex-1 items-center justify-between gap-2 rounded-xl border border-border/50 bg-white px-3 dark:border-border/50 dark:bg-black/20 sm:flex-none hover:bg-muted/50 dark:hover:bg-black/40 transition-colors"
+        className="flex h-10 min-w-[140px] flex-1 items-center justify-between gap-2 rounded-xl border border-border/70 bg-background px-3 dark:bg-card sm:flex-none hover:bg-muted/70 dark:hover:bg-muted/40 shadow-xs transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2">
           <Calendar size={16} className="shrink-0 text-azul-trifinio dark:text-blue-400" />
@@ -83,8 +83,8 @@ export default function MonthPicker({ year, month, onChange }: MonthPickerProps)
         className={cn(
           'h-10 shrink-0 cursor-pointer rounded-xl border px-4 text-sm font-semibold whitespace-nowrap transition-colors',
           todoElAnio
-            ? 'border-zinc-200 bg-zinc-200 text-zinc-900 dark:border-border/50 dark:bg-white/10 dark:text-white'
-            : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-border/50 dark:bg-black/20 dark:text-zinc-300 dark:hover:bg-black/40',
+            ? 'border-border/70 bg-zinc-200 text-zinc-900 dark:border-border/60 dark:bg-zinc-800 dark:text-white shadow-xs'
+            : 'border-border/70 bg-background text-zinc-700 hover:bg-muted dark:bg-card dark:text-zinc-200 dark:hover:bg-muted/50 shadow-xs',
         )}
       >
         Todo el año

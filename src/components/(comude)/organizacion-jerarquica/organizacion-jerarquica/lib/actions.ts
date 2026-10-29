@@ -163,7 +163,7 @@ const DEPARTAMENTOS_SELECT =
 const DEPARTAMENTOS_SELECT_LEGACY =
   "id, nombre, parent_id, descripcion, comunidad_id, orden";
 const DEPARTAMENTOS_SELECT_BASE = "id, nombre, parent_id, comunidad_id, orden";
-const PUESTOS_SELECT_FULL = "id, nombre, departamento_id, orden, activo, fecha, acreditaciones";
+const PUESTOS_SELECT_FULL = "id, nombre, departamento_id, activo, fecha, acreditaciones";
 const PUESTOS_SELECT_BASE = "id, nombre, departamento_id, activo, fecha, acreditaciones";
 
 async function listarDepartamentos(supabase: SupabaseServerClient, municipioId: number) {

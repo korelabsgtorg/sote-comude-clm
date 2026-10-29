@@ -9,6 +9,7 @@ import {
   ActividadPuntoMiembro,
   UsuarioAsignablePunto,
   ActividadComudeConContexto,
+  ActividadComisionConContexto,
 } from './zod';
 
 const T_ACTIVIDADES = 'tra_actividades';
@@ -732,7 +733,7 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
     .from(T_MIEMBROS)
     .select('*')
     .in('actividad_id', Array.from(validActividadIds))
-    .order('created_at', { ascending: true });
+    .order('creado_en', { ascending: true });
 
   // 6. Traer perfiles y puestos
   const userIds = new Set<string>();
@@ -834,4 +835,80 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
 
   return resultado;
 }
+
+/** Obtiene todas las actividades vinculadas a comisiones del municipio para el año indicado */
+export async function obtenerTodasActividadesComisiones(año?: number): Promise<ActividadComisionConContexto[]> {
+  const supabase = await createClient();
+  const municipioId = await getEffectiveMunicipioId(supabase);
+  if (!municipioId) return [];
+
+  const currentYear = año || new Date().getFullYear();
+
+  // 1. Obtener todas las comisiones del municipio
+  const { data: comisiones, error: errComisiones } = await supabase
+    .from('comisiones')
+    .select('id, nombre')
+    .eq('municipio_id', municipioId);
+
+  if (errComisiones || !comisiones || comisiones.length === 0) return [];
+
+  const comisionIds = comisiones.map((c) => c.id);
+  const comisionMap = new Map(comisiones.map((c) => [c.id, c.nombre]));
+
+  // 2. Obtener enlaces de actividades de estas comisiones
+  const { data: enlaces, error: errEnlaces } = await supabase
+    .from(T_ENLACES_COMISION)
+    .select('actividad_id, comision_id')
+    .in('comision_id', comisionIds);
+
+  if (errEnlaces || !enlaces || enlaces.length === 0) return [];
+
+  const actividadIds = Array.from(new Set(enlaces.map((e) => e.actividad_id)));
+  const enlaceMap = new Map(enlaces.map((e) => [e.actividad_id, e.comision_id]));
+
+  // 3. Traer las actividades de la tabla tra_actividades
+  const { data: actividades, error: errAct } = await supabase
+    .from(T_ACTIVIDADES)
+    .select('id, titulo, descripcion, fecha_limite, estado, encargado_id, creado_en')
+    .eq('municipio_id', municipioId)
+    .in('id', actividadIds);
+
+  if (errAct || !actividades || actividades.length === 0) return [];
+
+  // 4. Filtrar por año si corresponde (fecha_limite o creado_en)
+  const filtradas = actividades.filter((a) => {
+    const y1 = a.fecha_limite ? new Date(a.fecha_limite).getFullYear() : null;
+    const y2 = a.creado_en ? new Date(a.creado_en).getFullYear() : null;
+    return y1 === currentYear || y2 === currentYear;
+  });
+
+  if (filtradas.length === 0) return [];
+
+  // 5. Cargar perfiles de encargados
+  const userIds = Array.from(new Set(filtradas.map((a) => a.encargado_id).filter(Boolean)));
+  let perfilMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: perfiles } = await supabase
+      .from('profiles')
+      .select('id, nombre')
+      .in('id', userIds);
+    (perfiles || []).forEach((p) => perfilMap.set(p.id, p.nombre));
+  }
+
+  return filtradas.map((a) => {
+    const comId = enlaceMap.get(a.id) || '';
+    const comNombre = comisionMap.get(comId) || 'Comisión';
+    return {
+      id: a.id,
+      titulo: a.titulo,
+      descripcion: a.descripcion,
+      fecha_limite: a.fecha_limite,
+      estado: a.estado,
+      comision_id: comId,
+      comision_nombre: comNombre,
+      encargado_nombre: a.encargado_id ? perfilMap.get(a.encargado_id) || null : null,
+    };
+  });
+}
+
 

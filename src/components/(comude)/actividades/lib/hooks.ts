@@ -10,6 +10,7 @@ import {
   ActComudeArchivo,
   ActividadPunto,
   ActividadComudeConContexto,
+  ActividadComisionConContexto,
   UsuarioAsignablePunto,
   CrearActividadValues,
   RegistroAsistenciaValues,
@@ -18,6 +19,7 @@ import {
 import {
   obtenerActividadesDePunto,
   obtenerTodasActividadesComude,
+  obtenerTodasActividadesComisiones,
   obtenerUsuariosAsignablesMunicipio,
   crearActividadPunto,
   editarActividadPunto,
@@ -97,10 +99,19 @@ export function useActividades(year?: number, month?: number) {
   });
 }
 
-export function useTodasActividadesComude() {
+export function useTodasActividadesComude(enabled: boolean = true) {
   return useQuery<ActividadComudeConContexto[], Error>({
     queryKey: ["actividades-comude-todas"],
     queryFn: () => obtenerTodasActividadesComude(),
+    staleTime: 1000 * 60 * 5,
+    enabled,
+  });
+}
+
+export function useTodasActividadesComisiones(año?: number) {
+  return useQuery<ActividadComisionConContexto[], Error>({
+    queryKey: ["actividades-comisiones-todas", año],
+    queryFn: () => obtenerTodasActividadesComisiones(año),
     staleTime: 1000 * 60 * 5,
   });
 }

@@ -8,6 +8,7 @@ import { useActividades, useTodasActividadesComude } from "./lib/hooks";
 import ActividadesItem from "./ActividadesItem";
 import MonthPicker from "./modals/MonthPicker";
 import ListaActividadesAsignadasComude from "./ListaActividadesAsignadasComude";
+import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 
 interface ListActividadesProps {
   userId?: string | null;
@@ -37,7 +38,13 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: actividades, isLoading, isError, refetch } = useActividades(year, month);
-  const { data: todasActividades = [], isLoading: cargandoTodasActividades } = useTodasActividadesComude();
+  const isSuperOrAdmin = puedeGestionar || isSuperOrAdminRole(effectiveRole);
+  const { data: todasActividades = [], isLoading: cargandoTodasActividades } = useTodasActividadesComude(isSuperOrAdmin);
+
+  const actividadesAsignadasVisibles = useMemo(() => {
+    if (!isSuperOrAdmin) return [];
+    return todasActividades;
+  }, [todasActividades, isSuperOrAdmin]);
 
   const handleIrASesion = (comudeId: string, comudeFecha: string) => {
     const dias = diasRestantes(comudeFecha);
@@ -96,6 +103,13 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
     }
   }, [isLoading, hasAutoSelected, actividades, counts, vista]);
 
+  // Si el usuario no es super o administrador y de alguna forma estuviera en 'actividades', volver a 'hoy'
+  useEffect(() => {
+    if (!isSuperOrAdmin && vista === 'actividades') {
+      setVista('hoy');
+    }
+  }, [isSuperOrAdmin, vista]);
+
   // Reset auto-select flag when month/year changes
   useEffect(() => {
     setHasAutoSelected(false);
@@ -112,7 +126,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
             placeholder="Buscar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-black/5 dark:bg-black/20 border border-border/50 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-azul-trifinio/30 transition-all"
+            className="w-full bg-background dark:bg-card border border-border/70 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-azul-trifinio/30 shadow-xs transition-all"
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -128,7 +142,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
           </div>
           <button
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="flex items-center justify-center w-10 h-10 shrink-0 bg-black/5 dark:bg-black/20 border border-border/50 rounded-xl hover:bg-black/10 dark:hover:bg-black/30 transition-colors text-muted-foreground hover:text-foreground"
+            className="flex items-center justify-center w-10 h-10 shrink-0 bg-background dark:bg-card border border-border/70 rounded-xl hover:bg-muted dark:hover:bg-muted/50 shadow-xs transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
             title={sortOrder === 'desc' ? "Ordenar ascendentemente" : "Ordenar descendentemente"}
           >
             {sortOrder === 'desc' ? <ArrowDownWideNarrow size={18} /> : <ArrowUpNarrowWide size={18} />}
@@ -161,7 +175,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
           )}
 
           {/* Pestaña Actividades Asignadas — empujada a la derecha en PC mediante sm:ml-auto */}
-          {(todasActividades.length > 0 || vista === 'actividades' || cargandoTodasActividades) && (
+          {isSuperOrAdmin && (actividadesAsignadasVisibles.length > 0 || vista === 'actividades' || cargandoTodasActividades) && (
             <button
               onClick={() => setVista('actividades')}
               className={cn(
@@ -173,7 +187,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
             >
               <ClipboardList className="h-4 w-4" />
               <span>Actividades Asignadas</span>
-              {todasActividades.length > 0 && (
+              {actividadesAsignadasVisibles.length > 0 && (
                 <span
                   className={cn(
                     "ml-0.5 rounded-full px-1.5 py-0.2 text-[11px] font-semibold",
@@ -182,7 +196,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  {todasActividades.length}
+                  {actividadesAsignadasVisibles.length}
                 </span>
               )}
               {vista === 'actividades' && (
@@ -197,7 +211,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
       </div>
 
       {/* Renderizado condicional según vista */}
-      {vista === 'actividades' ? (
+      {isSuperOrAdmin && vista === 'actividades' ? (
         <ListaActividadesAsignadasComude
           filtroAnio={year}
           filtroMes={month}

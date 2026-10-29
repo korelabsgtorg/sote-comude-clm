@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -15,6 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useUser, useUserContext } from "@/components/(base)/providers/UserProvider";
+import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 import { useMisComisiones, useTodasComisiones } from "./lib/hooks";
 import { ComisionList } from "./ComisionList";
 import { ComisionesListSkeleton, DetalleActividadSkeleton } from "./ComisionesSkeleton";
@@ -42,7 +44,7 @@ function DetalleActividadComision({
 }: DetalleActividadComisionProps) {
   const { user, effectiveRole } = useUserContext();
   const usuarioActualId = user?.id || currentUserId || "";
-  const esSuper = effectiveRole === "super";
+  const esSuper = isSuperOrAdminRole(effectiveRole);
   const esMiembro =
     !esSupervision ||
     Boolean(
@@ -151,9 +153,14 @@ export default function GestorComision({
   tipoVista = "mis_comisiones",
 }: GestorComisionProps) {
   const user = useUser();
+  const searchParams = useSearchParams();
   const esSupervision = tipoVista === "supervision";
   const añoActual = new Date().getFullYear();
-  const [año, setAño] = useState<number>(añoActual);
+
+  const paramAño = searchParams.get("año") || searchParams.get("anio") || searchParams.get("year");
+  const añoInicial = paramAño && !isNaN(Number(paramAño)) ? Number(paramAño) : añoActual;
+  const [año, setAño] = useState<number>(añoInicial);
+
   const [busqueda, setBusqueda] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "cargados" | "pendientes">("todos");
   const [comisionesAbiertas, setComisionesAbiertas] = useState<
@@ -164,6 +171,8 @@ export default function GestorComision({
     tareaId: string;
   } | null>(null);
   const scrollPositionRef = useRef<number>(0);
+  const searchParamsHandledRef = useRef<string | null>(null);
+  const prevAñoRef = useRef<number>(añoInicial);
 
   const abrirActividad = (comisionId: string, tareaId: string) => {
     if (typeof window !== "undefined") {
@@ -176,6 +185,12 @@ export default function GestorComision({
   };
 
   const cerrarActividad = () => {
+    if (actividadEnfocada?.comisionId) {
+      setComisionesAbiertas((prev) => ({
+        ...prev,
+        [actividadEnfocada.comisionId]: true,
+      }));
+    }
     setActividadEnfocada(null);
   };
 
@@ -210,11 +225,52 @@ export default function GestorComision({
     return comisiones.find((c) => c.id === actividadEnfocada.comisionId) || null;
   }, [actividadEnfocada, comisiones]);
 
-  // Si cambia el año, restablecer filtro de estado y vista enfocada
+  // Si el usuario cambia manualmente el año en el dropdown, restablecer filtros
   useEffect(() => {
-    setFiltroEstado("todos");
-    setActividadEnfocada(null);
+    if (prevAñoRef.current !== año) {
+      prevAñoRef.current = año;
+      setFiltroEstado("todos");
+      setActividadEnfocada(null);
+    }
   }, [año]);
+
+  // Sincronizar apertura directa desde query params (?comisionId=...&actividadId=...&año=...)
+  useEffect(() => {
+    const currentQuery = searchParams.toString();
+    if (!currentQuery || searchParamsHandledRef.current === currentQuery) return;
+
+    const paramActividadId = searchParams.get("actividadId") || searchParams.get("id");
+    const paramComisionId = searchParams.get("comisionId");
+    const pAño = searchParams.get("año") || searchParams.get("anio") || searchParams.get("year");
+
+    if (pAño) {
+      const parsedAño = Number(pAño);
+      if (!isNaN(parsedAño) && parsedAño !== año) {
+        prevAñoRef.current = parsedAño;
+        setAño(parsedAño);
+      }
+    }
+
+    const targetComisionId = paramComisionId || (comisiones.length === 1 ? comisiones[0].id : null);
+
+    if (paramActividadId && targetComisionId) {
+      setActividadEnfocada({
+        comisionId: targetComisionId,
+        tareaId: paramActividadId,
+      });
+      setComisionesAbiertas((prev) => ({
+        ...prev,
+        [targetComisionId]: true,
+      }));
+      searchParamsHandledRef.current = currentQuery;
+    } else if (targetComisionId) {
+      setComisionesAbiertas((prev) => ({
+        ...prev,
+        [targetComisionId]: true,
+      }));
+      searchParamsHandledRef.current = currentQuery;
+    }
+  }, [searchParams, comisiones, año]);
 
   // Si está en "Mis Comisiones" y solo tiene 1 comisión, abrirla por defecto
   useEffect(() => {
@@ -266,35 +322,44 @@ export default function GestorComision({
     }
   };
 
-  if (actividadEnfocada && comisionSeleccionada) {
-    return (
-      <div className="space-y-3 sm:space-y-4">
-        <div className="flex items-center justify-between pb-1">
-          <motion.button
-            type="button"
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            onClick={cerrarActividad}
-            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 cursor-pointer font-bold text-xs sm:text-sm transition-colors"
-          >
-            <ArrowLeft size={16} /> Volver a la lista
-          </motion.button>
-          <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500 hidden sm:inline-block truncate max-w-md">
-            {comisionSeleccionada.nombre}
-          </span>
+  if (actividadEnfocada) {
+    if (isLoading) {
+      return (
+        <div className="space-y-3 sm:space-y-4">
+          <DetalleActividadSkeleton />
         </div>
+      );
+    }
+    if (comisionSeleccionada) {
+      return (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between pb-1">
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              onClick={cerrarActividad}
+              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 cursor-pointer font-bold text-xs sm:text-sm transition-colors"
+            >
+              <ArrowLeft size={16} /> Volver a la lista
+            </motion.button>
+            <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500 hidden sm:inline-block truncate max-w-md">
+              {comisionSeleccionada.nombre}
+            </span>
+          </div>
 
-        <DetalleActividadComision
-          comision={comisionSeleccionada}
-          año={año}
-          tareaId={actividadEnfocada.tareaId}
-          onVolver={cerrarActividad}
-          esSupervision={esSupervision}
-          currentUserId={user?.id}
-        />
-      </div>
-    );
+          <DetalleActividadComision
+            comision={comisionSeleccionada}
+            año={año}
+            tareaId={actividadEnfocada.tareaId}
+            onVolver={cerrarActividad}
+            esSupervision={esSupervision}
+            currentUserId={user?.id}
+          />
+        </div>
+      );
+    }
   }
 
   return (

@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
+  Users,
   Calendar,
   CheckCircle2,
   Clock,
@@ -16,12 +17,14 @@ import {
   Loader2,
   CheckSquare,
   Eye,
+  ChevronDown,
 } from 'lucide-react';
 import { useTodasActividadesComude } from './lib/hooks';
 import { ActividadComudeConContexto, ActComudePunto } from './lib/zod';
 import ActividadesPuntoModal from './modals/ActividadesPuntoModal';
 import ArchivosActividadModal from './modals/ArchivosActividadModal';
 import EditarActividadComudeModal from './modals/EditarActividadComudeModal';
+import { isSuperOrAdminRole } from '@/components/(base)/dashboard/modules';
 
 const ACCORDION_TRANSITION = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 const CONTENIDO_TRANSITION = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const };
@@ -200,6 +203,14 @@ export default function ListaActividadesAsignadasComude({
   const { data, isLoading, isError, refetch } = useTodasActividadesComude();
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
   const [mostrarSoloPendientes, setMostrarSoloPendientes] = useState(false);
+  const [participantesAbiertos, setParticipantesAbiertos] = useState<Record<string, boolean>>({});
+
+  const toggleParticipantes = (actividadId: string) => {
+    setParticipantesAbiertos((prev) => ({
+      ...prev,
+      [actividadId]: !prev[actividadId],
+    }));
+  };
 
   const [actividadArchivos, setActividadArchivos] = useState<ActividadComudeConContexto | null>(null);
   const [actividadEditando, setActividadEditando] = useState<ActividadComudeConContexto | null>(null);
@@ -215,9 +226,18 @@ export default function ListaActividadesAsignadasComude({
     actComudeId: '',
   });
 
+  const isSuperOrAdmin = puedeGestionar || isSuperOrAdminRole(effectiveRole);
+
   const actividadesFiltradas = useMemo(() => {
     const todas = data ?? [];
     return todas.filter((actividad) => {
+      // Solo super y administrador pueden ver todas las actividades; otros roles solo las que les pertenecen
+      if (!isSuperOrAdmin) {
+        const esEncargado = Boolean(userId && actividad.encargado_id === userId);
+        const esMiembro = Boolean(userId && actividad.miembros?.some((m) => m.usuario_id === userId));
+        if (!esEncargado && !esMiembro) return false;
+      }
+
       // Filtro de búsqueda por título o punto
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -244,7 +264,7 @@ export default function ListaActividadesAsignadasComude({
 
       return true;
     });
-  }, [data, searchQuery, filtroAnio, filtroMes, mostrarSoloPendientes]);
+  }, [data, searchQuery, filtroAnio, filtroMes, mostrarSoloPendientes, isSuperOrAdmin, userId]);
 
   const grupos = useMemo(() => {
     const map = new Map<string, GrupoActividades>();
@@ -560,15 +580,15 @@ export default function ListaActividadesAsignadasComude({
                                 {/* Encargado, revisión y descripción */}
                                 <div className="mt-2.5 flex flex-col gap-2">
                                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                    <p className="flex items-center gap-1.5 text-sm font-medium text-azul-trifinio dark:text-celeste-trifinio">
+                                    <div className="flex items-center gap-1.5 text-sm font-medium text-azul-trifinio dark:text-celeste-trifinio min-w-0">
                                       <User size={14} className="shrink-0" />
-                                      {actividad.encargado_nombre}
+                                      <span className="truncate">{actividad.encargado_nombre}</span>
                                       {actividad.encargado_puesto && (
-                                        <span className="text-xs text-muted-foreground font-normal">
+                                        <span className="text-xs text-muted-foreground font-normal shrink-0">
                                           ({actividad.encargado_puesto})
                                         </span>
                                       )}
-                                    </p>
+                                    </div>
                                     {actividad.revisado_por ? (
                                       <span className="inline-flex items-center rounded-md bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400 border border-green-500/20">
                                         Revisado por: {actividad.revisado_por.nombre}
@@ -586,32 +606,69 @@ export default function ListaActividadesAsignadasComude({
                                     </p>
                                   )}
 
-                                  {/* Participantes / Miembros */}
-                                  {actividad.miembros && actividad.miembros.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                                        Participantes:
-                                      </span>
-                                      {actividad.miembros.map((m) => (
-                                        <span
-                                          key={m.id}
-                                          className="inline-flex items-center gap-1 rounded-lg bg-muted/60 border border-border/50 px-2 py-0.5 text-xs text-foreground"
+                                  {/* Participantes / Miembros (Desplegable) */}
+                                  {actividad.miembros && actividad.miembros.length > 0 && (() => {
+                                    const totalMiembros = actividad.miembros.length;
+                                    const confirmadosMiembros = actividad.miembros.filter((m) => Boolean(m.fecha_confirmacion)).length;
+                                    const estaAbierto = Boolean(participantesAbiertos[actividad.id]);
+
+                                    return (
+                                      <div className="pt-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleParticipantes(actividad.id)}
+                                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-neutral-300 hover:text-azul-trifinio dark:hover:text-celeste-trifinio transition-colors cursor-pointer select-none py-1 px-2.5 rounded-md bg-muted/50 hover:bg-muted border border-border/60"
                                         >
-                                          <User size={11} className="text-purple-500" />
-                                          <span>{m.nombre_usuario}</span>
-                                          {m.fecha_confirmacion ? (
-                                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                              (Confirmado)
-                                            </span>
-                                          ) : (
-                                            <span className="text-[10px] text-orange-500 font-medium">
-                                              (Sin confirmar)
-                                            </span>
+                                          <Users size={13} className="text-purple-500 shrink-0" />
+                                          <span>Participantes ({totalMiembros})</span>
+                                          <span className="text-[10px] font-normal text-muted-foreground">
+                                            • {confirmadosMiembros}/{totalMiembros} confirmados
+                                          </span>
+                                          <ChevronDown
+                                            size={13}
+                                            className={`text-muted-foreground transition-transform duration-200 ${
+                                              estaAbierto ? "rotate-180" : ""
+                                            }`}
+                                          />
+                                        </button>
+
+                                        <AnimatePresence initial={false}>
+                                          {estaAbierto && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: "auto", opacity: 1 }}
+                                              exit={{ height: 0, opacity: 0 }}
+                                              transition={{ duration: 0.2 }}
+                                              className="overflow-hidden"
+                                            >
+                                              <div className="flex flex-wrap items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+                                                {actividad.miembros.map((m) => (
+                                                  <span
+                                                    key={m.id}
+                                                    className="inline-flex items-center flex-wrap gap-1 rounded-md bg-muted/60 border border-border/50 px-2 py-0.5 text-xs text-foreground max-w-full"
+                                                  >
+                                                    <div className="flex items-center gap-1 min-w-0">
+                                                      <User size={11} className="text-purple-500 shrink-0" />
+                                                      <span>{m.nombre_usuario}</span>
+                                                    </div>
+                                                    {m.fecha_confirmacion ? (
+                                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
+                                                        (Confirmado: {formatearFechaHorario(m.fecha_confirmacion)})
+                                                      </span>
+                                                    ) : (
+                                                      <span className="text-[10px] text-orange-500 font-medium whitespace-nowrap">
+                                                        (Sin confirmar)
+                                                      </span>
+                                                    )}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </motion.div>
                                           )}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
+                                        </AnimatePresence>
+                                      </div>
+                                    );
+                                  })()}
 
                                   {/* Indicador de checklist si tiene tareas */}
                                   {checklistItems.length > 0 && (

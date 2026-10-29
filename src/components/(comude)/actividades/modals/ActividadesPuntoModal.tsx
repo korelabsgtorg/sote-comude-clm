@@ -294,14 +294,14 @@ function DetalleActividadPanel({
       : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400';
 
   return (
-    <article className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-sm text-zinc-100 sm:rounded-2xl">
-      <div className="flex items-start justify-between gap-2 border-b border-zinc-800 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+    <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 sm:rounded-2xl">
+      <div className="flex items-start justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3 bg-zinc-50/50 dark:bg-zinc-900">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-400">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-300 bg-zinc-100 text-xs font-bold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
               {indice}
             </span>
-            <h3 className="text-base font-bold text-zinc-100">{actividad.titulo}</h3>
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{actividad.titulo}</h3>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${estadoBadgeClass}`}>
               {actividad.fecha_confirmacion || actividad.estado === 'Completado' ? (
                 <CheckCircle2 size={11} />
@@ -326,8 +326,8 @@ function DetalleActividadPanel({
           </div>
 
           {actividad.comision_nombre && (
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-400">
-              <Building2 size={13} className="shrink-0 text-purple-400" />
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400">
+              <Building2 size={13} className="shrink-0 text-purple-600 dark:text-purple-400" />
               <span className="leading-snug">{actividad.comision_nombre}</span>
             </div>
           )}
@@ -369,24 +369,24 @@ function DetalleActividadPanel({
 
       <div className="space-y-3 p-2.5 sm:space-y-4 sm:p-4">
         {actividad.descripcion && (
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-2.5 sm:rounded-xl sm:p-3">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Descripción</p>
-            <p className="whitespace-pre-wrap text-sm text-zinc-300">{actividad.descripcion}</p>
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 dark:border-zinc-700 dark:bg-zinc-800/50 p-2.5 sm:rounded-xl sm:p-3">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Descripción</p>
+            <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{actividad.descripcion}</p>
           </div>
         )}
 
         {/* Barra de progreso global */}
         {(totalGlobal > 0 || esGrupal) && (
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-2.5 space-y-2 sm:rounded-xl sm:p-3.5 sm:space-y-2.5">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 dark:border-zinc-700 dark:bg-zinc-800/50 p-2.5 space-y-2 sm:rounded-xl sm:p-3.5 sm:space-y-2.5">
             <div className="flex justify-between items-end">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {esGrupal ? 'Progreso Global' : 'Progreso de la actividad'}
               </p>
-              <span className={`text-xs font-bold ${porcentajeGlobal === 100 ? 'text-emerald-400' : 'text-zinc-300'}`}>
+              <span className={`text-xs font-bold ${porcentajeGlobal === 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-700 dark:text-zinc-300'}`}>
                 {completosGlobal}/{totalGlobal} · {porcentajeGlobal}%
               </span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-700">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${getColorBarra(porcentajeGlobal)}`}
                 style={{ width: `${porcentajeGlobal}%` }}
@@ -395,26 +395,26 @@ function DetalleActividadPanel({
 
             {/* Sub-barras para actividades grupales */}
             {esGrupal && (
-              <div className="pt-2 mt-2 border-t border-zinc-700 space-y-2">
+              <div className="pt-2 mt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
                 <div>
                   <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-1.5 sm:gap-2">
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-300 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-700 dark:text-zinc-300 min-w-0 flex-1">
                       <div className="flex items-center gap-1 min-w-0">
                         <Crown size={12} className="text-amber-500 shrink-0" />
                         <span className="truncate">
                           {actividad.encargado_nombre} {esAsignadoAMi ? '(Yo)' : ''}
                         </span>
-                        <span className="text-blue-400 text-[10px] shrink-0">(Encargado)</span>
+                        <span className="text-blue-600 dark:text-blue-400 text-[10px] shrink-0 font-medium">(Encargado)</span>
                       </div>
                       <div className="shrink-0">
                         {renderConfirmacion(actividad.fecha_confirmacion)}
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
                       {completadosEncargado}/{totalEncargado}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${getColorBarra(porcentajeEncargado)}`}
                       style={{ width: `${porcentajeEncargado}%` }}
@@ -430,9 +430,9 @@ function DetalleActividadPanel({
                   return (
                     <div key={m.id}>
                       <div className="flex justify-between items-start sm:items-center text-[11px] mb-1 gap-1.5 sm:gap-2">
-                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-300 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-zinc-700 dark:text-zinc-300 min-w-0 flex-1">
                           <div className="flex items-center gap-1 min-w-0">
-                            <User size={12} className="text-purple-400 shrink-0" />
+                            <User size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />
                             <span className="truncate">
                               {m.nombre_usuario} {esYo ? '(Yo)' : ''}
                             </span>
@@ -441,11 +441,11 @@ function DetalleActividadPanel({
                             {renderConfirmacion(m.fecha_confirmacion)}
                           </div>
                         </div>
-                        <span className="text-[10px] font-semibold text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
+                        <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 shrink-0 mt-0.5 sm:mt-0">
                           {mTotal === 0 ? (m.fecha_finalizacion ? 'Completado' : '—') : `${mComp}/${mTotal}`}
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-zinc-700 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${getColorBarra(mPct)}`}
                           style={{ width: `${mPct}%` }}
@@ -461,17 +461,17 @@ function DetalleActividadPanel({
 
         {/* Pestañas para Grupal vs Checklist Simple */}
         {esGrupal ? (
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/30 p-2.5 sm:rounded-xl sm:p-4">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 dark:border-zinc-700 dark:bg-zinc-800/30 p-2.5 sm:rounded-xl sm:p-4">
             <div
               ref={tabsScrollRef}
-              className="flex justify-start sm:justify-center gap-2 sm:gap-4 mb-3 sm:mb-4 overflow-x-auto border-b border-zinc-700 px-3 pb-1.5 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full"
+              className="flex justify-start sm:justify-center gap-2 sm:gap-4 mb-3 sm:mb-4 overflow-x-auto border-b border-zinc-200 dark:border-zinc-700 px-3 pb-1.5 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full"
             >
               {tabs.map((t) => {
                 const isActive = tabActivo === t.id;
                 const isEncargadoTab = t.id === 'encargado';
                 const activeColorClass = isEncargadoTab
-                  ? 'text-blue-400 border-b-2 border-blue-400'
-                  : 'text-purple-400 border-b-2 border-purple-400';
+                  ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400'
+                  : 'text-purple-600 border-b-2 border-purple-600 dark:text-purple-400 dark:border-purple-400';
 
                 return (
                   <button
@@ -485,7 +485,7 @@ function DetalleActividadPanel({
                       }
                     }}
                     className={`px-3 pb-2 pt-0.5 text-xs font-semibold whitespace-nowrap flex flex-col items-center shrink-0 transition-colors ${
-                      isActive ? activeColorClass : 'text-zinc-400 hover:text-zinc-200'
+                      isActive ? activeColorClass : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                     }`}
                   >
                     <span className={`text-[9px] uppercase font-bold tracking-wider mb-0.5 ${isActive ? 'opacity-90' : 'opacity-60'}`}>
@@ -516,7 +516,7 @@ function DetalleActividadPanel({
                       <li
                         key={i}
                         onClick={() => handleToggleGlobalCheck(i)}
-                        className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/70 p-2 rounded-lg border border-zinc-700/50 cursor-pointer hover:bg-zinc-800 transition-colors"
+                        className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-800/70 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700/50 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                       >
                         <input
                           type="checkbox"
@@ -524,7 +524,7 @@ function DetalleActividadPanel({
                           readOnly
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
-                        <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-500')}>
+                        <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-400 dark:text-zinc-500')}>
                           {item.title || (item as any).titulo || ''}
                         </span>
                       </li>
@@ -537,7 +537,7 @@ function DetalleActividadPanel({
             ) : (
               activeMember && (
                 <div className="space-y-3">
-                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     <CheckSquare size={14} /> Actividades de {activeMember.nombre_usuario} ({(activeMember.asignaciones || []).length})
                   </p>
                   {(activeMember.asignaciones || []).length > 0 ? (
@@ -549,7 +549,7 @@ function DetalleActividadPanel({
                           <li
                             key={i}
                             onClick={() => handleToggleMiembroCheck(activeMember.id, i)}
-                            className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/70 p-2 rounded-lg border border-zinc-700/50 cursor-pointer hover:bg-zinc-800 transition-colors"
+                            className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-800/70 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700/50 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                           >
                             <input
                               type="checkbox"
@@ -557,7 +557,7 @@ function DetalleActividadPanel({
                               readOnly
                               className="rounded text-purple-600 focus:ring-purple-500"
                             />
-                            <span className={cn(completada && 'line-through text-zinc-500')}>
+                            <span className={cn(completada && 'line-through text-zinc-400 dark:text-zinc-500')}>
                               {titulo}
                             </span>
                           </li>
@@ -574,7 +574,7 @@ function DetalleActividadPanel({
         ) : (
           checklist.length > 0 && (
             <div className="space-y-2">
-              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 <CheckSquare size={14} /> Entregables ({completadosEncargado}/{totalEncargado})
               </p>
               <ul className="space-y-1.5">
@@ -582,7 +582,7 @@ function DetalleActividadPanel({
                   <li
                     key={i}
                     onClick={() => handleToggleGlobalCheck(i)}
-                    className="flex items-center gap-2 text-sm text-zinc-200 bg-zinc-800/50 p-2 rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors"
+                    className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-800/50 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -590,7 +590,7 @@ function DetalleActividadPanel({
                       readOnly
                       className="rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-500')}>
+                    <span className={cn(Boolean(item.is_completed) && 'line-through text-zinc-400 dark:text-zinc-500')}>
                       {item.title || (item as any).titulo || ''}
                     </span>
                   </li>
@@ -601,7 +601,7 @@ function DetalleActividadPanel({
         )}
 
         {/* Sección de finalización y revisión */}
-        <div className="pt-3 border-t border-zinc-800 space-y-2.5">
+        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2.5">
           {actividad.estado === 'Completado' && actividad.actualizado_en && (
             <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               <CheckCircle2 size={13} />
@@ -645,7 +645,7 @@ function DetalleActividadPanel({
                   </button>
                 ) : (
                   <div
-                    className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm flex justify-center items-center gap-2 border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500 select-none cursor-not-allowed"
+                    className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm flex justify-center items-center gap-2 border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 select-none cursor-not-allowed"
                     title="Pendiente de finalizar por la persona asignada"
                   >
                     <Clock size={15} className="opacity-60" />
@@ -1182,7 +1182,7 @@ export default function ActividadesPuntoModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="dark fixed inset-0 z-[500] flex flex-col sm:items-center sm:justify-center sm:p-4">
+        <div className="fixed inset-0 z-[500] flex flex-col sm:items-center sm:justify-center sm:p-4">
           {/* Backdrop con blur que cubre toda la pantalla incluyendo el header */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -1199,11 +1199,11 @@ export default function ActividadesPuntoModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="relative z-10 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-zinc-900 text-zinc-100 sm:h-auto sm:max-h-[min(90vh,52rem)] sm:w-full sm:max-w-2xl sm:rounded-3xl sm:border sm:border-zinc-800 sm:shadow-2xl dark:sm:border-zinc-700 dark:sm:shadow-black/70"
+            className="relative z-10 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 sm:h-auto sm:max-h-[min(90vh,52rem)] sm:w-full sm:max-w-2xl sm:rounded-3xl sm:border sm:border-zinc-200 sm:shadow-2xl dark:sm:border-zinc-800 dark:sm:shadow-black/70"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:rounded-t-3xl sm:px-5 sm:pb-2.5 sm:pt-4">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:rounded-t-3xl sm:px-5 sm:pb-2.5 sm:pt-4 bg-zinc-50/50 dark:bg-zinc-900">
               <div className="min-w-0 pr-1">
                 <h2 className="text-base font-semibold leading-snug text-[#0066cc] line-clamp-1 dark:text-blue-400 sm:text-lg">
                   Actividades asignadas
@@ -1211,7 +1211,7 @@ export default function ActividadesPuntoModal({
               </div>
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white"
                 aria-label="Cerrar"
               >
                 <X size={20} />
@@ -1229,7 +1229,7 @@ export default function ActividadesPuntoModal({
               {canManage && (
                 <button
                   onClick={abrirNueva}
-                  className="flex h-11 sm:h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-700 text-sm font-semibold text-white transition-colors hover:bg-zinc-600"
+                  className="flex h-11 sm:h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-sm font-semibold text-white transition-colors shadow-sm"
                 >
                   <Plus size={18} /> Nueva actividad
                 </button>
@@ -1677,7 +1677,7 @@ export default function ActividadesPuntoModal({
                 type="button"
                 onClick={guardar}
                 disabled={creando || editando}
-                className="h-12 w-full cursor-pointer rounded-xl bg-zinc-200 text-sm font-semibold text-zinc-900 hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600"
+                className="h-12 w-full cursor-pointer rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
               >
                 {creando || editando ? (
                   <span className="flex items-center justify-center gap-2">

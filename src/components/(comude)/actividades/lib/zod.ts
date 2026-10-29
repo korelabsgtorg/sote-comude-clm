@@ -126,6 +126,17 @@ export interface ActividadComudeConContexto extends ActividadPunto {
   comude_descripcion?: string | null;
 }
 
+export interface ActividadComisionConContexto {
+  id: string;
+  titulo: string;
+  descripcion?: string | null;
+  fecha_limite: string | null;
+  estado: string;
+  comision_id: string;
+  comision_nombre: string;
+  encargado_nombre?: string | null;
+}
+
 export interface GrupoActividadesComude {
   comudeId: string;
   comudeTitulo: string;

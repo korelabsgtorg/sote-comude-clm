@@ -100,30 +100,30 @@ export default function ArchivosActividadModal({
             No hay archivos adjuntos en esta actividad.
           </div>
         ) : (
-          <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
+          <ul className="w-full min-w-0 divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
             {archivos.map((archivo) => {
               const esPdf = archivo.tipo === 'pdf' || archivo.nombre?.toLowerCase().endsWith('.pdf');
 
               return (
                 <li
                   key={archivo.id}
-                  className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/50"
+                  className="flex w-full min-w-0 items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 transition-colors hover:bg-muted/50 overflow-hidden"
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3 overflow-hidden">
                     <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg ${
                         esPdf
                           ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                           : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                       }`}
                     >
-                      {esPdf ? <FileText size={18} /> : <LinkIcon size={18} />}
+                      {esPdf ? <FileText size={17} /> : <LinkIcon size={17} />}
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p className="truncate block w-full text-xs sm:text-sm font-semibold text-foreground" title={archivo.nombre || undefined}>
                         {archivo.nombre}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="truncate text-[11px] sm:text-xs text-muted-foreground">
                         {esPdf ? 'Documento PDF' : 'Enlace externo'}
                       </p>
                     </div>
@@ -134,13 +134,13 @@ export default function ArchivosActividadModal({
                       type="button"
                       onClick={() => abrirPdf(archivo)}
                       disabled={loadingArchivoId === archivo.id}
-                      className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-azul-trifinio dark:hover:text-celeste-trifinio"
+                      className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-azul-trifinio dark:hover:text-celeste-trifinio"
                       title="Ver documento"
                     >
                       {loadingArchivoId === archivo.id ? (
-                        <Loader2 size={16} className="animate-spin text-azul-trifinio" />
+                        <Loader2 size={15} className="animate-spin text-azul-trifinio" />
                       ) : (
-                        <Eye size={16} />
+                        <Eye size={15} />
                       )}
                     </button>
                   ) : (
@@ -148,10 +148,10 @@ export default function ArchivosActividadModal({
                       href={archivo.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-azul-trifinio dark:hover:text-celeste-trifinio"
+                      className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-azul-trifinio dark:hover:text-celeste-trifinio"
                       title="Abrir enlace"
                     >
-                      <ExternalLink size={16} />
+                      <ExternalLink size={15} />
                     </a>
                   )}
                 </li>
@@ -159,12 +159,12 @@ export default function ArchivosActividadModal({
             })}
           </ul>
         )}
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
-            className="h-9 px-4 text-xs rounded-xl"
+            className="h-8 sm:h-9 px-4 text-xs rounded-lg cursor-pointer"
           >
             Cerrar
           </Button>
