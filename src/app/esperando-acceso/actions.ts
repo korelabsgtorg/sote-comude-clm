@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { sendPushToRoles } from "@/utils/push-utils";
 
-async function notifySpecialRoles(userName: string, isResend: boolean) {
+async function notifySpecialRoles(userName: string, isResend: boolean, municipioId?: string | number | null) {
   const roles = ["super", "admin"];
   const title = isResend ? "Nueva Solicitud de Acceso" : "Usuario Esperando Acceso";
   const body = isResend 
@@ -15,7 +15,7 @@ async function notifySpecialRoles(userName: string, isResend: boolean) {
     title,
     body,
     url: "/comude/admin/dispositivos" // Assuming this is where admins manage devices
-  });
+  }, municipioId);
 }
 
 export async function checkDeviceRequest() {
@@ -61,9 +61,9 @@ export async function createDeviceRequest() {
   if (error) return { success: false, error: error.message };
 
   // Notify of resend/new request
-  const { data: profile } = await supabase.from("profiles").select("nombre").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("nombre, municipio_id").eq("id", user.id).maybeSingle();
   const userName = profile?.nombre || user.email?.split("@")[0] || "Usuario";
-  await notifySpecialRoles(userName, true);
+  await notifySpecialRoles(userName, true, profile?.municipio_id);
 
   return { success: true };
 }
@@ -76,8 +76,8 @@ export async function notifyAdminsOfArrival() {
 
   if (!user) return;
 
-  const { data: profile } = await supabase.from("profiles").select("nombre").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("nombre, municipio_id").eq("id", user.id).maybeSingle();
   const userName = profile?.nombre || user.email?.split("@")[0] || "Usuario";
   
-  await notifySpecialRoles(userName, false);
+  await notifySpecialRoles(userName, false, profile?.municipio_id);
 }

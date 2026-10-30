@@ -67,13 +67,23 @@ export async function sendPushToUsers(userIds: string[], payload: { title: strin
   await Promise.all(sendPromises);
 }
 
-export async function sendPushToRoles(roles: string[], payload: { title: string; body: string; url?: string }) {
+export async function sendPushToRoles(
+  roles: string[],
+  payload: { title: string; body: string; url?: string },
+  municipioId?: string | number | null
+) {
   const supabase = await createClient();
 
-  const { data: profiles, error } = await supabase
+  let query = supabase
     .from("profiles")
     .select("id")
     .in("rol", roles);
+
+  if (municipioId) {
+    query = query.or(`municipio_id.eq.${municipioId},rol.eq.super`);
+  }
+
+  const { data: profiles, error } = await query;
 
   if (error || !profiles) {
     console.error("Error fetching profiles by role:", error);

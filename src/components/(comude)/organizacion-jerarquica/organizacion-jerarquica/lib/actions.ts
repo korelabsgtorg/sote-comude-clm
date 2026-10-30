@@ -1015,18 +1015,20 @@ export async function updateDepartamento(
 
 export async function deleteDepartamento(id: string): Promise<ActionResult> {
   try {
-    const { supabase, error } = await requireAdminConMunicipio();
+    const { supabase, municipioId, error } = await requireAdminConMunicipio();
     if (error || !supabase) return { success: false, error };
 
     const [{ count: subDepartamentos }, { count: puestos }] = await Promise.all([
       supabase
         .from("departamentos")
         .select("id", { count: "exact", head: true })
-        .eq("parent_id", id),
+        .eq("parent_id", id)
+        .eq("municipio_id", municipioId),
       supabase
         .from("puestos")
         .select("id", { count: "exact", head: true })
-        .eq("departamento_id", id),
+        .eq("departamento_id", id)
+        .eq("municipio_id", municipioId),
     ]);
 
     if ((subDepartamentos ?? 0) > 0 || (puestos ?? 0) > 0) {
@@ -1036,7 +1038,8 @@ export async function deleteDepartamento(id: string): Promise<ActionResult> {
     const { error: deleteError } = await supabase
       .from("departamentos")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("municipio_id", municipioId);
 
     if (deleteError) return { success: false, error: "DELETE_FAILED" };
     return { success: true, error: null };
@@ -1341,7 +1344,8 @@ export async function deletePuesto(id: string): Promise<ActionResult> {
     const { error: deleteError } = await supabase
       .from("puestos")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("municipio_id", municipioId);
 
     if (deleteError) return { success: false, error: "DELETE_FAILED" };
     return { success: true, error: null };

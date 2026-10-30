@@ -544,26 +544,51 @@ export async function registrarAsistencia(values: RegistroAsistenciaValues): Pro
   // Validación de tiempo y justificación
   const { data: actividad } = await supabase
     .from("act_comude")
-    .select("fecha")
+    .select("fecha, municipio_id")
     .eq("id", values.act_comude_id)
     .single();
 
   if (!actividad) throw new Error("Actividad no encontrada");
 
-  const settings = await getGlobalSettings();
-  if (settings) {
-    const ahora = new Date().getTime();
-    const horaProgramada = new Date(actividad.fecha).getTime();
-    const minDespues = settings.minutos_despues_permitidos * 60000;
-    const minAntes = settings.minutos_antes_permitidos * 60000;
+  let minutosAntes = 15;
+  let minutosDespues = 30;
 
-    if (values.tipo_registro === "entrada" && ahora < horaProgramada - minAntes) {
-      throw new Error("Es muy temprano para marcar asistencia");
-    }
+  if (actividad.municipio_id) {
+    const { data: munConfig } = await supabase
+      .from("configuraciones_municipio")
+      .select("minutos_antes_permitidos, minutos_despues_permitidos")
+      .eq("municipio_id", actividad.municipio_id)
+      .maybeSingle();
 
-    if (values.tipo_registro === "entrada" && ahora > horaProgramada + minDespues && (!values.notas || values.notas.trim().length < 5)) {
-      throw new Error("Se requiere una justificación válida para el registro tardío");
+    if (munConfig) {
+      minutosAntes = munConfig.minutos_antes_permitidos ?? 15;
+      minutosDespues = munConfig.minutos_despues_permitidos ?? 30;
+    } else {
+      const globalSettings = await getGlobalSettings();
+      if (globalSettings) {
+        minutosAntes = globalSettings.minutos_antes_permitidos ?? 15;
+        minutosDespues = globalSettings.minutos_despues_permitidos ?? 30;
+      }
     }
+  } else {
+    const globalSettings = await getGlobalSettings();
+    if (globalSettings) {
+      minutosAntes = globalSettings.minutos_antes_permitidos ?? 15;
+      minutosDespues = globalSettings.minutos_despues_permitidos ?? 30;
+    }
+  }
+
+  const ahora = new Date().getTime();
+  const horaProgramada = new Date(actividad.fecha).getTime();
+  const minDespues = minutosDespues * 60000;
+  const minAntes = minutosAntes * 60000;
+
+  if (values.tipo_registro === "entrada" && ahora < horaProgramada - minAntes) {
+    throw new Error("Es muy temprano para marcar asistencia");
+  }
+
+  if (values.tipo_registro === "entrada" && ahora > horaProgramada + minDespues && (!values.notas || values.notas.trim().length < 5)) {
+    throw new Error("Se requiere una justificación válida para el registro tardío");
   }
 
   const { error } = await supabase.from("act_comude_registros").insert({
