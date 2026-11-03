@@ -446,7 +446,13 @@ const puedeGestionar = (ctx: Contexto, t: TareaAutorizada) => {
 // Query principal
 // ═════════════════════════════════════════════════════════════════════════════
 
-export async function obtenerDatosGestor(tipoVista: TipoVistaTareas): Promise<{
+export async function obtenerDatosGestor(
+  tipoVista: TipoVistaTareas,
+  mes?: number,
+  anio?: number,
+  rangoInicio?: string,
+  rangoFin?: string
+): Promise<{
   perfil: PerfilUsuario;
   tareas: Tarea[];
   usuarios: Usuario[];
@@ -537,7 +543,27 @@ export async function obtenerDatosGestor(tipoVista: TipoVistaTareas): Promise<{
   } else if (tipoVista === 'gestion_rrhh') {
     if (!perfil.esSupervisor) return null;
 
-    const { data, error } = await base().order('fecha_limite', { ascending: false });
+    let queryRrhh = base();
+
+    if (rangoInicio && rangoFin) {
+      queryRrhh = queryRrhh
+        .gte('fecha_limite', `${rangoInicio}T00:00:00.000Z`)
+        .lte('fecha_limite', `${rangoFin}T23:59:59.999Z`);
+    } else {
+      const ahora = new Date();
+      const m = mes !== undefined ? mes : ahora.getMonth();
+      const a = anio !== undefined ? anio : ahora.getFullYear();
+
+      // Ventana de 1 mes con margen de +/- 7 días para incluir semanas colindantes del calendario/slider
+      const inicioVentana = new Date(Date.UTC(a, m, 1 - 7, 0, 0, 0, 0)).toISOString();
+      const finVentana = new Date(Date.UTC(a, m + 1, 7, 23, 59, 59, 999)).toISOString();
+
+      queryRrhh = queryRrhh
+        .gte('fecha_limite', inicioVentana)
+        .lte('fecha_limite', finVentana);
+    }
+
+    const { data, error } = await queryRrhh.order('fecha_limite', { ascending: false });
     if (error) {
       console.error('[tareas] Error obteniendo actividades (supervisión):', error);
       return { perfil, tareas: [], usuarios: todosLosUsuarios };

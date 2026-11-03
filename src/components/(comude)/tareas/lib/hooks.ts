@@ -29,7 +29,14 @@ import {
 } from "./zod";
 
 export const TAREAS_KEYS = {
-  gestor: (vista: string) => ["gestor-tareas", vista],
+  gestor: (vista: string, mes?: number, anio?: number, rIni?: string, rFin?: string) => [
+    "gestor-tareas",
+    vista,
+    mes ?? "all",
+    anio ?? "all",
+    rIni ?? "all",
+    rFin ?? "all",
+  ],
   comision: (comisionId: string, año: number) => ["gestor-tareas", "comision", comisionId, año],
   all: ["gestor-tareas"],
   pendiente: ["bloqueo-actividad-pendiente"],
@@ -39,11 +46,23 @@ const KEYS = TAREAS_KEYS;
 
 const FIVE_MINUTES = 1000 * 60 * 5;
 
-export const useGestorData = (tipoVista: TipoVistaTareas, initialData: any) => {
+export const useGestorData = (
+  tipoVista: TipoVistaTareas,
+  initialData: any,
+  mes?: number,
+  anio?: number,
+  rangoInicio?: string,
+  rangoFin?: string
+) => {
+  const ahora = new Date();
+  const esMesActual =
+    (mes === undefined && anio === undefined && !rangoInicio && !rangoFin) ||
+    (mes === ahora.getMonth() && anio === ahora.getFullYear() && !rangoInicio && !rangoFin);
+
   return useQuery({
-    queryKey: KEYS.gestor(tipoVista),
-    queryFn: () => obtenerDatosGestor(tipoVista),
-    initialData,
+    queryKey: KEYS.gestor(tipoVista, mes, anio, rangoInicio, rangoFin),
+    queryFn: () => obtenerDatosGestor(tipoVista, mes, anio, rangoInicio, rangoFin),
+    initialData: esMesActual ? initialData : undefined,
     staleTime: FIVE_MINUTES,
   });
 };

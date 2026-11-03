@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, CalendarDays, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarClock, CalendarCheck, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useActividades, useTodasActividadesComude } from "./lib/hooks";
+import { useActividades, useTodasActividadesComude, useCountActividadesComude } from "./lib/hooks";
 import ActividadesItem from "./ActividadesItem";
 import MonthPicker from "./modals/MonthPicker";
 import ListaActividadesAsignadasComude from "./ListaActividadesAsignadasComude";
@@ -39,12 +39,20 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
 
   const { data: actividades, isLoading, isError, refetch } = useActividades(year, month);
   const isSuperOrAdmin = puedeGestionar || isSuperOrAdminRole(effectiveRole);
-  const { data: todasActividades = [], isLoading: cargandoTodasActividades } = useTodasActividadesComude(isSuperOrAdmin);
+
+  // Contador ultra ligero para la pestaña sin cargar toda la data pesada de inicio
+  const { data: totalActividadesCount = 0 } = useCountActividadesComude(isSuperOrAdmin);
+
+  // Solo se consulta la lista pesada si la pestaña está activa
+  const isActividadesTabActive = isSuperOrAdmin && vista === 'actividades';
+  const { data: todasActividades = [], isLoading: cargandoTodasActividades } = useTodasActividadesComude(isActividadesTabActive);
 
   const actividadesAsignadasVisibles = useMemo(() => {
     if (!isSuperOrAdmin) return [];
     return todasActividades;
   }, [todasActividades, isSuperOrAdmin]);
+
+  const countBadge = vista === 'actividades' ? actividadesAsignadasVisibles.length : totalActividadesCount;
 
   const handleIrASesion = (comudeId: string, comudeFecha: string) => {
     const dias = diasRestantes(comudeFecha);
@@ -175,7 +183,7 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
           )}
 
           {/* Pestaña Actividades Asignadas — empujada a la derecha en PC mediante sm:ml-auto */}
-          {isSuperOrAdmin && (actividadesAsignadasVisibles.length > 0 || vista === 'actividades' || cargandoTodasActividades) && (
+          {isSuperOrAdmin && (countBadge > 0 || vista === 'actividades' || cargandoTodasActividades) && (
             <button
               onClick={() => setVista('actividades')}
               className={cn(
@@ -187,16 +195,20 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
             >
               <ClipboardList className="h-4 w-4" />
               <span>Actividades Asignadas</span>
-              {actividadesAsignadasVisibles.length > 0 && (
+              {(countBadge > 0 || cargandoTodasActividades) && (
                 <span
                   className={cn(
-                    "ml-0.5 rounded-full px-1.5 py-0.2 text-[11px] font-semibold",
+                    "ml-0.5 rounded-full px-1.5 py-0.2 text-[11px] font-semibold flex items-center justify-center",
                     vista === 'actividades'
                       ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  {actividadesAsignadasVisibles.length}
+                  {cargandoTodasActividades && vista === 'actividades' ? (
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  ) : (
+                    countBadge
+                  )}
                 </span>
               )}
               {vista === 'actividades' && (

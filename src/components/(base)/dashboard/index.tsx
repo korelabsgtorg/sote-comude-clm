@@ -116,6 +116,7 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
         user={user}
       />
 
+      {/* Banner de Portada Móvil */}
       <div className="flex flex-col md:hidden w-full relative">
         {/* Encabezado con Logo arriba de la portada */}
         <div className="w-full pt-3 pb-2 bg-card border-b border-border/40 relative z-[2]">
@@ -133,37 +134,10 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
             />
           </div>
         </div>
-
-        {/* Sección de Contenido que se desliza sobre la portada fija */}
-        <div className="relative z-10 w-full px-[1%] pt-4 pb-20 bg-background overflow-hidden">
-          <HexagonPattern
-            hexagons={[
-              [1, 1],
-              [4, 4],
-              [2, 2],
-              [3, 4],
-              [5, 4],
-              [8, 2],
-              [6, 3],
-              [8, 5],
-              [10, 10],
-            ]}
-            className={cn(
-              "inset-0 skew-y-6",
-              "stroke-neutral-300/50 fill-neutral-200/35 dark:stroke-white/[0.05] dark:fill-white/[0.04]",
-              "mask-[radial-gradient(420px_circle_at_center,white,transparent)]",
-              "[mask-image:radial-gradient(420px_circle_at_center,white,transparent)]",
-              "[-webkit-mask-image:radial-gradient(420px_circle_at_center,white,transparent)]"
-            )}
-          />
-          <div className="relative z-10">
-            <CardsGrid />
-          </div>
-        </div>
       </div>
 
+      {/* Banner de Portada en PC */}
       <div className="hidden md:flex md:flex-col w-full">
-        {/* Banner de Portada en PC (70vh relativo a la altura de pantalla) */}
         <div className="relative w-full h-[70vh] min-h-[440px] bg-[#0a1628] overflow-hidden flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -177,32 +151,32 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Sección de Contenido (Actividades COMUDE) */}
-        <div className="relative z-10 w-full bg-background overflow-hidden px-3 sm:px-6 lg:px-8 xl:px-10 pt-6 pb-20">
-          <HexagonPattern
-            hexagons={[
-              [1, 1],
-              [4, 4],
-              [2, 2],
-              [3, 4],
-              [5, 4],
-              [8, 2],
-              [6, 3],
-              [8, 5],
-              [10, 10],
-            ]}
-            className={cn(
-              "inset-0 skew-y-6",
-              "stroke-neutral-300/50 fill-neutral-200/35 dark:stroke-white/[0.05] dark:fill-white/[0.04]",
-              "mask-[radial-gradient(420px_circle_at_center,white,transparent)]",
-              "[mask-image:radial-gradient(420px_circle_at_center,white,transparent)]",
-              "[-webkit-mask-image:radial-gradient(420px_circle_at_center,white,transparent)]"
-            )}
-          />
-          <div className="relative z-20 w-full max-w-[1850px] mx-auto pt-0 pb-2">
-            <CardsGrid />
-          </div>
+      {/* Sección de Contenido Unificada (Montada una sola vez) */}
+      <div className="relative z-10 w-full bg-background overflow-hidden px-[1%] sm:px-6 lg:px-8 xl:px-10 pt-4 md:pt-6 pb-20">
+        <HexagonPattern
+          hexagons={[
+            [1, 1],
+            [4, 4],
+            [2, 2],
+            [3, 4],
+            [5, 4],
+            [8, 2],
+            [6, 3],
+            [8, 5],
+            [10, 10],
+          ]}
+          className={cn(
+            "inset-0 skew-y-6",
+            "stroke-neutral-300/50 fill-neutral-200/35 dark:stroke-white/[0.05] dark:fill-white/[0.04]",
+            "mask-[radial-gradient(420px_circle_at_center,white,transparent)]",
+            "[mask-image:radial-gradient(420px_circle_at_center,white,transparent)]",
+            "[-webkit-mask-image:radial-gradient(420px_circle_at_center,white,transparent)]"
+          )}
+        />
+        <div className="relative z-20 w-full max-w-[1850px] mx-auto pt-0 pb-2">
+          <CardsGrid />
         </div>
       </div>
     </div>

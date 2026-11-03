@@ -7,7 +7,14 @@ interface Props {
 }
 
 export default async function GestorTareas({ tipoVista }: Props) {
-  const datos = await obtenerDatosGestor(tipoVista);
+  const ahora = new Date();
+  const mesActual = ahora.getMonth();
+  const anioActual = ahora.getFullYear();
+  const datos = await obtenerDatosGestor(
+    tipoVista,
+    tipoVista === 'gestion_rrhh' ? mesActual : undefined,
+    tipoVista === 'gestion_rrhh' ? anioActual : undefined
+  );
 
   if (!datos) return (
     <div className="flex items-center justify-center min-h-[50vh] p-4">

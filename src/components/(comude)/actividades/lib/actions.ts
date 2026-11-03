@@ -101,30 +101,11 @@ export async function getActividades(year?: number, month?: number): Promise<Act
     .lte("fecha", endDate)
     .order("fecha", { ascending: true });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("municipio_id, rol")
-      .eq("id", user.id)
-      .single();
-
-    const isSuper = profile?.rol?.toLowerCase() === "super";
-
-    if (isSuper) {
-      const globalMun = await getGlobalMunicipioCookie();
-      if (globalMun?.id) {
-        query = query.eq("municipio_id", globalMun.id);
-      } else if (profile?.municipio_id) {
-        query = query.eq("municipio_id", profile.municipio_id);
-      }
-    } else {
-      if (profile?.municipio_id) {
-        query = query.eq("municipio_id", profile.municipio_id);
-      } else {
-        query = query.eq("municipio_id", -1);
-      }
-    }
+  const municipioId = await getEffectiveMunicipioId(supabase);
+  if (municipioId) {
+    query = query.eq("municipio_id", municipioId);
+  } else {
+    query = query.eq("municipio_id", -1);
   }
 
   const { data, error } = await query;
@@ -161,17 +142,9 @@ export async function getActividadById(idOrSlug: string): Promise<ActComudeConPa
     `)
     .order("orden", { referencedTable: "act_comude_puntos", ascending: true });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("municipio_id, rol")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.municipio_id) {
-      query = query.eq("municipio_id", profile.municipio_id);
-    }
+  const municipioId = await getEffectiveMunicipioId(supabase);
+  if (municipioId) {
+    query = query.eq("municipio_id", municipioId);
   }
 
   if (realId) {

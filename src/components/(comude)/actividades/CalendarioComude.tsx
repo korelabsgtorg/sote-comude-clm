@@ -491,6 +491,13 @@ export default function CalendarioComude({
   const isLoading = cargandoSesiones || cargandoActComude || cargandoComisiones || cargandoTareas;
   const numeroSemanas = Math.ceil(celdasCalendario.length / 7) || 5;
 
+  const renderBadgeCount = (val: number) => {
+    if (isLoading) {
+      return <span className="inline-block w-2.5 h-2 bg-current/30 rounded-[2px] animate-pulse" />;
+    }
+    return val;
+  };
+
   return (
     <div className="space-y-4 w-full transition-all">
       {/* ─────────────────────────────────────────────────────────────
@@ -517,7 +524,7 @@ export default function CalendarioComude({
               "px-1.5 py-0.2 rounded-[3px] text-[9.5px] font-mono leading-none",
               filtroCategoria === "comude" ? "bg-white/20 text-white" : "bg-blue-200/50 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"
             )}>
-              {contadoresMes.comude}
+              {renderBadgeCount(contadoresMes.comude)}
             </span>
           </button>
 
@@ -539,7 +546,7 @@ export default function CalendarioComude({
               "px-1.5 py-0.2 rounded-[3px] text-[9.5px] font-mono leading-none",
               filtroCategoria === "asig_comude" ? "bg-white/20 text-white" : "bg-purple-200/50 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
             )}>
-              {contadoresMes.asig_comude}
+              {renderBadgeCount(contadoresMes.asig_comude)}
             </span>
           </button>
 
@@ -561,7 +568,7 @@ export default function CalendarioComude({
               "px-1.5 py-0.2 rounded-[3px] text-[9.5px] font-mono leading-none",
               filtroCategoria === "comision" ? "bg-white/20 text-white" : "bg-amber-200/50 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
             )}>
-              {contadoresMes.comision}
+              {renderBadgeCount(contadoresMes.comision)}
             </span>
           </button>
 
@@ -583,7 +590,7 @@ export default function CalendarioComude({
               "px-1.5 py-0.2 rounded-[3px] text-[9.5px] font-mono leading-none",
               filtroCategoria === "personal" ? "bg-white/20 text-white" : "bg-emerald-200/50 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
             )}>
-              {contadoresMes.personal}
+              {renderBadgeCount(contadoresMes.personal)}
             </span>
           </button>
 
@@ -605,7 +612,7 @@ export default function CalendarioComude({
               "px-1.5 py-0.2 rounded-[3px] text-[9.5px] font-mono leading-none",
               filtroCategoria === "grupal" ? "bg-white/20 text-white" : "bg-indigo-200/50 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200"
             )}>
-              {contadoresMes.grupal}
+              {renderBadgeCount(contadoresMes.grupal)}
             </span>
           </button>
 
@@ -813,16 +820,22 @@ export default function CalendarioComude({
 
                   {/* Etiquetas: COMUDE y Actividades generalizadas (Act {cantidad}) */}
                   <div className="flex flex-col gap-1 w-full mt-auto pb-0.5">
-                    {countComude > 0 && (
-                      <div className="w-full text-center py-0.5 px-0.5 sm:px-1 rounded-[3px] text-[8.5px] sm:text-[10px] font-extrabold bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/70 shadow-xs tracking-tighter sm:tracking-normal leading-tight">
-                        COMUDE
-                      </div>
-                    )}
+                    {isLoading ? (
+                      <div className="h-2 w-3/4 mx-auto bg-slate-200/70 dark:bg-neutral-800/80 rounded-[2px] animate-pulse my-0.5" />
+                    ) : (
+                      <>
+                        {countComude > 0 && (
+                          <div className="w-full text-center py-0.5 px-0.5 sm:px-1 rounded-[3px] text-[8.5px] sm:text-[10px] font-extrabold bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/70 shadow-xs tracking-tighter sm:tracking-normal leading-tight">
+                            COMUDE
+                          </div>
+                        )}
 
-                    {totalOtrasActividades > 0 && (
-                      <div className="w-full text-center py-0.5 px-0.5 sm:px-1 rounded-[3px] text-[8.5px] sm:text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800/70 shadow-xs tracking-tighter sm:tracking-normal leading-tight">
-                        Act {totalOtrasActividades}
-                      </div>
+                        {totalOtrasActividades > 0 && (
+                          <div className="w-full text-center py-0.5 px-0.5 sm:px-1 rounded-[3px] text-[8.5px] sm:text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800/70 shadow-xs tracking-tighter sm:tracking-normal leading-tight">
+                            Act {totalOtrasActividades}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -870,7 +883,30 @@ export default function CalendarioComude({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-800/60">
-                {eventosPaginados.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: ITEMS_POR_PAGINA }).map((_, i) => (
+                    <tr key={`skeleton-row-${i}`} className="h-[54px] sm:h-[62px] animate-pulse">
+                      <td className="py-3 px-3 border-r border-slate-100 dark:border-neutral-800/50">
+                        <div className="h-4.5 w-16 bg-slate-200/80 dark:bg-neutral-800 rounded-md" />
+                      </td>
+                      <td className="py-3 px-3 border-r border-slate-100 dark:border-neutral-800/50">
+                        <div className="space-y-1.5">
+                          <div className="h-3.5 w-3/4 bg-slate-200/80 dark:bg-neutral-800 rounded" />
+                          <div className="h-2.5 w-1/2 bg-slate-100 dark:bg-neutral-800/60 rounded" />
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 border-r border-slate-100 dark:border-neutral-800/50 text-center">
+                        <div className="h-4.5 w-20 bg-slate-200/80 dark:bg-neutral-800 rounded-md mx-auto" />
+                      </td>
+                      <td className="py-3 px-3 border-r border-slate-100 dark:border-neutral-800/50">
+                        <div className="h-3.5 w-24 bg-slate-200/80 dark:bg-neutral-800 rounded" />
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="h-6 w-14 bg-slate-200/80 dark:bg-neutral-800 rounded-md mx-auto" />
+                      </td>
+                    </tr>
+                  ))
+                ) : eventosPaginados.length === 0 ? (
                   <>
                     <tr className="h-[54px] sm:h-[62px]">
                       <td colSpan={5} className="py-3 px-4 text-slate-400 dark:text-neutral-500 text-xs italic">
@@ -991,7 +1027,7 @@ export default function CalendarioComude({
                 : `${(paginaActual - 1) * ITEMS_POR_PAGINA + 1}–${Math.min(
                     paginaActual * ITEMS_POR_PAGINA,
                     eventosFiltradosTabla.length
-                  )} de ${eventosFiltradosTabla.length}`}
+                  )} de ${isLoading ? "..." : eventosFiltradosTabla.length}`}
             </span>
 
             <div className="flex items-center gap-2">

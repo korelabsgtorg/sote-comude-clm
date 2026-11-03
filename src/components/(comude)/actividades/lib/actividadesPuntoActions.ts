@@ -706,36 +706,26 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
   const validActividadIds = new Set(actividades.map((a) => a.id));
   const validEnlaces = enlaces.filter((e) => validActividadIds.has(e.actividad_id));
 
-  // 3. Traer los puntos
-  const { data: puntos } = await supabase
-    .from('act_comude_puntos')
-    .select('id, titulo, act_comude_id')
-    .in('id', puntoIds);
+  // 3 y 4. Traer los puntos y miembros en paralelo
+  const [{ data: puntos }, { data: rawMiembros }] = await Promise.all([
+    supabase
+      .from('act_comude_puntos')
+      .select('id, titulo, act_comude_id')
+      .in('id', puntoIds),
+    supabase
+      .from(T_MIEMBROS)
+      .select('*')
+      .in('actividad_id', Array.from(validActividadIds))
+      .order('creado_en', { ascending: true }),
+  ]);
 
   const puntoMap = new Map((puntos || []).map((p) => [p.id, p]));
 
-  // 4. Traer las sesiones COMUDE
+  // 5 y 6. Traer sesiones COMUDE y perfiles en paralelo
   const comudeIds = Array.from(
     new Set((puntos || []).map((p) => p.act_comude_id).filter((id): id is string => !!id)),
   );
 
-  const { data: comudes } = comudeIds.length > 0
-    ? await supabase
-        .from('act_comude')
-        .select('id, fecha, detalles_sesion, estado')
-        .in('id', comudeIds)
-    : { data: [] as any[] };
-
-  const comudeMap = new Map((comudes || []).map((c: any) => [c.id, c]));
-
-  // 5. Traer miembros de estas actividades
-  const { data: rawMiembros } = await supabase
-    .from(T_MIEMBROS)
-    .select('*')
-    .in('actividad_id', Array.from(validActividadIds))
-    .order('creado_en', { ascending: true });
-
-  // 6. Traer perfiles y puestos
   const userIds = new Set<string>();
   actividades.forEach((a) => {
     if (a.encargado_id) userIds.add(a.encargado_id);
@@ -746,25 +736,32 @@ export async function obtenerTodasActividadesComude(): Promise<ActividadComudeCo
   });
 
   const userIdsArr = Array.from(userIds);
+
+  const [comudesRes, perfilesRes] = await Promise.all([
+    comudeIds.length > 0
+      ? supabase.from('act_comude').select('id, fecha, detalles_sesion, estado').in('id', comudeIds)
+      : Promise.resolve({ data: [] }),
+    userIdsArr.length > 0
+      ? supabase.from('profiles').select('id, nombre, puesto_id').in('id', userIdsArr)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const comudes = comudesRes.data || [];
+  const comudeMap = new Map((comudes as any[]).map((c: any) => [c.id, c]));
+
+  const perfiles = perfilesRes.data || [];
   let perfilesMap = new Map<string, { nombre: string; puesto_id?: string | null }>();
   let puestosMap = new Map<string, string>();
 
-  if (userIdsArr.length > 0) {
-    const { data: perfiles } = await supabase
-      .from('profiles')
-      .select('id, nombre, puesto_id')
-      .in('id', userIdsArr);
+  (perfiles as any[]).forEach((p: any) => perfilesMap.set(p.id, p));
 
-    (perfiles || []).forEach((p) => perfilesMap.set(p.id, p));
-
-    const puestoIds = Array.from(new Set((perfiles || []).map((p) => p.puesto_id).filter(Boolean)));
-    if (puestoIds.length > 0) {
-      const { data: puestos } = await supabase
-        .from('puestos')
-        .select('id, nombre')
-        .in('id', puestoIds);
-      (puestos || []).forEach((p) => puestosMap.set(p.id, p.nombre));
-    }
+  const puestoIds = Array.from(new Set((perfiles as any[]).map((p: any) => p.puesto_id).filter(Boolean)));
+  if (puestoIds.length > 0) {
+    const { data: puestos } = await supabase
+      .from('puestos')
+      .select('id, nombre')
+      .in('id', puestoIds);
+    (puestos || []).forEach((p) => puestosMap.set(p.id, p.nombre));
   }
 
   // Mapear miembros por actividad
@@ -912,3 +909,29 @@ export async function obtenerTodasActividadesComisiones(año?: number): Promise<
 }
 
 
+
+/** Cuenta rápidamente las actividades asignadas de COMUDE para el municipio sin traer todos los registros */
+export async function contarActividadesComude(): Promise<number> {
+  const supabase = await createClient();
+  const municipioId = await getEffectiveMunicipioId(supabase);
+  if (!municipioId) return 0;
+
+  const { data: enlaces, error: errorEnlaces } = await supabase
+    .from(T_ENLACES)
+    .select('actividad_id');
+
+  if (errorEnlaces || !enlaces || enlaces.length === 0) {
+    return 0;
+  }
+
+  const actividadIds = Array.from(new Set(enlaces.map((e) => e.actividad_id)));
+
+  const { count, error } = await supabase
+    .from(T_ACTIVIDADES)
+    .select('id', { count: 'exact', head: true })
+    .in('id', actividadIds)
+    .eq('municipio_id', municipioId);
+
+  if (error || count === null) return 0;
+  return count;
+}

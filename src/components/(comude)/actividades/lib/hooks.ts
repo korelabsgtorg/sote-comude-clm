@@ -19,6 +19,7 @@ import {
 import {
   obtenerActividadesDePunto,
   obtenerTodasActividadesComude,
+  contarActividadesComude,
   obtenerTodasActividadesComisiones,
   obtenerUsuariosAsignablesMunicipio,
   crearActividadPunto,
@@ -96,6 +97,16 @@ export function useActividades(year?: number, month?: number) {
     queryKey: ["actividades-comude", year, month],
     queryFn: () => getActividades(year, month),
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+
+export function useCountActividadesComude(enabled: boolean = true) {
+  return useQuery<number, Error>({
+    queryKey: ["actividades-comude-count"],
+    queryFn: () => contarActividadesComude(),
+    staleTime: 1000 * 60 * 5,
+    enabled,
   });
 }
 

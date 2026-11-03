@@ -123,7 +123,20 @@ const ALCANCE_JEFE_STYLES: Record<string, { active: string, inactive: string, ba
 };
 
 export default function TareaList({ initialData, tipoVista }: Props) {
-  const { data } = useGestorData(tipoVista, initialData);
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => new Date().getMonth()); 
+  const [anioSeleccionado, setAnioSeleccionado] = useState(() => new Date().getFullYear());
+  const [filtroTipo, setFiltroTipo] = useState<'mes' | 'rango'>('mes');
+  const [fechaInicialRango, setFechaInicialRango] = useState(() => rangoMesActual().start);
+  const [fechaFinalRango, setFechaFinalRango] = useState(() => rangoMesActual().end);
+
+  const { data, isFetching } = useGestorData(
+    tipoVista,
+    initialData,
+    tipoVista === 'gestion_rrhh' ? mesSeleccionado : undefined,
+    tipoVista === 'gestion_rrhh' ? anioSeleccionado : undefined,
+    tipoVista === 'gestion_rrhh' && filtroTipo === 'rango' ? fechaInicialRango : undefined,
+    tipoVista === 'gestion_rrhh' && filtroTipo === 'rango' ? fechaFinalRango : undefined
+  );
   
   const tareas = (data?.tareas || []) as Tarea[];
   const usuarios = (data?.usuarios || []) as Usuario[];
@@ -134,13 +147,8 @@ export default function TareaList({ initialData, tipoVista }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [busqueda, setBusqueda] = useState('');
-  const [mesSeleccionado, setMesSeleccionado] = useState(0); 
-  const [anioSeleccionado, setAnioSeleccionado] = useState(ANIO_ACTUAL);
   const [semanaVista, setSemanaVista] = useState(() => new Date());
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | undefined>(undefined);
-  const [filtroTipo, setFiltroTipo] = useState<'mes' | 'rango'>('mes');
-  const [fechaInicialRango, setFechaInicialRango] = useState(() => rangoMesActual().start);
-  const [fechaFinalRango, setFechaFinalRango] = useState(() => rangoMesActual().end);
   const [ordenDescendente, setOrdenDescendente] = useState(true);
   const [alcanceJefe, setAlcanceJefe] = useState<'equipo' | 'externa'>('equipo');
   
