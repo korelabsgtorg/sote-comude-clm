@@ -22,6 +22,8 @@ import {
   contarActividadesComude,
   obtenerTodasActividadesComisiones,
   obtenerUsuariosAsignablesMunicipio,
+  obtenerEventosCalendario,
+  EventoCalendario,
   crearActividadPunto,
   editarActividadPunto,
   eliminarActividadPunto,
@@ -123,6 +125,23 @@ export function useTodasActividadesComisiones(año?: number) {
   return useQuery<ActividadComisionConContexto[], Error>({
     queryKey: ["actividades-comisiones-todas", año],
     queryFn: () => obtenerTodasActividadesComisiones(año),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useEventosCalendario(año: number, puedeGestionar: boolean = false) {
+  return useQuery<EventoCalendario[], Error>({
+    queryKey: ["eventos-calendario", año, puedeGestionar],
+    queryFn: async () => {
+      const data = await obtenerEventosCalendario(año, puedeGestionar);
+      return data.map((e) => {
+        const d = new Date(e.fecha);
+        return {
+          ...e,
+          dateStr: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        };
+      });
+    },
     staleTime: 1000 * 60 * 5,
   });
 }

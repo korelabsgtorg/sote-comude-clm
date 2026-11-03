@@ -235,10 +235,28 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
         />
       ) : (
         <>
-          {/* Estados de carga / error / vacío para sesiones */}
+          {/* Skeleton de carga para sesiones */}
           {isLoading && (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <div className="space-y-2.5 animate-in fade-in duration-300">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-white/5 backdrop-blur-sm shadow-sm overflow-hidden relative p-4 pl-5 animate-pulse"
+                >
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/40" />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-2/5" />
+                      <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-1/4" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 bg-blue-100 dark:bg-blue-900/30 rounded w-16" />
+                        <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-32" />
+                      </div>
+                    </div>
+                    <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-neutral-800 shrink-0" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

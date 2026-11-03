@@ -122,6 +122,73 @@ const ALCANCE_JEFE_STYLES: Record<string, { active: string, inactive: string, ba
   'externa': { active: 'bg-amber-600 text-white', inactive: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400', badge: 'bg-amber-100 text-amber-700' },
 };
 
+function SkeletonTareaList({ tipoVista }: { tipoVista: TipoVistaTareas }) {
+  const isAgrupado = tipoVista !== 'mis_actividades';
+  return (
+    <div className="max-w-[1600px] w-full mx-auto px-1 sm:px-6 lg:px-8 flex flex-col gap-3 sm:gap-4 pb-20 mt-2 sm:mt-7 animate-pulse">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+        <div className="space-y-2 text-center sm:text-left">
+          <div className="h-8 bg-slate-200 dark:bg-neutral-800 rounded-lg w-56 sm:w-72" />
+          <div className="h-4 bg-slate-100 dark:bg-neutral-800/60 rounded w-48 sm:w-64" />
+        </div>
+        <div className="h-10 bg-slate-200 dark:bg-neutral-800 rounded-xl w-36" />
+      </div>
+
+      <div className="flex flex-col gap-3.5 w-full mt-2">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 w-full">
+          <div className="flex items-center gap-2 bg-white/90 dark:bg-neutral-900/90 p-1 rounded-xl border border-slate-200 dark:border-neutral-800 h-10 w-full sm:w-auto">
+            <div className="h-8 bg-slate-200 dark:bg-neutral-800 rounded-lg w-20 sm:w-24" />
+            <div className="h-8 bg-slate-100 dark:bg-neutral-800/60 rounded-lg w-20 sm:w-24" />
+            <div className="h-8 bg-slate-100 dark:bg-neutral-800/60 rounded-lg w-20 sm:w-24" />
+            <div className="h-8 bg-slate-100 dark:bg-neutral-800/60 rounded-lg w-20 sm:w-24" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-9 bg-slate-200 dark:bg-neutral-800 rounded-xl w-28 sm:w-36" />
+            <div className="h-9 bg-slate-200 dark:bg-neutral-800 rounded-xl w-32" />
+          </div>
+        </div>
+        <div className="h-11 bg-white/90 dark:bg-neutral-900/90 border border-slate-200 dark:border-neutral-800 rounded-xl w-full" />
+      </div>
+
+      <div className="space-y-3 mt-4">
+        <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-44 mb-2" />
+        {[1, 2, 3].map((i) => (
+          isAgrupado ? (
+            <div
+              key={i}
+              className="border border-slate-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 shadow-sm p-4 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-1/3" />
+                  <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-20" />
+                </div>
+              </div>
+              <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-neutral-800 shrink-0" />
+            </div>
+          ) : (
+            <div
+              key={i}
+              className="border border-slate-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 shadow-sm p-4 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-1/3" />
+                <div className="h-5 bg-slate-100 dark:bg-neutral-800 rounded-full w-16" />
+              </div>
+              <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-1/2" />
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-24" />
+                <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-20" />
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TareaList({ initialData, tipoVista }: Props) {
   const [mesSeleccionado, setMesSeleccionado] = useState(() => new Date().getMonth()); 
   const [anioSeleccionado, setAnioSeleccionado] = useState(() => new Date().getFullYear());
@@ -489,7 +556,7 @@ export default function TareaList({ initialData, tipoVista }: Props) {
       return 'Actividades';
   }, [tipoVista, perfilUsuario]);
 
-  if (!isMounted) return <div className="w-full h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
+  if (!isMounted) return <SkeletonTareaList tipoVista={tipoVista} />;
 
   return (
     <div className="max-w-[1600px] w-full mx-auto px-1 sm:px-6 lg:px-8 flex flex-col gap-3 sm:gap-4 pb-20 mt-2 sm:mt-7">
@@ -565,7 +632,11 @@ export default function TareaList({ initialData, tipoVista }: Props) {
                                 >
                                     <span>{ORIGEN_LABELS[tab]}</span>
                                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] min-w-[17px] text-center font-extrabold shrink-0 ${isActive ? 'bg-white/20 text-white' : styles.badge}`}>
-                                      {conteos[tab]}
+                                      {isFetching ? (
+                                        <span className="inline-block w-2.5 h-2 bg-current/30 rounded-[2px] animate-pulse" />
+                                      ) : (
+                                        conteos[tab]
+                                      )}
                                     </span>
                                 </button>
                             );
@@ -774,7 +845,7 @@ export default function TareaList({ initialData, tipoVista }: Props) {
       <div className="space-y-4">
         {!expandedId && tareasRenderizadas.length > 0 && (
            <div className="flex items-center justify-between gap-2 text-slate-500 dark:text-slate-400 text-sm font-semibold mb-2">
-               <span>Total en {filtroTipo === 'rango' ? 'el rango' : diaSeleccionado ? 'el día' : 'el mes'}: {tareasRenderizadas.length} actividades</span>
+               <span>Total en {filtroTipo === 'rango' ? 'el rango' : diaSeleccionado ? 'el día' : 'el mes'}: {isFetching ? '...' : `${tareasRenderizadas.length} actividades`}</span>
                {tipoVista !== 'mis_actividades' && tareasAgrupadas.length > 0 && (
                  <button
                    type="button"
@@ -787,7 +858,42 @@ export default function TareaList({ initialData, tipoVista }: Props) {
            </div>
         )}
 
-        {tareasRenderizadas.length === 0 ? (
+        {isFetching ? (
+          <div className="space-y-3 animate-in fade-in duration-200">
+            {[1, 2, 3].map((i) => (
+              tipoVista !== 'mis_actividades' ? (
+                <div
+                  key={i}
+                  className="border border-slate-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 shadow-sm p-4 flex items-center justify-between animate-pulse"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 shrink-0" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-1/3" />
+                      <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-neutral-800 shrink-0" />
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className="border border-slate-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 shadow-sm p-4 space-y-3 animate-pulse"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-1/3" />
+                    <div className="h-5 bg-slate-100 dark:bg-neutral-800 rounded-full w-16" />
+                  </div>
+                  <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-1/2" />
+                  <div className="flex items-center gap-2 pt-1">
+                    <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-24" />
+                    <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-20" />
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
+        ) : tareasRenderizadas.length === 0 ? (
            <div className="text-center py-16 px-4 bg-white/40 dark:bg-neutral-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-neutral-800 flex flex-col items-center justify-center shadow-xs">
                 <div className="w-16 h-16 mb-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
                   <ClipboardList size={30} strokeWidth={1.75} />

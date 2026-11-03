@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server';
 import { sendPushToUsers } from '@/utils/push-utils';
 import { revalidatePath } from 'next/cache';
 import { getGlobalMunicipioCookie } from '@/components/(base)/layout/actions';
+import { getComudeUrl } from './slug';
+import { isSuperOrAdminRole } from '@/components/(base)/dashboard/modules';
 import {
   ActividadPunto,
   ActividadPuntoMiembro,
@@ -934,4 +936,248 @@ export async function contarActividadesComude(): Promise<number> {
 
   if (error || count === null) return 0;
   return count;
+}
+
+export interface EventoCalendario {
+  id: string;
+  tipo: "comude" | "asig_comude" | "comision" | "personal" | "grupal";
+  tipoEtiqueta: string;
+  titulo: string;
+  descripcion?: string | null;
+  lugarOContexto?: string | null;
+  fecha: string;
+  dateStr: string;
+  estado: string;
+  url: string;
+  urlTexto: string;
+}
+
+/**
+ * Server Action unificada para el Calendario COMUDE:
+ * Consulta en paralelo todas las fuentes (sesiones COMUDE, actividades asignadas COMUDE,
+ * comisiones y actividades personales/grupales) y devuelve directamente los eventos formateados.
+ */
+export async function obtenerEventosCalendario(
+  año?: number,
+  puedeGestionar: boolean = false
+): Promise<EventoCalendario[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('municipio_id, rol')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) return [];
+
+  const isSuper = profile.rol?.toLowerCase() === 'super';
+  let municipioId: number | null = profile.municipio_id ?? null;
+  if (isSuper) {
+    const globalMun = await getGlobalMunicipioCookie();
+    if (globalMun?.id) {
+      municipioId = globalMun.id;
+    }
+  }
+  if (!municipioId) return [];
+
+  const isSuperOrAdmin = puedeGestionar || isSuperOrAdminRole(profile.rol);
+  const currentYear = año || new Date().getFullYear();
+
+  // Buffer de ~15 días antes y después para celdas de transición en la cuadrícula mensual
+  const startDate = new Date(currentYear - 1, 11, 20).toISOString();
+  const endDate = new Date(currentYear + 1, 0, 15, 23, 59, 59, 999).toISOString();
+
+  // 1. Consultas en paralelo para todas las fuentes del calendario
+  const [
+    { data: rawSesiones },
+    { data: rawActividades },
+    { data: rawEnlacesComude },
+    { data: rawPuntos },
+    { data: rawEnlacesComision },
+    { data: rawComisiones },
+  ] = await Promise.all([
+    supabase
+      .from('act_comude')
+      .select('id, fecha, ubicacion, detalles_sesion, estado')
+      .eq('municipio_id', municipioId)
+      .gte('fecha', startDate)
+      .lte('fecha', endDate)
+      .order('fecha', { ascending: true }),
+
+    supabase
+      .from(T_ACTIVIDADES)
+      .select('id, titulo, descripcion, fecha_limite, estado, encargado_id')
+      .eq('municipio_id', municipioId)
+      .gte('fecha_limite', startDate)
+      .lte('fecha_limite', endDate)
+      .order('fecha_limite', { ascending: true }),
+
+    supabase
+      .from(T_ENLACES)
+      .select('actividad_id, punto_comude_id'),
+
+    supabase
+      .from('act_comude_puntos')
+      .select('id, titulo, act_comude_id'),
+
+    supabase
+      .from(T_ENLACES_COMISION)
+      .select('actividad_id, comision_id'),
+
+    supabase
+      .from('comisiones')
+      .select('id, nombre')
+      .eq('municipio_id', municipioId),
+  ]);
+
+  const actividades = rawActividades || [];
+  const actividadIds = actividades.map((a) => a.id);
+
+  // 2. Miembros de actividades en el rango para determinar tareas grupales y membresía
+  let rawMiembros: { actividad_id: string; usuario_id: string }[] = [];
+  if (actividadIds.length > 0) {
+    const { data: miembrosData } = await supabase
+      .from(T_MIEMBROS)
+      .select('actividad_id, usuario_id')
+      .in('actividad_id', actividadIds);
+    rawMiembros = (miembrosData as any) || [];
+  }
+
+  // Mapas de consulta rápida O(1)
+  const puntoMap = new Map((rawPuntos || []).map((p) => [p.id, p]));
+  const comisionMap = new Map((rawComisiones || []).map((c) => [c.id, c.nombre]));
+  const sesionMap = new Map((rawSesiones || []).map((s: any) => [s.id, s]));
+
+  const enlaceComudeMap = new Map((rawEnlacesComude || []).map((e) => [e.actividad_id, e.punto_comude_id]));
+  const enlaceComisionMap = new Map((rawEnlacesComision || []).map((e) => [e.actividad_id, e.comision_id]));
+
+  const miembrosPorActividad = new Map<string, string[]>();
+  const misActividadesIds = new Set<string>();
+
+  rawMiembros.forEach((m) => {
+    const list = miembrosPorActividad.get(m.actividad_id) || [];
+    list.push(m.usuario_id);
+    miembrosPorActividad.set(m.actividad_id, list);
+
+    if (m.usuario_id === user.id) {
+      misActividadesIds.add(m.actividad_id);
+    }
+  });
+
+  const eventos: EventoCalendario[] = [];
+
+  // 1. Sesiones COMUDE
+  (rawSesiones || []).forEach((s: any) => {
+    if (!s.fecha) return;
+    try {
+      const d = new Date(s.fecha);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const lugar = (s.ubicacion || s.lugar || "").trim();
+      const subtitulo = s.detalles_sesion?.titulo || (lugar ? `Sesión • ${lugar}` : "Sesión de Consejo Municipal de Desarrollo");
+
+      eventos.push({
+        id: s.id,
+        tipo: "comude",
+        tipoEtiqueta: "COMUDE",
+        titulo: "Sesión COMUDE",
+        descripcion: subtitulo,
+        lugarOContexto: lugar || "COMUDE",
+        fecha: s.fecha,
+        dateStr,
+        estado: s.estado || "En preparación",
+        url: getComudeUrl(s.id, s.detalles_sesion?.titulo),
+        urlTexto: "Ver sesión",
+      });
+    } catch {}
+  });
+
+  // 2, 3 y 4. Actividades COMUDE, Comisiones y Personales / Grupales
+  actividades.forEach((a: any) => {
+    if (!a.fecha_limite) return;
+    try {
+      const d = new Date(a.fecha_limite);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const puntoId = enlaceComudeMap.get(a.id);
+      const comisionId = enlaceComisionMap.get(a.id);
+      const miembros = miembrosPorActividad.get(a.id) || [];
+      const soyEncargado = a.encargado_id === user.id;
+      const soyMiembro = misActividadesIds.has(a.id);
+      const pertenezco = soyEncargado || soyMiembro;
+
+      // 2. Actividad asignada por COMUDE
+      if (puntoId) {
+        if (!isSuperOrAdmin && !pertenezco) return;
+        const punto = puntoMap.get(puntoId);
+        const sesion = punto?.act_comude_id ? sesionMap.get(punto.act_comude_id) : null;
+        const subtitulo = punto?.titulo
+          ? `Punto: ${punto.titulo}`
+          : (sesion?.detalles_sesion?.titulo ? `COMUDE: ${sesion.detalles_sesion.titulo}` : a.descripcion);
+
+        eventos.push({
+          id: a.id,
+          tipo: "asig_comude",
+          tipoEtiqueta: "Actividad",
+          titulo: a.titulo,
+          descripcion: subtitulo,
+          lugarOContexto: "COMUDE",
+          fecha: a.fecha_limite,
+          dateStr,
+          estado: (a.estado || "no_iniciado").replace("_", " "),
+          url: `/comude/actividades?origen=comude&id=${a.id}`,
+          urlTexto: "Ver actividad COMUDE",
+        });
+        return;
+      }
+
+      // 3. Actividad de Comisión
+      if (comisionId) {
+        if (!isSuperOrAdmin && !pertenezco) return;
+        const comisionNombre = comisionMap.get(comisionId) || "Comisión";
+        const subtitulo = comisionNombre ? `Comisión: ${comisionNombre}` : a.descripcion;
+        const anio = d.getFullYear();
+        const comisionBaseUrl = isSuperOrAdmin ? "/comude/comisiones/supervision" : "/comude/comisiones";
+        const comisionUrl = `${comisionBaseUrl}?comisionId=${comisionId}&actividadId=${a.id}&año=${anio}`;
+
+        eventos.push({
+          id: a.id,
+          tipo: "comision",
+          tipoEtiqueta: "Actividad",
+          titulo: a.titulo,
+          descripcion: subtitulo,
+          lugarOContexto: "COMISION",
+          fecha: a.fecha_limite,
+          dateStr,
+          estado: a.estado || "Asignado",
+          url: comisionUrl,
+          urlTexto: "Ver actividad",
+        });
+        return;
+      }
+
+      // 4. Actividad Personal o Grupal (solo se muestra si el usuario pertenece a ella)
+      if (pertenezco) {
+        const esGrupal = miembros.length > 0;
+        eventos.push({
+          id: a.id,
+          tipo: esGrupal ? "grupal" : "personal",
+          tipoEtiqueta: "Actividad",
+          titulo: a.titulo,
+          descripcion: a.descripcion,
+          lugarOContexto: esGrupal ? "GRUPAL" : "PERSONAL",
+          fecha: a.fecha_limite,
+          dateStr,
+          estado: a.estado || "Asignado",
+          url: `/comude/actividades?origen=internas&id=${a.id}`,
+          urlTexto: "Ir a actividades",
+        });
+      }
+    } catch {}
+  });
+
+  return eventos.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 }

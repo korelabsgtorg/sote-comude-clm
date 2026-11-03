@@ -29,6 +29,68 @@ type UserItem = {
   rol: string | null;
 };
 
+function UsuariosSkeleton() {
+  return (
+    <div className="w-full mx-auto max-w-3xl lg:max-w-7xl pt-5 pb-10 px-4 animate-pulse">
+      {/* Header */}
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="h-6 w-48 bg-slate-200 dark:bg-neutral-800 rounded-lg" />
+            <div className="h-3.5 w-32 bg-slate-100 dark:bg-neutral-800/60 rounded" />
+          </div>
+          <div className="h-9 w-32 bg-slate-200 dark:bg-neutral-800 rounded-lg shrink-0" />
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex items-center gap-3">
+          <div className="h-9 flex-1 bg-slate-100 dark:bg-neutral-800/60 rounded-lg border border-border/40" />
+          <div className="hidden lg:block h-9 w-32 bg-slate-100 dark:bg-neutral-800/60 rounded-md shrink-0" />
+        </div>
+      </div>
+
+      {/* Grid of Role Cards */}
+      <div className="hidden lg:grid lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        {[1, 2, 3].map((col) => (
+          <div
+            key={col}
+            className="border border-border rounded-xl bg-card overflow-hidden flex flex-col"
+          >
+            <div className="bg-muted/60 px-4 py-2.5 border-b border-border flex items-center justify-between gap-2">
+              <div className="h-4 w-28 bg-slate-200 dark:bg-neutral-800 rounded" />
+              <div className="h-3.5 w-6 bg-slate-200 dark:bg-neutral-800 rounded-full" />
+            </div>
+            <div className="divide-y divide-border/40">
+              {[1, 2, 3, 4].map((row) => (
+                <div key={row} className="px-4 py-3 flex items-center gap-3">
+                  <div className="size-8 rounded-full bg-slate-200 dark:bg-neutral-800 shrink-0" />
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="h-3.5 bg-slate-200 dark:bg-neutral-800 rounded w-3/4" />
+                    <div className="h-2.5 bg-slate-100 dark:bg-neutral-800/60 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile View */}
+      <div className="lg:hidden border border-border rounded-xl bg-card overflow-hidden divide-y divide-border/40">
+        {[1, 2, 3, 4, 5].map((row) => (
+          <div key={row} className="p-4 flex items-center gap-3">
+            <div className="size-9 rounded-full bg-slate-200 dark:bg-neutral-800 shrink-0" />
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-3/5" />
+              <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-2/5" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function VerUsuarios() {
   const { effectiveRole } = useUserContext();
 
@@ -168,11 +230,7 @@ export function VerUsuarios() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-40 w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <UsuariosSkeleton />;
   }
 
   if (isError) {

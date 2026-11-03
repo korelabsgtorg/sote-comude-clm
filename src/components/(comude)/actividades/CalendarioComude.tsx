@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -22,19 +21,8 @@ import {
   Calendar as CalendarIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  useActividades, 
-  useTodasActividadesComude, 
-  useTodasActividadesComisiones 
-} from "./lib/hooks";
-import { 
-  ActComudeConParticipantes, 
-  ActividadComudeConContexto, 
-  ActividadComisionConContexto 
-} from "./lib/zod";
-import { getComudeUrl } from "./lib/slug";
-import { obtenerDatosGestor } from "@/components/(comude)/tareas/lib/actions";
-import { type Tarea } from "@/components/(comude)/tareas/lib/zod";
+import { useEventosCalendario } from "./lib/hooks";
+import { type EventoCalendario } from "./lib/actividadesPuntoActions";
 import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 
 interface CalendarioComudeProps {
@@ -58,19 +46,8 @@ const MESES_CORTOS = [
 
 type CategoriaFiltro = "todos" | "comude" | "asig_comude" | "comision" | "personal" | "grupal";
 
-interface EventoNormalizado {
-  id: string;
-  tipo: "comude" | "asig_comude" | "comision" | "personal" | "grupal";
-  tipoEtiqueta: string;
-  titulo: string;
-  descripcion?: string | null;
-  lugarOContexto?: string | null;
-  fecha: string;
-  dateStr: string;
-  estado: string;
-  url: string;
-  urlTexto: string;
-}
+type EventoNormalizado = EventoCalendario;
+
 
 function formatHora12(isoStr: string) {
   try {
@@ -146,190 +123,16 @@ export default function CalendarioComude({
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
-  // 1. Sesiones COMUDE
+    // ── Consulta Unificada del Calendario ──────────────────────────────────
   const { 
-    data: actividades = [], 
-    isLoading: cargandoSesiones,
-    refetch: refetchSesiones 
-  } = useActividades(currentYear, -1);
-
-  // 2. Actividades Asignadas por el COMUDE
-  const { 
-    data: todasActividadesComude = [], 
-    isLoading: cargandoActComude,
-    refetch: refetchActComude 
-  } = useTodasActividadesComude();
-
-  // 3. Actividades vinculadas a Comisiones
-  const { 
-    data: todasActividadesComisiones = [], 
-    isLoading: cargandoComisiones,
-    refetch: refetchComisiones 
-  } = useTodasActividadesComisiones(currentYear);
-
-  // 4. Tareas del gestor (mis_actividades)
-  const { 
-    data: gestorData, 
-    isLoading: cargandoTareas,
-    refetch: refetchTareas 
-  } = useQuery({
-    queryKey: ["gestor-tareas", "mis_actividades"],
-    queryFn: () => obtenerDatosGestor("mis_actividades"),
-    staleTime: 1000 * 60 * 5,
-  });
+    data: todosLosEventos = [], 
+    isLoading, 
+    refetch 
+  } = useEventosCalendario(currentYear, isSuperOrAdmin);
 
   const handleRefetchAll = () => {
-    refetchSesiones();
-    refetchActComude();
-    refetchComisiones();
-    refetchTareas();
+    refetch();
   };
-
-  const tareasCrudas = useMemo(() => {
-    return (gestorData?.tareas || []) as Tarea[];
-  }, [gestorData]);
-
-  // Filtramos solo actividades estrictamente personales
-  const tareasPersonalesPuras = useMemo(() => {
-    const idsComude = new Set((todasActividadesComude || []).map((a) => a.id));
-    const idsComision = new Set((todasActividadesComisiones || []).map((c) => c.id));
-    return tareasCrudas.filter((t) => 
-      !t.es_concejo && 
-      !t.punto_id && 
-      !t.comision_id && 
-      !idsComude.has(t.id) && 
-      !idsComision.has(t.id)
-    );
-  }, [tareasCrudas, todasActividadesComude, todasActividadesComisiones]);
-
-  const misTareasIds = useMemo(() => {
-    return new Set(tareasCrudas.map((t) => t.id));
-  }, [tareasCrudas]);
-
-  // ── Mapeo de Eventos Normalizados ──────────────────────────────────────
-  const todosLosEventos = useMemo<EventoNormalizado[]>(() => {
-    const lista: EventoNormalizado[] = [];
-
-    // 1. Sesiones COMUDE
-    actividades.forEach((s) => {
-      if (!s.fecha) return;
-      try {
-        const d = new Date(s.fecha);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const lugar = (s.ubicacion || (s as any).lugar || "").trim();
-        const subtitulo = s.detalles_sesion?.titulo || (lugar ? `Sesión • ${lugar}` : "Sesión de Consejo Municipal de Desarrollo");
-
-        lista.push({
-          id: s.id,
-          tipo: "comude",
-          tipoEtiqueta: "COMUDE",
-          titulo: "Sesión COMUDE",
-          descripcion: subtitulo,
-          lugarOContexto: lugar || "COMUDE",
-          fecha: s.fecha,
-          dateStr,
-          estado: s.estado || "En preparación",
-          url: getComudeUrl(s.id, s.detalles_sesion?.titulo),
-          urlTexto: "Ver sesión",
-        });
-      } catch {}
-    });
-
-    // 2. Actividades Asignadas por COMUDE
-    todasActividadesComude.forEach((a) => {
-      if (!a.fecha_limite) return;
-      try {
-        const pertenezcoAActComude = 
-          misTareasIds.has(a.id) || 
-          Boolean(userId && (a.encargado_id === userId || a.miembros?.some((m) => m.usuario_id === userId)));
-
-        // Solo super y administrador pueden ver todas las actividades; otros roles solo ven las que les pertenecen
-        if (!isSuperOrAdmin && !pertenezcoAActComude) return;
-
-        const d = new Date(a.fecha_limite);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const subtitulo = a.punto_titulo ? `Punto: ${a.punto_titulo}` : (a.comude_titulo ? `COMUDE: ${a.comude_titulo}` : a.descripcion);
-
-        lista.push({
-          id: a.id,
-          tipo: "asig_comude",
-          tipoEtiqueta: "Actividad",
-          titulo: a.titulo,
-          descripcion: subtitulo,
-          lugarOContexto: "COMUDE",
-          fecha: a.fecha_limite,
-          dateStr,
-          estado: (a.estado || "no_iniciado").replace("_", " "),
-          url: `/comude/actividades?origen=comude&id=${a.id}`,
-          urlTexto: "Ver actividad COMUDE",
-        });
-      } catch {}
-    });
-
-    // 3. Actividades de Comisiones
-    todasActividadesComisiones.forEach((c) => {
-      if (!c.fecha_limite) return;
-      try {
-        const estoyInvolucrado = misTareasIds.has(c.id);
-
-        // Solo super y administrador pueden ver todas las actividades; otros roles solo ven las que les pertenecen
-        if (!isSuperOrAdmin && !estoyInvolucrado) return;
-
-        const d = new Date(c.fecha_limite);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const subtitulo = c.comision_nombre ? `Comisión: ${c.comision_nombre}` : c.descripcion;
-        const anio = d.getFullYear();
-
-        const comisionBaseUrl = isSuperOrAdmin ? "/comude/comisiones/supervision" : "/comude/comisiones";
-        const comisionUrl = c.comision_id
-          ? `${comisionBaseUrl}?comisionId=${c.comision_id}&actividadId=${c.id}&año=${anio}`
-          : `/comude/actividades?origen=comisiones&id=${c.id}`;
-
-        lista.push({
-          id: c.id,
-          tipo: "comision",
-          tipoEtiqueta: "Actividad",
-          titulo: c.titulo,
-          descripcion: subtitulo,
-          lugarOContexto: "COMISION",
-          fecha: c.fecha_limite,
-          dateStr,
-          estado: c.estado || "Asignado",
-          url: comisionUrl,
-          urlTexto: "Ver actividad",
-        });
-      } catch {}
-    });
-
-    // 4. Actividades Normales (Personales y Grupales)
-    tareasPersonalesPuras.forEach((t) => {
-      if (!t.due_date) return;
-      try {
-        const d = new Date(t.due_date);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const esGrupal = Boolean(t.miembros && t.miembros.length > 0);
-        const tipo = esGrupal ? "grupal" : "personal";
-        const oficina = t.assignee?.oficina_nombre && t.assignee.oficina_nombre !== "Sin oficina" ? t.assignee.oficina_nombre : null;
-        const subtitulo = oficina ? `Oficina: ${oficina}` : t.description;
-
-        lista.push({
-          id: t.id,
-          tipo,
-          tipoEtiqueta: "Actividad",
-          titulo: t.title,
-          descripcion: subtitulo,
-          lugarOContexto: esGrupal ? "GRUPAL" : "PERSONAL",
-          fecha: t.due_date,
-          dateStr,
-          estado: t.status || "Asignado",
-          url: `/comude/actividades?origen=internas&id=${t.id}`,
-          urlTexto: "Ir a actividades",
-        });
-      } catch {}
-    });
-
-    return lista.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-  }, [actividades, todasActividadesComude, todasActividadesComisiones, tareasPersonalesPuras, misTareasIds, isSuperOrAdmin, userId]);
 
   // Contadores para las píldoras superiores del mes actual
   const contadoresMes = useMemo(() => {
@@ -488,8 +291,7 @@ export default function CalendarioComude({
     setIsMonthPickerOpen(false);
   };
 
-  const isLoading = cargandoSesiones || cargandoActComude || cargandoComisiones || cargandoTareas;
-  const numeroSemanas = Math.ceil(celdasCalendario.length / 7) || 5;
+    const numeroSemanas = Math.ceil(celdasCalendario.length / 7) || 5;
 
   const renderBadgeCount = (val: number) => {
     if (isLoading) {

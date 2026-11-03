@@ -166,13 +166,26 @@ export default function DirectorioContactosModal({
         {/* ── Lista ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-5 pb-5 pt-2">
 
-          {/* Estado carga */}
+          {/* Estado carga (Skeleton) */}
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-azul-trifinio/10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-azul-trifinio" />
-              </div>
-              <p className="text-sm text-muted-foreground">Cargando directorio...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-in fade-in duration-300">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-border/30 bg-black/[0.02] dark:bg-white/[0.03] animate-pulse"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-neutral-800 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-2/5" />
+                      <div className="h-4 bg-slate-100 dark:bg-neutral-800/60 rounded-full w-14" />
+                    </div>
+                    <div className="h-3 bg-slate-100 dark:bg-neutral-800/60 rounded w-3/5" />
+                    <div className="h-2.5 bg-slate-100 dark:bg-neutral-800/40 rounded w-1/4" />
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-neutral-800 shrink-0" />
+                </div>
+              ))}
             </div>
           )}
 

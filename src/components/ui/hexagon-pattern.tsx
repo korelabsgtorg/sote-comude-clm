@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import { useId } from "react"
+import { useId, useState, useEffect } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -60,7 +60,9 @@ function hexVertexList(
   const startAngle = direction === "horizontal" ? 0 : 30
   return Array.from({ length: 6 }, (_, i) => {
     const angle = ((startAngle + i * 60) * Math.PI) / 180
-    return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)] as const
+    const px = Math.round((cx + r * Math.cos(angle)) * 10000) / 10000
+    const py = Math.round((cy + r * Math.sin(angle)) * 10000) / 10000
+    return [px, py] as const
   })
 }
 
@@ -71,7 +73,7 @@ function hexPoints(
   direction: "horizontal" | "vertical"
 ): string {
   return hexVertexList(cx, cy, r, direction)
-    .map(([px, py]) => `${Number(px.toFixed(4))},${Number(py.toFixed(4))}`)
+    .map(([px, py]) => `${px},${py}`)
     .join(" ")
 }
 
@@ -214,12 +216,12 @@ function hexCenter(
     const { colStep, rowStep } = getHexSpacing(r, direction, gap)
     const x = col * colStep + colStep / 2
     const y = row * rowStep + rowStep / 2 + (col % 2 !== 0 ? rowStep / 2 : 0)
-    return [Number(x.toFixed(4)), Number(y.toFixed(4))]
+    return [Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]
   } else {
     const { colStep, rowStep } = getHexSpacing(r, direction, gap)
     const x = col * colStep + colStep / 2 + (row % 2 !== 0 ? colStep / 2 : 0)
     const y = row * rowStep + rowStep / 2
-    return [Number(x.toFixed(4)), Number(y.toFixed(4))]
+    return [Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]
   }
 }
 
@@ -235,6 +237,15 @@ export function HexagonPattern({
   ...props
 }: HexagonPatternProps) {
   const id = useId()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   const { tileW, tileH, centers } = getTileGeometry(radius, direction, gap)
   const solidStroke = isSolidStrokeDasharray(strokeDasharray)
@@ -255,12 +266,12 @@ export function HexagonPattern({
       <defs>
         <pattern
           id={id}
-          width={Number(tileW.toFixed(4))}
-          height={Number(tileH.toFixed(4))}
-          suppressHydrationWarning
+          width={tileW}
+          height={tileH}
           patternUnits="userSpaceOnUse"
           x={x}
           y={y}
+          suppressHydrationWarning
         >
           {solidStroke
             ? centers.map(([cx, cy]) => (
@@ -268,7 +279,7 @@ export function HexagonPattern({
                   className="fill-none"
                   key={`${cx}-${cy}`}
                   points={hexPoints(cx, cy, radius, direction)}
-                  strokeDasharray={strokeDasharray}
+                  suppressHydrationWarning
                 />
               ))
             : dashedEdges?.map(([a, b]) => (
@@ -280,6 +291,7 @@ export function HexagonPattern({
                   y1={a[1]}
                   y2={b[1]}
                   strokeDasharray={strokeDasharray}
+                  suppressHydrationWarning
                 />
               ))}
         </pattern>
@@ -288,7 +300,7 @@ export function HexagonPattern({
       <rect width="100%" height="100%" fill={`url(#${id})`} stroke="none" />
 
       {hexagons && hexagons.length > 0 && (
-        <svg aria-hidden="true" className="overflow-visible" x={x} y={y}>
+        <svg aria-hidden="true" className="overflow-visible" x={x} y={y} suppressHydrationWarning>
           {hexagons.map(([col, row]) => {
             const [cx, cy] = hexCenter(col, row, radius, direction, gap)
             return (
@@ -296,6 +308,7 @@ export function HexagonPattern({
                 key={`${col}-${row}`}
                 points={hexPoints(cx, cy, radius - 1, direction)}
                 strokeWidth="0"
+                suppressHydrationWarning
               />
             )
           })}
