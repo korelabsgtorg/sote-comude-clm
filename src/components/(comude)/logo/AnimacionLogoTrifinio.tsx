@@ -54,7 +54,7 @@ export default function AnimacionLogoTrifinio({ isOpen, onClose }: AnimacionLogo
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, ease: "easeOut" }}
-                  className="font-black text-azul-trifinio leading-[1.05] whitespace-nowrap antialiased"
+                  className="font-black text-[#0066cc] leading-[1.05] whitespace-nowrap antialiased"
                   style={{
                     fontFamily: "'Arial Black', sans-serif",
                     fontSize: "clamp(1.2rem, 3.5vw, 3.2rem)",
@@ -71,14 +71,14 @@ export default function AnimacionLogoTrifinio({ isOpen, onClose }: AnimacionLogo
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
-                    className="w-full h-[2px] sm:h-[3px] mt-2.5 bg-azul-trifinio origin-left transform-gpu [transform:translateZ(0)]"
+                    className="w-full h-[2px] sm:h-[3px] mt-2.5 bg-[#0066cc] origin-left transform-gpu [transform:translateZ(0)]"
                   />
 
                   <motion.p
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, ease: "easeOut" }}
-                    className="text-azul-trifinio font-bold italic mt-2 sm:mt-2.5 px-0 antialiased"
+                    className="text-[#0066cc] font-bold italic mt-2 sm:mt-2.5 px-0 antialiased"
                     style={{
                       fontFamily: "Arial, sans-serif",
                       fontSize: "clamp(0.85rem, 1.8vw, 1.8rem)",

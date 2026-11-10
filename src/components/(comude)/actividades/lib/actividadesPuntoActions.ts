@@ -81,10 +81,16 @@ export interface EditarActividadPuntoInput {
 
 /** Helper para obtener el municipio_id efectivo del usuario en sesión */
 async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [{ data: { user } }, globalMun] = await Promise.all([
+    supabase.auth.getUser(),
+    getGlobalMunicipioCookie(),
+  ]);
   if (!user) return null;
+
+  const metaRole = String(user.user_metadata?.rol || '').toLowerCase().trim();
+  if (metaRole === 'super' && globalMun?.id) {
+    return globalMun.id;
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -94,9 +100,8 @@ async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
 
   if (!profile) return null;
 
-  const isSuper = profile.rol?.toLowerCase() === 'super';
+  const isSuper = (profile.rol || metaRole).toLowerCase().trim() === 'super';
   if (isSuper) {
-    const globalMun = await getGlobalMunicipioCookie();
     if (globalMun?.id) {
       return globalMun.id;
     }
@@ -918,21 +923,32 @@ export async function contarActividadesComude(): Promise<number> {
   const municipioId = await getEffectiveMunicipioId(supabase);
   if (!municipioId) return 0;
 
-  const { data: enlaces, error: errorEnlaces } = await supabase
-    .from(T_ENLACES)
-    .select('actividad_id');
+  // Conteo en 1 sola consulta filtrando por relación interna y municipio_id
+  const { count: directCount, error: directError } = await supabase
+    .from(T_ACTIVIDADES)
+    .select(`id, ${T_ENLACES}!inner(actividad_id)`, { count: 'exact', head: true })
+    .eq('municipio_id', municipioId);
 
-  if (errorEnlaces || !enlaces || enlaces.length === 0) {
+  if (!directError && directCount !== null) {
+    return directCount;
+  }
+
+  // Fallback seguro filtrando primero las actividades del municipio actual
+  const { data: actsMunicipio, error: errorActs } = await supabase
+    .from(T_ACTIVIDADES)
+    .select('id')
+    .eq('municipio_id', municipioId);
+
+  if (errorActs || !actsMunicipio || actsMunicipio.length === 0) {
     return 0;
   }
 
-  const actividadIds = Array.from(new Set(enlaces.map((e) => e.actividad_id)));
+  const munActividadIds = actsMunicipio.map((a) => a.id);
 
   const { count, error } = await supabase
-    .from(T_ACTIVIDADES)
-    .select('id', { count: 'exact', head: true })
-    .in('id', actividadIds)
-    .eq('municipio_id', municipioId);
+    .from(T_ENLACES)
+    .select('actividad_id', { count: 'exact', head: true })
+    .in('actividad_id', munActividadIds);
 
   if (error || count === null) return 0;
   return count;

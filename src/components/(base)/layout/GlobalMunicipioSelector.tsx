@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { MapPin } from "lucide-react";
 
-export function GlobalMunicipioSelector() {
+export function GlobalMunicipioSelector({ enabled = true }: { enabled?: boolean }) {
   const { effectiveRole } = useUserContext();
   const router = useRouter();
   const [selectedMun, setSelectedMun] = useState<string>("");
@@ -17,14 +17,14 @@ export function GlobalMunicipioSelector() {
   const { data: initialState } = useQuery({
     queryKey: ["global-municipio-state"],
     queryFn: () => getInitialGlobalMunicipioState(),
-    enabled: effectiveRole === "super",
+    enabled: enabled && effectiveRole === "super",
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: allMunsData } = useQuery({
     queryKey: ["todos-municipios"],
     queryFn: () => getAllMunicipios(),
-    enabled: effectiveRole === "super",
+    enabled: enabled && effectiveRole === "super",
     staleTime: Infinity,
   });
 

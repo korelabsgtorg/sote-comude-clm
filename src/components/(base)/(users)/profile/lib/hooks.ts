@@ -14,7 +14,7 @@ export const useProfile = (userId: string, isEnabled: boolean = true) => {
     queryKey: ["profile", userId],
     queryFn: () => getProfileById(userId),
     enabled: !!userId && isEnabled,
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
 
@@ -34,7 +34,7 @@ export const useUserCredentials = (
     queryKey: ["credentials", userId],
     queryFn: () => getUserAuthData(userId),
     enabled: !!userId && isEnabled,
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
 

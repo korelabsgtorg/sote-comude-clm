@@ -92,22 +92,25 @@ export function UserProvider({
       return;
     }
     let isMounted = true;
-    verificarEsJefeUsuario()
-      .then((resultado) => {
-        if (isMounted) setEsJefe(resultado);
-      })
-      .catch(() => {
-        if (isMounted) setEsJefe(false);
-      });
-    verificarEsMiembroComision()
-      .then((resultado) => {
-        if (isMounted) setEsMiembroComision(resultado);
-      })
-      .catch(() => {
-        if (isMounted) setEsMiembroComision(false);
-      });
+    const timer = setTimeout(() => {
+      verificarEsJefeUsuario()
+        .then((resultado) => {
+          if (isMounted) setEsJefe(resultado);
+        })
+        .catch(() => {
+          if (isMounted) setEsJefe(false);
+        });
+      verificarEsMiembroComision()
+        .then((resultado) => {
+          if (isMounted) setEsMiembroComision(resultado);
+        })
+        .catch(() => {
+          if (isMounted) setEsMiembroComision(false);
+        });
+    }, 150);
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [user?.id]);
 
@@ -127,6 +130,7 @@ export function UserProvider({
 
   return (
     <UserContext.Provider value={{ user, simulatedRole, setSimulatedRole, effectiveRole, realRole, esJefe, esMiembroComision }}>
+      {children}
       {user && (
         <>
           <PushListener />
@@ -134,7 +138,6 @@ export function UserProvider({
           <BloqueoActividad />
         </>
       )}
-      {children}
     </UserContext.Provider>
   );
 }

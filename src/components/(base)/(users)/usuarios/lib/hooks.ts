@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getManageableRoles } from "./permissions";
 import { getGlobalMunicipioCookie } from "@/components/(base)/layout/actions";
 
-export function useUsers(actorRole?: string) {
+export function useUsers(actorRole?: string, options?: { enabled?: boolean }) {
   const supabase = createClient();
 
   return useQuery({
@@ -63,6 +63,6 @@ export function useUsers(actorRole?: string) {
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    enabled: !!actorRole && getManageableRoles(actorRole).length > 0,
+    enabled: (options?.enabled ?? true) && !!actorRole && getManageableRoles(actorRole).length > 0,
   });
 }

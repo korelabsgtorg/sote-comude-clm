@@ -17,6 +17,7 @@ import VerPerfil from "@/components/(base)/(users)/profile/VerPerfil";
 import PassKeysModal from "@/components/(base)/layout/modals/PassKeysModal";
 import { useAppSettings } from "@/components/(base)/(settings)/hooks";
 import GestorActividades from "@/components/(comude)/actividades/GestorActividades";
+import { ActComudeConParticipantes } from "@/components/(comude)/actividades/lib/zod";
 import {
   User as UserIcon,
   KeyRound,
@@ -36,7 +37,17 @@ const DASHBOARD_ICON_PLATE_CLASS =
   "flex items-center justify-center dark:rounded-2xl dark:bg-white";
 
 
-export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { initialPortada?: string }) {
+export function Dashboard({
+  initialPortada = "/sote/hero-background2.jpg",
+  initialActividades,
+  initialActividadesYear,
+  initialActividadesCount,
+}: {
+  initialPortada?: string;
+  initialActividades?: ActComudeConParticipantes[];
+  initialActividadesYear?: number;
+  initialActividadesCount?: number;
+}) {
   const { user, effectiveRole } = useUserContext();
   const { data: appSettings } = useAppSettings();
   const passkeysEnabled = appSettings?.enable_passkeys ?? false;
@@ -97,7 +108,13 @@ export function Dashboard({ initialPortada = "/sote/hero-background2.jpg" }: { i
 
 
       <div className="w-full text-left">
-        <GestorActividades userId={user?.id} effectiveRole={effectiveRole} />
+        <GestorActividades
+          userId={user?.id}
+          effectiveRole={effectiveRole}
+          initialActividades={initialActividades}
+          initialActividadesYear={initialActividadesYear}
+          initialActividadesCount={initialActividadesCount}
+        />
       </div>
     </motion.div>
   );

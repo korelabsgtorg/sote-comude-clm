@@ -68,7 +68,53 @@ export type ActionState = {
   errors?: {
     [key: string]: string[];
   };
+  username?: string;
 } | null;
+
+export async function obtenerUsernameDisponible(baseUsername: string): Promise<string> {
+  const cleanBase = baseUsername
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]/g, "");
+
+  if (!cleanBase) return "";
+
+  try {
+    const supabaseAdmin = getAdminClient();
+    const { data: usersData, error } = await supabaseAdmin.auth.admin.listUsers({
+      perPage: 1000,
+    });
+
+    if (error || !usersData?.users) {
+      return cleanBase;
+    }
+
+    const taken = new Set();
+    for (const u of usersData.users) {
+      if (u.email) {
+        const emailUser = u.email.split("@")[0].toLowerCase();
+        taken.add(emailUser);
+      }
+      if (u.user_metadata?.username) {
+        taken.add(String(u.user_metadata.username).toLowerCase());
+      }
+    }
+
+    if (!taken.has(cleanBase)) {
+      return cleanBase;
+    }
+
+    let counter = 2;
+    while (taken.has(`${cleanBase}${counter}`)) {
+      counter++;
+    }
+
+    return `${cleanBase}${counter}`;
+  } catch (err) {
+    console.error("[obtenerUsernameDisponible] Error:", err);
+    return cleanBase;
+  }
+}
 
 export async function signup(
   prevState: ActionState,
@@ -120,62 +166,77 @@ export async function signup(
     finalMunicipioId = actorProfile?.municipio_id ?? null;
   }
 
-  const fakeEmail = `${username}@app.com`;
-
   const supabaseAdmin = getAdminClient();
 
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email: fakeEmail,
-    password: password,
-    email_confirm: true,
-    user_metadata: {
-      name,
-      nombre: name,
-      username,
-      rol,
-      organizacion_id: organizacion_id ?? null,
-      municipio_id: finalMunicipioId,
-    },
-  });
+  let finalUsername = username;
+  let candidateUsername = username;
+  let attempt = 1;
+  const baseUser = username.replace(/\d+$/, "");
 
-  if (error) {
-    console.error("[signup] createUser error:", error);
-    if (error.message.includes("already registered") || error.status === 422) {
-      return {
-        errors: {
-          username: ["Usuario ya está registrado, por favor eliga otro"],
-        },
-      };
+  let createdUser = null;
+  let createError = null;
+
+  while (attempt <= 15) {
+    const fakeEmail = `${candidateUsername}@app.com`;
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email: fakeEmail,
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        name,
+        nombre: name,
+        username: candidateUsername,
+        rol,
+        organizacion_id: organizacion_id ?? null,
+        municipio_id: finalMunicipioId,
+      },
+    });
+
+    if (error && (error.message.includes("already registered") || error.status === 422)) {
+      attempt++;
+      candidateUsername = `${baseUser}${attempt}`;
+      continue;
     }
-    return { message: translateError(error.message) };
+
+    if (error) {
+      createError = error;
+      break;
+    }
+
+    createdUser = data?.user;
+    finalUsername = candidateUsername;
+    break;
   }
 
-  if (data.user) {
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .upsert(
-        {
-          id: data.user.id,
-          nombre: name,
-          rol: rol,
-          organizacion_id: organizacion_id ?? null,
-          municipio_id: finalMunicipioId,
-        },
-        { onConflict: "id" },
-      );
-
-    if (profileError) {
-      console.error("[signup] profile upsert error:", profileError);
-      await supabaseAdmin.auth.admin.deleteUser(data.user.id);
-      return {
-        message:
-          "No se pudo guardar el perfil del usuario: " +
-          translateError(profileError.message),
-      };
-    }
+  if (createError || !createdUser) {
+    console.error("[signup] createUser error:", createError);
+    return { message: translateError(createError?.message || "No se pudo crear el usuario.") };
   }
 
-  return { success: true };
+  const { error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .upsert(
+      {
+        id: createdUser.id,
+        nombre: name,
+        rol: rol,
+        organizacion_id: organizacion_id ?? null,
+        municipio_id: finalMunicipioId,
+      },
+      { onConflict: "id" },
+    );
+
+  if (profileError) {
+    console.error("[signup] profile upsert error:", profileError);
+    await supabaseAdmin.auth.admin.deleteUser(createdUser.id);
+    return {
+      message:
+        "No se pudo guardar el perfil del usuario: " +
+        translateError(profileError.message),
+    };
+  }
+
+  return { success: true, username: finalUsername };
 }
 
 function translateError(msg: string): string {

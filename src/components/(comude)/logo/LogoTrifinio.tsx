@@ -90,8 +90,8 @@ export default function LogoTrifinio({
     },
   };
 
-  const textClass = cn("text-azul-trifinio antialiased");
-  const lineClass = cn("bg-azul-trifinio");
+  const textClass = cn("text-[#0066cc] antialiased");
+  const lineClass = cn("bg-[#0066cc]");
   const blurBgClass = forceAzulColors
     ? "bg-white/55 backdrop-blur-md border border-white/50 transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]"
     : "bg-white/55 backdrop-blur-md border border-white/50 transform-gpu [backface-visibility:hidden] [transform:translateZ(0)]";

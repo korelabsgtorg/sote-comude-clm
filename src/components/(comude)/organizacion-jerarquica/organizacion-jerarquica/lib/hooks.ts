@@ -31,7 +31,7 @@ const DEPARTAMENTOS_KEY = ["departamentos-flat"];
 const PUESTOS_KEY = ["puestos-flat"];
 const PERSONAS_ASIGNAR_KEY = "personas-para-asignar";
 
-export function useEstructuraOrganizacional() {
+export function useEstructuraOrganizacional(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ESTRUCTURA_KEY,
     queryFn: async () => {
@@ -43,6 +43,7 @@ export function useEstructuraOrganizacional() {
     },
     staleTime: 1000 * 60 * 5, // 5 minutos de cache fresco para navegación instantánea
     gcTime: 1000 * 60 * 30, // Conserva en memoria por 30 minutos
+    enabled: options?.enabled ?? true,
   });
 }
 

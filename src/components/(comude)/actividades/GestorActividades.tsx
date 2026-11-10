@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { CalendarDays, Plus, BookUser, Calendar, ListFilter } from "lucide-react";
 import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
+import { ActComudeConParticipantes } from "./lib/zod";
 import ListActividades from "./ListActividades";
 import CalendarioComude from "./CalendarioComude";
 import CrearComude from "./modals/CrearComude";
@@ -11,9 +12,18 @@ import DirectorioContactosModal from "./modals/DirectorioContactosModal";
 interface GestorActividadesProps {
   userId?: string | null;
   effectiveRole: string;
+  initialActividades?: ActComudeConParticipantes[];
+  initialActividadesYear?: number;
+  initialActividadesCount?: number;
 }
 
-export default function GestorActividades({ userId, effectiveRole }: GestorActividadesProps) {
+export default function GestorActividades({
+  userId,
+  effectiveRole,
+  initialActividades,
+  initialActividadesYear,
+  initialActividadesCount,
+}: GestorActividadesProps) {
   const [modalCrearOpen, setModalCrearOpen] = useState(false);
   const [modalContactosOpen, setModalContactosOpen] = useState(false);
   const [vistaPrincipal, setVistaPrincipal] = useState<'sesiones' | 'calendario'>('sesiones');
@@ -89,6 +99,9 @@ export default function GestorActividades({ userId, effectiveRole }: GestorActiv
           puedeGestionar={puedeGestionar}
           effectiveRole={effectiveRole}
           onCrearClick={() => setModalCrearOpen(true)}
+          initialActividades={initialActividades}
+          initialActividadesYear={initialActividadesYear}
+          initialActividadesCount={initialActividadesCount}
         />
       ) : (
         <CalendarioComude

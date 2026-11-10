@@ -637,7 +637,7 @@ export default function TablaPuntosAgenda({
   sesionEstado,
   filtroEstado,
 }: TablaPuntosAgendaProps) {
-  const { data: puntosServidor } = usePuntosDeActividad(actComudeId);
+  const { data: puntosServidor } = usePuntosDeActividad(actComudeId, puntos);
   const puntosEfectivos = puntosServidor ?? puntos;
   const puntosFiltrados = filtroEstado ? puntosEfectivos.filter(p => (p.estado ?? "No iniciado") === filtroEstado) : puntosEfectivos;
   

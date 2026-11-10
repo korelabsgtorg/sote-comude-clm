@@ -107,7 +107,9 @@ export default function DetalleActividadView({
 
   // Estado para la sustitución de participantes
   const [isSustituirModalOpen, setIsSustituirModalOpen] = useState(false);
-  const { data: estructuraOrg } = useEstructuraOrganizacional();
+  const { data: estructuraOrg } = useEstructuraOrganizacional({
+    enabled: activeTab === "participantes" && effectiveRole !== "super",
+  });
 
   const puedeSustituir = useMemo(() => {
     if (effectiveRole === "super") return true;

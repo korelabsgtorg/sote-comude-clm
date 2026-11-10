@@ -571,12 +571,12 @@ export default function ActividadesItem({
     actividad.convocatoria && (actividad.convocatoria.emitida || actividad.convocatoria.created_at)
   );
 
-  // Pre-cargar en segundo plano la configuración y logos en caché de memoria para descarga instantánea
+  // Pre-cargar en segundo plano la configuración y logos cuando el usuario expande la tarjeta
   useEffect(() => {
-    if (convocatoriaEmitida) {
+    if (isExpanded && convocatoriaEmitida) {
       void getOrFetchConvocatoriaConfig();
     }
-  }, [convocatoriaEmitida]);
+  }, [isExpanded, convocatoriaEmitida]);
 
   const handleEliminar = async (e: React.MouseEvent) => {
     e.stopPropagation();

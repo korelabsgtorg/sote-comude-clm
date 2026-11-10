@@ -706,7 +706,7 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
 
               {effectiveRole === "super" && (pathname === "/" || pathname === "/comude") && (
                 <div className="mt-3 p-3 bg-white/90 dark:bg-zinc-900/90 rounded-2xl ring-1 ring-white/60 dark:ring-zinc-700/60 flex justify-center">
-                  <GlobalMunicipioSelector />
+                  <GlobalMunicipioSelector enabled={isOpen} />
                 </div>
               )}
             </div>

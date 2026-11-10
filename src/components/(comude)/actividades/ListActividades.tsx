@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, CalendarDays, ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarClock, CalendarCheck, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActividades, useTodasActividadesComude, useCountActividadesComude } from "./lib/hooks";
+import { ActComudeConParticipantes } from "./lib/zod";
 import ActividadesItem from "./ActividadesItem";
 import MonthPicker from "./modals/MonthPicker";
 import ListaActividadesAsignadasComude from "./ListaActividadesAsignadasComude";
@@ -15,6 +16,9 @@ interface ListActividadesProps {
   puedeGestionar: boolean;
   effectiveRole: string;
   onCrearClick: () => void;
+  initialActividades?: ActComudeConParticipantes[];
+  initialActividadesYear?: number;
+  initialActividadesCount?: number;
 }
 
 type VistaType = 'hoy' | 'proximas' | 'terminadas' | 'actividades';
@@ -27,8 +31,16 @@ function diasRestantes(fechaStr: string) {
   return Math.ceil((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function ListActividades({ userId, puedeGestionar, effectiveRole, onCrearClick }: ListActividadesProps) {
-  const [year, setYear] = useState(() => new Date().getFullYear());
+export default function ListActividades({
+  userId,
+  puedeGestionar,
+  effectiveRole,
+  onCrearClick,
+  initialActividades,
+  initialActividadesYear,
+  initialActividadesCount,
+}: ListActividadesProps) {
+  const [year, setYear] = useState(() => initialActividadesYear || new Date().getFullYear());
   const [month, setMonth] = useState(-1);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -37,11 +49,21 @@ export default function ListActividades({ userId, puedeGestionar, effectiveRole,
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data: actividades, isLoading, isError, refetch } = useActividades(year, month);
+  const isDefaultFilter =
+    month === -1 && year === (initialActividadesYear || new Date().getFullYear());
+
+  const { data: actividades, isLoading, isError, refetch } = useActividades(
+    year,
+    month,
+    isDefaultFilter ? initialActividades : undefined
+  );
   const isSuperOrAdmin = puedeGestionar || isSuperOrAdminRole(effectiveRole);
 
   // Contador ultra ligero para la pestaña sin cargar toda la data pesada de inicio
-  const { data: totalActividadesCount = 0 } = useCountActividadesComude(isSuperOrAdmin);
+  const { data: totalActividadesCount = 0 } = useCountActividadesComude(
+    isSuperOrAdmin,
+    initialActividadesCount
+  );
 
   // Solo se consulta la lista pesada si la pestaña está activa
   const isActividadesTabActive = isSuperOrAdmin && vista === 'actividades';

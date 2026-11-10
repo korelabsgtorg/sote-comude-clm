@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { getOrganizaciones, getDepartamentos, getMunicipios, crearDepartamento, crearMunicipio } from "./actions";
+import { getOrganizaciones, getDepartamentos, getMunicipios, crearDepartamento, crearMunicipio, obtenerUsernameDisponible } from "./actions";
 import { MagicCard } from "@/components/ui/magic-card";
 import {
   X,
@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSignupLogic } from "./hooks";
 import { AnimatePresence, motion } from "framer-motion";
-import { generateStrongPassword } from "@/utils/general/password-generator";
+
 import { AuroraText } from "@/components/ui/aurora-text";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useUser, useUserContext } from "@/components/(base)/providers/UserProvider";
@@ -173,6 +173,8 @@ export default function SignUp({
 
   const showOrganizacion = isObservatorioRole(logic.rol);
 
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+
   const suggestedUsername = useMemo(() => {
     if (logic.name.trim().length > 3) {
       const cleanName = logic.name
@@ -195,14 +197,46 @@ export default function SignUp({
     return "";
   }, [logic.name]);
 
+  useEffect(() => {
+    if (!suggestedUsername) {
+      logic.setUsername("");
+      return;
+    }
+
+    let isMounted = true;
+    setIsCheckingUsername(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const available = await obtenerUsernameDisponible(suggestedUsername);
+        if (isMounted) {
+          logic.setUsername(available);
+        }
+      } catch (err) {
+        if (isMounted) {
+          logic.setUsername(suggestedUsername);
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingUsername(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [suggestedUsername]);
+
   const resetForm = () => {
-    const pass = generateStrongPassword();
+    const pass = `Acceso/${new Date().getFullYear()}`;
     logic.setName("");
     logic.setUsername("");
     logic.setPasswordValue(pass);
     logic.setRol(creatableRoles[0] || "comude");
     logic.setOrganizacionId("");
-    logic.setShowPassword(false);
+    logic.setShowPassword(true);
     setPhoneNumber("");
     setCopied(false);
     setIsUsernameEdited(false);
@@ -231,7 +265,7 @@ export default function SignUp({
 
   useEffect(() => {
     if (logic.state?.success && !hasMovedToStep2.current) {
-      setSavedData({ user: logic.username, pass: logic.passwordValue });
+      setSavedData({ user: logic.state?.username || logic.username, pass: logic.passwordValue });
       hasMovedToStep2.current = true;
       setStep(2);
       onSuccess?.();
@@ -359,44 +393,33 @@ export default function SignUp({
                           className="flex items-center gap-1"
                         >
                           Usuario
-                          {suggestedUsername && (
-                            <>
-                              <span className="text-muted-foreground font-normal ml-1 border-l border-border pl-2">Sugerido:</span>{" "}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  logic.setUsername(suggestedUsername);
-                                  setIsUsernameEdited(true);
-                                }}
-                                className="group/sug flex items-center gap-1.5 transition-opacity cursor-pointer"
-                              >
-                                <AuroraText className="text-sm font-black lowercase opacity-80 group-hover/sug:opacity-100 transition-opacity">
-                                  {suggestedUsername}
-                                </AuroraText>
-                                <Wand2
-                                  size={14}
-                                  className="text-primary/70 group-hover/sug:text-primary transition-all group-hover/sug:scale-110 rotate-15"
-                                />
-                                
-                              </button>
-                            </>
-                          )}
                         </Label>
+                        <div className="flex items-center gap-1.5 animate-pulse">
+                          <AuroraText className="text-sm font-bold">
+                            {isCheckingUsername ? "Verificando..." : "Autogenerado"}
+                          </AuroraText>
+                          {isCheckingUsername ? (
+                            <Loader2 size={13} className="animate-spin text-primary" />
+                          ) : (
+                            <Wand2 size={14} className="text-primary rotate-15" />
+                          )}
+                        </div>
                       </div>
-                      <Input
-                        id="username"
-                        name="username"
-                        placeholder="ej. jperz"
-                        value={logic.username}
-                        onChange={(e) => {
-                          logic.setUsername(e.target.value);
-                          if (!isUsernameEdited) setIsUsernameEdited(true);
-                        }}
-                        className={cn(
-                          logic.state?.errors?.username &&
-                            "border-destructive ring-1 ring-destructive",
-                        )}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="username"
+                          name="username"
+                          placeholder="ej. jperz"
+                          value={logic.username}
+                          readOnly
+                          tabIndex={-1}
+                          className={cn(
+                            "pr-10 bg-muted/20 font-mono border-dashed transition-all cursor-default focus-visible:ring-0",
+                            logic.state?.errors?.username &&
+                              "border-destructive ring-1 ring-destructive",
+                          )}
+                        />
+                      </div>
                       {logic.state?.errors?.username && (
                         <p className="text-[10px] text-destructive font-bold px-1 italic">
                           {logic.state.errors.username[0]}
@@ -487,7 +510,7 @@ export default function SignUp({
                         <Label htmlFor="password">Contraseña</Label>
                         <div className="flex items-center gap-1.5 animate-pulse">
                           <AuroraText className="text-sm font-bold">
-                            Autogenerada
+                            Temporal
                           </AuroraText>
                           <Wand2
                             size={14}

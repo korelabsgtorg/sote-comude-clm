@@ -8,8 +8,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 1000 * 60 * 3, // 3 minutos de caché por defecto (evita solicitudes redundantes)
-            gcTime: 1000 * 60 * 10, // 10 minutos de permanencia en memoria
+            staleTime: 1000 * 60 * 5, // 5 minutos de caché por defecto (evita solicitudes redundantes)
+            gcTime: 1000 * 60 * 15, // 15 minutos de permanencia en memoria
             refetchOnWindowFocus: false, // Evita disparar peticiones al cambiar de ventana/pestaña
             refetchOnMount: false, // Reutiliza datos frescos al cambiar entre vistas
             retry: 1,

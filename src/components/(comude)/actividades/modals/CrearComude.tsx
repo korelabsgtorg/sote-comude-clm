@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useCrearActividad, useEditarActividad } from "../lib/hooks";
+import { useCrearActividad, useEditarActividad, useParticipantesDeActividad } from "../lib/hooks";
 import { CrearActividadValues, ActComudeConParticipantes } from "../lib/zod";
 import { useUsers } from "@/components/(base)/(users)/usuarios/lib/hooks";
 import { useEstructuraOrganizacional } from "@/components/(comude)/organizacion-jerarquica/organizacion-jerarquica/lib/hooks";
@@ -99,9 +99,15 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
   const { mutateAsync: editar, isPending: isEditando } = useEditarActividad();
   const isPending = isCreando || isEditando;
   const isEditMode = !!actividad;
+  const necesitaCargarParticipantes =
+    isOpen && isEditMode && (actividad?.act_comude_participantes?.length ?? 0) === 0;
 
-  const { data: usuarios } = useUsers(actorRole);
-  const { data: estructuraOrg, isLoading: isLoadingEstructura } = useEstructuraOrganizacional();
+  const { data: usuarios } = useUsers(actorRole, { enabled: isOpen });
+  const { data: estructuraOrg, isLoading: isLoadingEstructura } = useEstructuraOrganizacional({
+    enabled: isOpen,
+  });
+  const { data: participantesRemotos, isLoading: isLoadingParticipantes } =
+    useParticipantesDeActividad(actividad?.id, necesitaCargarParticipantes);
 
   useEffect(() => {
     setMounted(true);
@@ -117,8 +123,12 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
       setLibro(actividad.detalles_sesion?.libro || "");
       setUbicacion(actividad.ubicacion || "");
       setFecha(parseInitialDate(actividad.fecha));
+      const origenParticipantes =
+        (actividad.act_comude_participantes?.length ?? 0) > 0
+          ? actividad.act_comude_participantes
+          : participantesRemotos || [];
       setParticipantes(
-        (actividad.act_comude_participantes || []).map(p => ({
+        origenParticipantes.map(p => ({
           usuario_id: p.usuario_id,
           nombre: p.profiles?.nombre || "Sin nombre",
           encargado: p.encargado
@@ -128,7 +138,7 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
       const autoParticipantes = extraerJefaturasYCocodesDeEstructura(estructuraOrg);
       setParticipantes(autoParticipantes);
     }
-  }, [isOpen, actividad, estructuraOrg]);
+  }, [isOpen, actividad, estructuraOrg, participantesRemotos]);
 
   // Bloquear scroll de manera segura sin layout shift
   useEffect(() => {
@@ -379,7 +389,12 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
                 </p>
               </div>
 
-              {participantes.length > 0 ? (
+              {isLoadingParticipantes ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-xs border border-dashed border-border/50 rounded-xl">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Cargando participantes...</span>
+                </div>
+              ) : participantes.length > 0 ? (
                 <div className="space-y-2">
                   {participantes.map((p) => (
                     <div key={p.usuario_id} className="flex items-center justify-between text-sm bg-muted/30 border border-border/50 rounded-xl px-3.5 py-2.5">
@@ -419,7 +434,7 @@ export default function CrearComude({ isOpen, onClose, actorRole, actividad }: C
           </div>
           <button
             onClick={handleSubmit}
-            disabled={isPending}
+            disabled={isPending || isLoadingParticipantes}
             className="flex items-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-xl bg-foreground text-background hover:opacity-90 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -37,6 +37,7 @@ import {
 } from "./actividadesPuntoActions";
 import {
   getActividades,
+  getParticipantesDeActividad,
   getActividadById,
   getRegistrosAsistencia,
   crearActividadComude,
@@ -72,6 +73,7 @@ export function useSustituirParticipante() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
       queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["participantes-actividad-comude"] });
       queryClient.invalidateQueries({ queryKey: ["registros-asistencia"] });
       queryClient.invalidateQueries({ queryKey: ["actividad-pendiente-confirmacion"] });
       notifyActividadPendienteRefresh();
@@ -94,21 +96,36 @@ export function useEmitirConvocatoria() {
 
 // ----- QUERIES -----
 
-export function useActividades(year?: number, month?: number) {
+export function useActividades(
+  year?: number,
+  month?: number,
+  initialData?: ActComudeConParticipantes[]
+) {
   return useQuery<ActComudeConParticipantes[], Error>({
     queryKey: ["actividades-comude", year, month],
     queryFn: () => getActividades(year, month),
+    staleTime: 1000 * 60 * 5,
+    initialData,
+  });
+}
+
+export function useParticipantesDeActividad(actComudeId?: string, enabled: boolean = false) {
+  return useQuery<ActComudeConParticipantes["act_comude_participantes"], Error>({
+    queryKey: ["participantes-actividad-comude", actComudeId],
+    queryFn: () => getParticipantesDeActividad(actComudeId!),
+    enabled: Boolean(actComudeId) && enabled,
     staleTime: 1000 * 60 * 5,
   });
 }
 
 
-export function useCountActividadesComude(enabled: boolean = true) {
+export function useCountActividadesComude(enabled: boolean = true, initialData?: number) {
   return useQuery<number, Error>({
     queryKey: ["actividades-comude-count"],
     queryFn: () => contarActividadesComude(),
     staleTime: 1000 * 60 * 5,
     enabled,
+    initialData,
   });
 }
 
@@ -146,12 +163,16 @@ export function useEventosCalendario(año: number, puedeGestionar: boolean = fal
   });
 }
 
-export function useActividadById(id: string | null) {
+export function useActividadById(
+  id: string | null,
+  initialData?: ActComudeConParticipantes | null
+) {
   return useQuery<ActComudeConParticipantes | null, Error>({
     queryKey: ["actividad-comude", id],
     queryFn: () => getActividadById(id!),
     enabled: !!id,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 60 * 5,
+    initialData: initialData ?? undefined,
   });
 }
 
@@ -218,6 +239,7 @@ export function useEditarActividad() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
       queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["participantes-actividad-comude"] });
     },
   });
 }
@@ -278,12 +300,16 @@ export function useActualizarImagenesActividad() {
 // ----- HOOKS DE PUNTOS DE AGENDA -----
 // ============================================================
 
-export function usePuntosDeActividad(actComudeId: string | null) {
+export function usePuntosDeActividad(
+  actComudeId: string | null,
+  initialData?: ActComudePunto[]
+) {
   return useQuery<ActComudePunto[], Error>({
     queryKey: ["puntos-comude", actComudeId],
     queryFn: () => getPuntosDeActividad(actComudeId!),
     enabled: !!actComudeId,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 60 * 5,
+    initialData,
   });
 }
 
@@ -493,7 +519,7 @@ export function useActividadesDePunto(puntoId: string | null, enabled: boolean =
     queryKey: ["actividades-punto", puntoId],
     queryFn: () => obtenerActividadesDePunto(puntoId!),
     enabled: !!puntoId && enabled,
-    staleTime: 1000 * 30, // 30 segundos
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 }
 
@@ -512,7 +538,10 @@ export function useCrearActividadPunto() {
     mutationFn: (input) => crearActividadPunto(input),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
-      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-count"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
     },
   });
@@ -524,7 +553,8 @@ export function useEditarActividadPunto() {
     mutationFn: ({ actividadId, input }) => editarActividadPunto(actividadId, input),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
-      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
     },
   });
 }
@@ -535,7 +565,10 @@ export function useEliminarActividadPunto() {
     mutationFn: ({ actividadId, puntoId }) => eliminarActividadPunto(actividadId, puntoId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["actividades-punto", variables.puntoId] });
-      queryClient.invalidateQueries({ queryKey: ["puntos-actividad"] });
+      queryClient.invalidateQueries({ queryKey: ["puntos-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividad-comude"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-count"] });
+      queryClient.invalidateQueries({ queryKey: ["actividades-comude-todas"] });
       queryClient.invalidateQueries({ queryKey: ["actividades-comude"] });
     },
   });

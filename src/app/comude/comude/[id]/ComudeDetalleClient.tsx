@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActividadById } from "@/components/(comude)/actividades/lib/hooks";
+import { ActComudeConParticipantes } from "@/components/(comude)/actividades/lib/zod";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { isSuperOrAdminRole } from "@/components/(base)/dashboard/modules";
 import DetalleActividadView from "@/components/(comude)/actividades/DetalleActividadView";
@@ -183,10 +184,16 @@ function DetalleSesionSkeleton({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ComudeDetalleClient({ id }: { id: string }) {
+export default function ComudeDetalleClient({
+  id,
+  initialActividad,
+}: {
+  id: string;
+  initialActividad?: ActComudeConParticipantes | null;
+}) {
   const router = useRouter();
   const { user, effectiveRole } = useUserContext();
-  const { data: actividad, isLoading, isError } = useActividadById(id);
+  const { data: actividad, isLoading, isError } = useActividadById(id, initialActividad);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

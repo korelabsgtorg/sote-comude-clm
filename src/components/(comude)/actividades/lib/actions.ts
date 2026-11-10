@@ -46,8 +46,16 @@ async function attachProfilesToActividades(actividades: any[], supabase: any) {
 
 /** Helper para obtener el municipio_id efectivo según el rol del usuario */
 async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const [{ data: { user } }, globalMun] = await Promise.all([
+    supabase.auth.getUser(),
+    getGlobalMunicipioCookie(),
+  ]);
   if (!user) return null;
+
+  const metaRole = String(user.user_metadata?.rol || "").toLowerCase().trim();
+  if (metaRole === "super" && globalMun?.id) {
+    return globalMun.id;
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -57,10 +65,9 @@ async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
 
   if (!profile) return null;
 
-  const isSuper = profile.rol?.toLowerCase() === "super";
+  const isSuper = (profile.rol || metaRole).toLowerCase().trim() === "super";
 
   if (isSuper) {
-    const globalMun = await getGlobalMunicipioCookie();
     if (globalMun?.id) {
       return globalMun.id;
     }
@@ -70,7 +77,7 @@ async function getEffectiveMunicipioId(supabase: any): Promise<number | null> {
   return profile.municipio_id ?? null;
 }
 
-/** Obtiene las actividades COMUDE de un mes específico */
+/** Obtiene las actividades COMUDE de un mes o año específico (consulta ligera para la lista) */
 export async function getActividades(year?: number, month?: number): Promise<ActComudeConParticipantes[]> {
   const supabase = await createClient();
 
@@ -88,14 +95,16 @@ export async function getActividades(year?: number, month?: number): Promise<Act
   let query = supabase
     .from("act_comude")
     .select(`
-      *,
-      act_comude_participantes (
-        act_comude_id,
-        usuario_id,
-        encargado,
-        confirmed_at,
-        created_by
-      )
+      id,
+      fecha,
+      created_at,
+      municipio_id,
+      estado,
+      inicio,
+      fin,
+      ubicacion,
+      detalles_sesion,
+      convocatoria
     `)
     .gte("fecha", startDate)
     .lte("fecha", endDate)
@@ -112,9 +121,32 @@ export async function getActividades(year?: number, month?: number): Promise<Act
 
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) return [];
-  
-  const actividadesConPerfiles = await attachProfilesToActividades(data, supabase);
-  return actividadesConPerfiles as ActComudeConParticipantes[];
+
+  return data.map((act: any) => ({
+    ...act,
+    act_comude_participantes: [],
+  })) as ActComudeConParticipantes[];
+}
+
+/** Obtiene únicamente los participantes con sus perfiles de una sesión específica (para el modal Editar) */
+export async function getParticipantesDeActividad(
+  actComudeId: string
+): Promise<ActComudeConParticipantes["act_comude_participantes"]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("act_comude_participantes")
+    .select("act_comude_id, usuario_id, encargado, confirmed_at, created_by")
+    .eq("act_comude_id", actComudeId);
+
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return [];
+
+  const [conPerfiles] = await attachProfilesToActividades(
+    [{ act_comude_participantes: data }],
+    supabase
+  );
+  return conPerfiles.act_comude_participantes;
 }
 
 /** Obtiene una actividad con sus participantes, perfiles y puntos de agenda (admite UUID o slug de título) */
@@ -147,12 +179,39 @@ export async function getActividadById(idOrSlug: string): Promise<ActComudeConPa
     query = query.eq("municipio_id", municipioId);
   }
 
+  const enrichActividadDetalle = async (act: any): Promise<ActComudeConParticipantes> => {
+    const puntos = (act.act_comude_puntos || []) as ActComudePunto[];
+    const puntoIds = puntos.map((p) => p.id);
+
+    const [[conPerfiles], enlacesRes] = await Promise.all([
+      attachProfilesToActividades([act], supabase),
+      puntoIds.length > 0
+        ? supabase
+            .from("tra_actividad_comude_enlaces")
+            .select("punto_comude_id")
+            .in("punto_comude_id", puntoIds)
+        : Promise.resolve({ data: [] as { punto_comude_id: string }[] }),
+    ]);
+
+    const conteos: Record<string, number> = {};
+    (enlacesRes.data || []).forEach((e: any) => {
+      conteos[e.punto_comude_id] = (conteos[e.punto_comude_id] || 0) + 1;
+    });
+
+    return {
+      ...conPerfiles,
+      act_comude_puntos: puntos.map((p) => ({
+        ...p,
+        actividades_count: conteos[p.id] || 0,
+      })),
+    } as ActComudeConParticipantes;
+  };
+
   if (realId) {
     query = query.eq("id", realId);
     const { data, error } = await query.limit(1).maybeSingle();
     if (error || !data) return null;
-    const res = await attachProfilesToActividades([data], supabase);
-    return res[0] as ActComudeConParticipantes;
+    return enrichActividadDetalle(data);
   }
 
   // Búsqueda por slug limpio sin UUID
@@ -166,8 +225,7 @@ export async function getActividadById(idOrSlug: string): Promise<ActComudeConPa
 
   if (!target) return null;
 
-  const res = await attachProfilesToActividades([target], supabase);
-  return res[0] as ActComudeConParticipantes;
+  return enrichActividadDetalle(target);
 }
 
 /** Obtiene los registros de asistencia de una actividad */
